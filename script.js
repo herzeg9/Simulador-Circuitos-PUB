@@ -28,12 +28,22 @@ const exemplos = {
          {"Componente": "R2", "Tipo": "Resistor", "Valor": "2", "Nos": [2, 0]},
          {"Componente": "R3", "Tipo": "Resistor", "Valor": "2", "Nos": [2, 3]},
          {"Componente": "V2", "Tipo": "VoltageSource", "Valor": "10", "Nos": [3, 0]}
+    ],
+    "capacitor_dc": [
+        {"Componente": "V1", "Tipo": "VoltageSource", "Valor": "10", "Nos": [1, 0]},
+        {"Componente": "R1", "Tipo": "Resistor", "Valor": "1k", "Nos": [1, 2]},
+        {"Componente": "C1", "Tipo": "Capacitor", "Valor": "100u", "Nos": [2, 0]}
+    ],
+    "indutor_dc": [
+        {"Componente": "V1", "Tipo": "VoltageSource", "Valor": "10", "Nos": [1, 0]},
+        {"Componente": "R1", "Tipo": "Resistor", "Valor": "100", "Nos": [1, 2]},
+        {"Componente": "L1", "Tipo": "Inductor", "Valor": "100m", "Nos": [2, 0]}
     ]
 };
 
 /**
  * Carrega um exemplo de circuito, limpando a lista atual e preenchendo com os componentes do exemplo selecionado.
- * @param {string} chave - Chave do exemplo a ser carregado ('divisor', 'ponte', 'amp', 'misto').
+ * @param {string} chave - Chave do exemplo a ser carregado ('divisor', 'ponte', 'amp', 'misto', 'capacitor_dc', 'indutor_dc').
  * @returns {void}
  */
 function carregarExemplo(chave) {
