@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laboratório PUB 2025 - Versão Master</title>
+    
+    <script>MathJax = {loader: {load: ['input/asciimath', 'output/chtml']}, asciimath: {delimiters: [['`','`']]}};</script>
+    <script type="text/javascript" id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/startup.js"></script>
+
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <!-- Dark Mode Toggle -->
+    <div class="dark-mode-toggle">
+        <label class="switch">
+            <input type="checkbox" id="darkModeSwitch" onchange="toggleDarkMode()">
+            <span class="slider"></span>
+        </label>
+        <span class="toggle-label">🌙 Dark Mode</span>
+    </div>
+
+    <h1>⚡ Laboratório Virtual de Circuitos</h1>
+    <p class="subtitle">Análise Nodal, Malhas e Fontes Controladas</p>
+
+    <div class="main-layout">
+        <div class="input-panel">
+            
+            <label style="font-weight:bold; color:#3498db;">📚 Biblioteca:</label>
+            <select class="example-select" onchange="carregarExemplo(this.value)">
+                <option value="">-- Carregar Exemplo --</option>
+                <option value="divisor">1. Divisor de Tensão</option>
+                <option value="ponte">2. Ponte de Wheatstone</option>
+                <option value="amp">3. Amplificador (VCVS)</option>
+                <option value="misto">4. Malhas Complexas</option>
+            </select>
+
+            <div class="control-group">
+                <button class="btn-add" style="background:#f1c40f; color:#333;" onclick="add('Resistor')">+ R</button>
+                <button class="btn-add" style="background:#e74c3c" onclick="add('VoltageSource')">+ V</button>
+                <button class="btn-add" style="background:#2ecc71" onclick="add('CurrentSource')">+ I</button>
+                <button class="btn-add" style="background:#9b59b6" onclick="add('VCVS')"> Dep.</button>
+            </div>
+
+            <ul id="listaComponentes"></ul>
+
+            <div class="button-group">
+                <button class="btn-calc" onclick="calcular()">🚀 Analisar Completo</button>
+                <button class="btn-clear" onclick="limparTudo()">🗑️ Limpar Tudo</button>
+            </div>
+            <div id="loading" class="loading">Processando na Wolfram Cloud...</div>
+        </div>
+
+        <div class="output-panel" id="resultado">
+            <div class="card" style="text-align:center; color:#999; padding: 60px;">
+                <p><strong>Bem-vindo!</strong></p>
+                <p>Adicione componentes ou escolha um exemplo.</p>
+                <p style="font-size:0.8em">Agora com suporte a Fontes Dependentes e Malhas.</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

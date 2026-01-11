@@ -1,0 +1,425 @@
+/* Variáveis CSS para temas */
+:root {
+    --bg-primary: #f0f2f5;
+    --bg-card: #ffffff;
+    --text-primary: #333;
+    --text-secondary: #7f8c8d;
+    --text-title: #2c3e50;
+    --border-color: #ddd;
+    --shadow: rgba(0,0,0,0.05);
+}
+
+body.dark-mode {
+    --bg-primary: #1a1a1a;
+    --bg-card: #2d2d2d;
+    --text-primary: #e0e0e0;
+    --text-secondary: #b0b0b0;
+    --text-title: #f0f0f0;
+    --border-color: #444;
+    --shadow: rgba(0,0,0,0.3);
+}
+
+/* Dark Mode Toggle Switch */
+.dark-mode-toggle {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    z-index: 1000;
+    background: var(--bg-card);
+    padding: 8px 15px;
+    border-radius: 25px;
+    box-shadow: 0 2px 8px var(--shadow);
+    transition: all 0.3s ease;
+}
+
+.toggle-label {
+    font-size: 0.85em;
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+/* Switch Toggle */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 24px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: 0.4s;
+    border-radius: 24px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: 0.4s;
+    border-radius: 50%;
+}
+
+input:checked + .slider {
+    background-color: #3498db;
+}
+
+input:checked + .slider:before {
+    transform: translateX(26px);
+}
+
+.slider:hover {
+    box-shadow: 0 0 5px rgba(52, 152, 219, 0.5);
+}
+
+body { 
+    font-family: 'Segoe UI', Roboto, sans-serif; 
+    max-width: 1250px; 
+    margin: 0 auto; 
+    padding: 20px; 
+    background-color: var(--bg-primary); 
+    color: var(--text-primary);
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+h1 { 
+    text-align: center; 
+    color: var(--text-title); 
+    margin-bottom: 5px; 
+}
+.subtitle { 
+    text-align: center; 
+    color: var(--text-secondary); 
+    margin-bottom: 25px; 
+    font-size: 0.9em; 
+}
+
+.main-layout { display: flex; gap: 20px; align-items: flex-start; }
+.input-panel { 
+    flex: 0 0 360px; 
+    background: var(--bg-card); 
+    padding: 20px; 
+    border-radius: 12px; 
+    box-shadow: 0 4px 10px var(--shadow); 
+    position: sticky; 
+    top: 20px; 
+    max-height: 90vh; 
+    overflow-y: auto;
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+}
+.output-panel { flex: 1; min-width: 0; }
+
+/* Biblioteca */
+.example-select { 
+    width: 100%; 
+    padding: 10px; 
+    margin-bottom: 15px; 
+    border: 2px solid #3498db; 
+    border-radius: 6px; 
+    background: #ebf5fb; 
+    color: #2980b9; 
+    font-weight: bold; 
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+body.dark-mode .example-select {
+    background: #1e3a5f;
+    color: #85c1e9;
+    border-color: #3498db;
+}
+
+/* Botões */
+.control-group { display: flex; gap: 5px; margin-bottom: 15px; flex-wrap: wrap; }
+.btn-add { flex: 1; border: none; padding: 10px; border-radius: 5px; cursor: pointer; color: white; font-weight: bold; font-size: 0.85em; transition:0.2s; min-width: 80px;}
+.btn-add:hover { opacity: 0.9; transform: translateY(-1px); }
+.button-group { display: flex; gap: 10px; margin-top: 10px; }
+.btn-calc { background: #e74c3c; color: white; border: none; padding: 12px; flex: 1; border-radius: 6px; font-size: 1.1em; font-weight: bold; cursor: pointer; box-shadow: 0 4px 0 #c0392b; transition: all 0.2s ease; }
+.btn-calc:active { transform: translateY(2px); box-shadow: 0 1px 0 #c0392b; }
+.btn-calc:hover { opacity: 0.95; }
+.btn-clear { background: #d35400; color: white; border: none; padding: 12px; flex: 1; border-radius: 6px; font-size: 1.1em; font-weight: bold; cursor: pointer; box-shadow: 0 4px 0 #a04000; transition: all 0.2s ease; }
+.btn-clear:active { transform: translateY(2px); box-shadow: 0 1px 0 #a04000; }
+.btn-clear:hover { opacity: 0.95; background: #c0392b; }
+
+/* Lista Componentes - ESTILOS NOVOS AQUI */
+#listaComponentes { list-style: none; padding: 0; margin: 0; }
+
+.comp-item { 
+    display: flex; align-items: center; gap: 5px; 
+    padding: 8px; margin-bottom: 8px; 
+    border-radius: 6px; border-left: 5px solid #ccc; 
+    font-size: 0.9em; flex-wrap: wrap;
+    transition: 0.2s;
+}
+
+/* Badge (O quadradinho com a letra) */
+.comp-badge {
+    display: inline-block; width: 25px; height: 25px; line-height: 25px;
+    text-align: center; border-radius: 4px; color: white; font-weight: bold; font-size: 0.9em;
+}
+
+.comp-item input { 
+    padding: 4px; 
+    border: 1px solid var(--border-color); 
+    border-radius: 4px; 
+    text-align: center; 
+    background: rgba(255,255,255,0.8);
+    color: var(--text-primary);
+    transition: all 0.3s ease;
+}
+
+body.dark-mode .comp-item input {
+    background: rgba(45, 45, 45, 0.8);
+    color: var(--text-primary);
+}
+
+.comp-item input.val-input { width: 60px; font-weight: bold; color: var(--text-primary); position: relative; }
+.comp-item input.val-input.error { border: 2px solid #e74c3c; background-color: #fee; }
+body.dark-mode .comp-item input.val-input.error { background-color: #4a1f1f; }
+.comp-item input.val-input.error:focus { outline: none; box-shadow: 0 0 0 2px rgba(231, 76, 60, 0.3); }
+
+/* Tooltip de erro */
+.val-input-wrapper { position: relative; display: inline-block; }
+.tooltip-error {
+    visibility: hidden;
+    opacity: 0;
+    background-color: #e74c3c;
+    color: white;
+    text-align: center;
+    border-radius: 4px;
+    padding: 5px 8px;
+    position: absolute;
+    z-index: 1000;
+    bottom: 125%;
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    font-size: 0.75em;
+    transition: opacity 0.3s, visibility 0.3s;
+    pointer-events: none;
+    margin-bottom: 5px;
+}
+.tooltip-error::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    margin-left: -5px;
+    border-width: 5px;
+    border-style: solid;
+    border-color: #e74c3c transparent transparent transparent;
+}
+/* Tooltip será controlado via JavaScript para melhor compatibilidade */
+.nodes-group { display: flex; gap: 3px; align-items: center; }
+.btn-del { 
+    background: transparent; 
+    color: #aaa; 
+    border: none; 
+    cursor: pointer; 
+    font-weight: bold; 
+    font-size: 1.2em; 
+    margin-left: auto;
+    transition: color 0.3s ease;
+}
+.btn-del:hover { color: #e74c3c; }
+body.dark-mode .btn-del { color: #888; }
+body.dark-mode .btn-del:hover { color: #e74c3c; }
+
+/* CORES ESPECÍFICAS (Corrigido para nomes completos) */
+
+/* Resistor (Amarelo) */
+.type-Resistor { border-left-color: #f1c40f; background-color: #fef9e7; } 
+.type-Resistor .comp-badge { background-color: #f1c40f; color: #333; } 
+
+body.dark-mode .type-Resistor { 
+    background-color: #3a3415; 
+}
+body.dark-mode .type-Resistor .comp-badge { 
+    background-color: #f1c40f; 
+    color: #1a1a1a; 
+    font-weight: bold;
+}
+
+/* Tensão (Vermelho) */
+.type-VoltageSource { border-left-color: #e74c3c; background-color: #fdedec; } 
+.type-VoltageSource .comp-badge { background-color: #e74c3c; }
+
+body.dark-mode .type-VoltageSource { 
+    background-color: #3a1f1f; 
+}
+body.dark-mode .type-VoltageSource .comp-badge { 
+    background-color: #e74c3c; 
+    color: #fff;
+}
+
+/* Corrente (Verde) */
+.type-CurrentSource { border-left-color: #2ecc71; background-color: #eafaf1; } 
+.type-CurrentSource .comp-badge { background-color: #2ecc71; }
+
+body.dark-mode .type-CurrentSource { 
+    background-color: #1a3a2a; 
+}
+body.dark-mode .type-CurrentSource .comp-badge { 
+    background-color: #2ecc71; 
+    color: #fff;
+}
+
+/* Dependente (Roxo) - Esse já estava certo, mantive igual */
+.type-VCVS { border-left-color: #9b59b6; background-color: #f4ecf7; }
+.type-VCVS .comp-badge { background-color: #9b59b6; }
+
+body.dark-mode .type-VCVS { 
+    background-color: #2d1f3a; 
+}
+body.dark-mode .type-VCVS .comp-badge { 
+    background-color: #9b59b6; 
+    color: #fff;
+}
+
+/* Resultados */
+.card { 
+    background: var(--bg-card); 
+    padding: 25px; 
+    margin-bottom: 25px; 
+    border-radius: 10px; 
+    box-shadow: 0 2px 5px var(--shadow); 
+    animation: fadeIn 0.5s;
+    transition: background-color 0.3s ease, box-shadow 0.3s ease, color 0.3s ease;
+    color: var(--text-primary);
+}
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+.section-title { 
+    color: var(--text-title); 
+    border-bottom: 2px solid var(--border-color); 
+    padding-bottom: 10px; 
+    margin-top: 0; 
+    display: flex; 
+    align-items: center; 
+    gap: 10px;
+    transition: color 0.3s ease, border-color 0.3s ease;
+}
+.formula { 
+    font-size: 1.2em; 
+    text-align: center; 
+    overflow-x: auto; 
+    padding: 10px;
+    color: var(--text-primary);
+}
+.numeric-result { 
+    text-align: center; 
+    font-size: 1.3em; 
+    color: #27ae60; 
+    font-weight: bold; 
+    margin-top: 5px; 
+    background: #eafaf1; 
+    padding: 8px; 
+    border-radius: 8px; 
+    border: 1px dashed #2ecc71;
+}
+
+body.dark-mode .numeric-result {
+    background: #1a3a2a;
+    color: #4ade80;
+    border-color: #2ecc71;
+}
+
+.super-container { display: flex; flex-direction: column; gap: 10px; }
+.super-card { 
+    background: #fffcf5; 
+    border: 1px solid #fae5d3; 
+    padding: 15px; 
+    border-radius: 8px; 
+    border-left: 5px solid #e67e22;
+    transition: all 0.3s ease;
+}
+
+body.dark-mode .super-card {
+    background: #3a2a1a;
+    border-color: #6b4e2a;
+    color: var(--text-primary);
+}
+
+.didactic-text { 
+    font-size: 0.9em; 
+    color: var(--text-secondary); 
+    font-style: italic; 
+    margin-bottom: 10px; 
+    background: rgba(255,255,255,0.7); 
+    padding: 5px; 
+    border-radius: 4px;
+    transition: all 0.3s ease;
+}
+
+body.dark-mode .didactic-text {
+    background: rgba(45, 45, 45, 0.7);
+    color: var(--text-secondary);
+}
+
+.loading { 
+    text-align: center; 
+    color: var(--text-secondary); 
+    font-style: italic; 
+    display: none; 
+    margin-top: 20px;
+}
+
+/* Ajustes para elementos com estilos inline no HTML */
+body.dark-mode .example-select option {
+    background: var(--bg-card);
+    color: var(--text-primary);
+}
+
+/* Label da biblioteca */
+body.dark-mode label[style*="color:#3498db"] {
+    color: #85c1e9 !important;
+}
+
+/* Cards com cores inline */
+body.dark-mode .card[style*="color:#999"] {
+    color: var(--text-secondary) !important;
+}
+
+body.dark-mode .card[style*="color:red"] {
+    color: #ff6b6b !important;
+}
+
+/* Ajustes para spans com cores inline nos componentes VCVS */
+body.dark-mode span[style*="color:#9b59b6"] {
+    color: #bb86fc !important;
+}
+
+body.dark-mode span[style*="color:#999"] {
+    color: var(--text-secondary) !important;
+}
+
+/* Ajustes responsivos */
+@media (max-width: 800px) { 
+    .main-layout { flex-direction: column; } 
+    .input-panel { position: static; width: auto; flex: none; }
+    .dark-mode-toggle {
+        position: relative;
+        top: 0;
+        right: 0;
+        margin-bottom: 15px;
+        align-self: flex-end;
+    }
+}
