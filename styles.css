@@ -294,6 +294,30 @@ body.dark-mode .type-VCVS .comp-badge {
     color: #fff;
 }
 
+/* Capacitor (Laranja/Coral) */
+.type-Capacitor { border-left-color: #ff6b35; background-color: #fff5f0; }
+.type-Capacitor .comp-badge { background-color: #ff6b35; }
+
+body.dark-mode .type-Capacitor { 
+    background-color: #3a2515; 
+}
+body.dark-mode .type-Capacitor .comp-badge { 
+    background-color: #ff6b35; 
+    color: #fff;
+}
+
+/* Indutor (Azul Escuro/Índigo) */
+.type-Inductor { border-left-color: #4a5568; background-color: #f0f2f5; }
+.type-Inductor .comp-badge { background-color: #4a5568; }
+
+body.dark-mode .type-Inductor { 
+    background-color: #1a1d24; 
+}
+body.dark-mode .type-Inductor .comp-badge { 
+    background-color: #4a5568; 
+    color: #fff;
+}
+
 /* Resultados */
 .card { 
     background: var(--bg-card); 

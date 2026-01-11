@@ -1,4 +1,4 @@
-const API_URL = "https://www.wolframcloud.com/obj/herzeghenrique/MinhaAPI_Circuitos_V15"; 
+const API_URL = "https://www.wolframcloud.com/obj/herzeghenrique/MinhaAPI_Circuitos_V16"; 
 
 let idCounter = 1;
 
@@ -178,6 +178,8 @@ function add(tipo, nomeFixo=null, nosInput=null, val=null) {
 
     if (tipo === 'VoltageSource') { label='V'; nome=`V${id}`; }
     if (tipo === 'CurrentSource') { label='A'; nome=`I${id}`; }
+    if (tipo === 'Capacitor') { label='C'; nome=`C${id}`; }
+    if (tipo === 'Inductor') { label='L'; nome=`L${id}`; }
     if (tipo === 'VCVS') { 
         label='G'; nome=`E${id}`; valLabel="Ganho";
         // Para VCVS, há 4 nós: saída+ saída- entrada+ entrada-
@@ -198,7 +200,7 @@ function add(tipo, nomeFixo=null, nosInput=null, val=null) {
         <div class="nodes-group">${inputsNos}</div>
         <span style="font-size:0.8em; color:#999; margin-left:5px">${valLabel}</span>
         <span class="val-input-wrapper">
-            <input type="text" class="val-input" value="${val || (tipo==='VCVS'?'2':'1k')}" data-tipo="${tipo}">
+            <input type="text" class="val-input" value="${val || (tipo==='VCVS'?'2':(tipo==='Capacitor'?'100u':(tipo==='Inductor'?'1m':'1k')))}" data-tipo="${tipo}">
         </span>
         <button class="btn-del" onclick="this.parentElement.remove()">×</button>
     `;
@@ -229,12 +231,14 @@ function add(tipo, nomeFixo=null, nosInput=null, val=null) {
  * extraindo os valores dos campos da UI (nome, valor, tipo, e nós).
  * 
  * Sobre a lógica de substituição dos sufixos: para campos de valor (val-input), 
- * realiza-se uma substituição para transformar sufixos comuns de eletrônica (k, m, M, u)
+ * realiza-se uma substituição para transformar sufixos comuns de eletrônica (k, m, M, u, n, p)
  * em fatores numéricos multiplicativos:
  * - 'k' é substituído por '*1000'
  * - 'M' (maiúsculo) por '*1000000'
  * - 'm' (minúsculo) por '*0.001'
  * - 'u' por '*0.000001'
+ * - 'n' por '*0.000000001'
+ * - 'p' por '*0.000000000001'
  * Desta forma, o valor "1k" se torna "1*1000" e pode ser avaliado/multiplicado corretamente no backend.
  * Se o valor está vazio, utiliza o nome do componente como valor.
  * 
@@ -250,12 +254,15 @@ function gerarJSON() {
         if(!valRaw) {
             valRaw = item.querySelector('.nome-comp').value;
         } else {
-            // Lógica de substituição dos sufixos: transforma "1k", "1M", "1m", "1u" em expressões numéricas
+            // Lógica de substituição dos sufixos: transforma "1k", "1M", "1m", "1u", "1n", "1p" em expressões numéricas
+            // Ordem importante: M (mega) antes de m (mili) para evitar substituições incorretas
             valRaw = valRaw
                 .replace(/k/g, "*1000")
-                .replace(/m/g, "*0.001")
                 .replace(/M/g, "*1000000")
-                .replace(/u/g, "*0.000001");
+                .replace(/m/g, "*0.001")
+                .replace(/u/g, "*0.000001")
+                .replace(/n/g, "*0.000000001")
+                .replace(/p/g, "*0.000000000001");
         }
 
         let nos = [];

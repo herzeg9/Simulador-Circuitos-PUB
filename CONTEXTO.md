@@ -32,3 +32,13 @@ Exemplo de Objeto Componente:
 - Tensão: Vermelho (`.type-VoltageSource`)
 - Corrente: Verde (`.type-CurrentSource`)
 - Dependente: Roxo (`.type-VCVS`)
+
+## 🧠 Regras de Negócio Importantes
+...
+5. **Indutores (DC):** Devem ser tratados como Curto-circuito (Tensão = 0). A API retorna a corrente que passa por eles.
+6. **Capacitores (DC):** Devem ser tratados como Circuito Aberto. A API não calcula corrente (é 0A), mas o nó não pode ficar flutuando (deve ter caminho resistivo para o terra ou fonte).
+
+## 🎨 Padrão Visual (CSS)
+...
+- Indutor: Azul Escuro (`.type-Inductor`)
+- Capacitor: Laranja (`.type-Capacitor`)
