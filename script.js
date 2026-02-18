@@ -354,8 +354,10 @@ async function calcular() {
         </div>`;
         return;
     }
-    
+
     const netlistObj = gerarJSON();
+    // Verifica se o circuito possui componentes reativos (Capacitor ou Indutor)
+    const temComponentesReativos = netlistObj.some(comp => comp.Tipo === 'Capacitor' || comp.Tipo === 'Inductor');
     load.style.display = "block";
     
     const formData = new FormData();
@@ -390,7 +392,10 @@ async function calcular() {
             });
             divRes.innerHTML += html + `</div></div>`;
         } else if (dados.Superposicao) {
-             divRes.innerHTML += `<div class="card" style="background:#fffcf5; border-left:5px solid #f1c40f"><p>⚠️ <em>A Superposição passo-a-passo foi ocultada pois o circuito contém Fontes Dependentes.</em></p></div>`;
+            const msgSuperposicao = temComponentesReativos
+                ? 'A Superposição passo-a-passo foi ocultada pois o circuito contém Fontes Dependentes ou Componentes Reativos (L/C).'
+                : 'A Superposição passo-a-passo foi ocultada pois o circuito contém Fontes Dependentes.';
+            divRes.innerHTML += `<div class="card" style="background:#fffcf5; border-left:5px solid #f1c40f"><p>⚠️ <em>${msgSuperposicao}</em></p></div>`;
         }
 
         if (dados.Resultados) {
