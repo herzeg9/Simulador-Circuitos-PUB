@@ -1,4 +1,4 @@
-const API_URL = "https://www.wolframcloud.com/obj/597a94fc-cc21-413f-aa12-f428d4775e80"; 
+const API_URL = "https://www.wolframcloud.com/obj/a3280920-1e5f-40ed-8903-77f89c00c795"; 
 
 let idCounter = 1;
 
@@ -356,6 +356,17 @@ async function calcular() {
     }
 
     const netlistObj = gerarJSON();
+    
+    // --- NOVO CÓDIGO DE BLOQUEIO AQUI ---
+    if (netlistObj.length === 0) {
+        divRes.innerHTML = `<div class="card" style="color:#e67e22; border-left: 5px solid #e67e22;">
+            <h3 style="margin-top:0;">⚠️ Circuito Vazio</h3>
+            <p>Adicione pelo menos um componente à área de trabalho antes de analisar.</p>
+        </div>`;
+        return;
+    }
+    // ------------------------------------
+    
     // Verifica se o circuito possui componentes reativos (Capacitor ou Indutor)
     const temComponentesReativos = netlistObj.some(comp => comp.Tipo === 'Capacitor' || comp.Tipo === 'Inductor');
     load.style.display = "block";
