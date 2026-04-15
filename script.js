@@ -403,10 +403,17 @@ async function calcular() {
             });
             divRes.innerHTML += html + `</div></div>`;
         } else if (dados.Superposicao) {
-            const msgSuperposicao = temComponentesReativos
-                ? 'A Superposição passo-a-passo foi ocultada pois o circuito contém Fontes Dependentes ou Componentes Reativos (L/C).'
-                : 'A Superposição passo-a-passo foi ocultada pois o circuito contém Fontes Dependentes.';
-            divRes.innerHTML += `<div class="card" style="background:#fffcf5; border-left:5px solid #f1c40f"><p>⚠️ <em>${msgSuperposicao}</em></p></div>`;
+            // Conta quantas fontes independentes existem na netlist enviada
+            const qtdFontes = netlistObj.filter(c => c.Tipo === 'VoltageSource' || c.Tipo === 'CurrentSource').length;
+            
+            if (qtdFontes <= 1 && !temComponentesReativos) {
+                divRes.innerHTML += `<div class="card" style="background:#fffcf5; border-left:5px solid #f1c40f"><p>⚠️ <em>A Superposição não é aplicável pois o circuito possui apenas uma fonte independente.</em></p></div>`;
+            } else {
+                const msgSuperposicao = temComponentesReativos
+                    ? 'A Superposição passo-a-passo foi ocultada pois o circuito contém Fontes Dependentes ou Componentes Reativos (L/C).'
+                    : 'A Superposição passo-a-passo foi ocultada pois o circuito contém Fontes Dependentes.';
+                divRes.innerHTML += `<div class="card" style="background:#fffcf5; border-left:5px solid #f1c40f"><p>⚠️ <em>${msgSuperposicao}</em></p></div>`;
+            }
         }
 
         if (dados.Resultados) {
