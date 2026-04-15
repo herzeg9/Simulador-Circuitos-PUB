@@ -1,4 +1,4 @@
-const API_URL = "https://www.wolframcloud.com/obj/bb69a5c2-50ee-4c93-a647-4a7176b48736"; 
+const API_URL = "https://www.wolframcloud.com/obj/a49b36dd-8abb-48ab-bef4-fa689eda2817"; 
 
 let idCounter = 1;
 
