@@ -1,4 +1,4 @@
-const API_URL = "https://www.wolframcloud.com/obj/herzeghenrique/MinhaAPI_Circuitos_V16"; 
+const API_URL = "https://www.wolframcloud.com/obj/bb69a5c2-50ee-4c93-a647-4a7176b48736"; 
 
 let idCounter = 1;
 
