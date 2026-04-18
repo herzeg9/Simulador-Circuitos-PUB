@@ -381,7 +381,7 @@ function add(tipo, nomeFixo=null, nosInput=null, val=null, alvo=null) {
  * Em AC, fontes independentes usam chaves Modulo e Fase (graus); nos demais casos, Valor.
  * Sufixos k, M, m, u, n, p aplicam-se a Valor/Modulo via aplicarSufixosValor.
  *
- * @returns {{ Config: { Modo: string, Frequencia?: number }, Netlist: Array<Object> }}
+ * @returns {{ Config: { Modo: string, Frequencia: number }, Netlist: Array<Object> }}
  */
 function gerarJSON() {
     const modo = getModoSimulacao();
@@ -451,12 +451,12 @@ function gerarJSON() {
         netlist.push(compObj);
     });
 
-    const config = { "Modo": modo };
-    if (modo === 'AC') {
-        const freqEl = document.getElementById('inputFrequenciaAc');
-        const f = freqEl ? parseFloat(freqEl.value) : NaN;
-        config["Frequencia"] = Number.isFinite(f) ? f : 60;
-    }
+    const freqEl = document.getElementById('inputFrequenciaAc');
+    const f = freqEl ? parseFloat(freqEl.value) : NaN;
+    const config = {
+        "Modo": modo,
+        "Frequencia": Number.isFinite(f) ? f : 60
+    };
 
     return { "Config": config, "Netlist": netlist };
 }
@@ -534,9 +534,7 @@ async function calcular() {
     load.style.display = "block";
     
     const formData = new FormData();
-    // A API Wolfram atual espera "netlist" como JSON array de componentes (ListQ no ImportString).
-    // gerarJSON() devolve { Config, Netlist }; só o array é enviado aqui até o backend aceitar o objeto completo.
-    formData.append("netlist", JSON.stringify(listaComp));
+    formData.append("netlist", JSON.stringify(netlistObj));
 
     try {
         const resp = await fetch(API_URL, { method: "POST", body: formData });
