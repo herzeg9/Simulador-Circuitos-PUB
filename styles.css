@@ -149,25 +149,72 @@ body.dark-mode .example-select {
 
 /* Botões */
 .control-group { display: flex; gap: 5px; margin-bottom: 15px; flex-wrap: wrap; }
-/* Linha compacta: tipo de fonte dependente + botão adicionar */
+/* Fontes dependentes: select + botão (linha única, harmonia com o grid) */
 .control-group-dep {
     display: flex;
-    flex: 1 1 200px;
-    gap: 5px;
+    flex: 1 1 min(100%, 220px);
+    gap: 8px;
     align-items: stretch;
     min-width: 0;
 }
 .control-group-dep .dep-select {
-    width: auto;
     flex: 1;
     min-width: 0;
-    margin-bottom: 0;
+    margin: 0;
+    padding: 10px 32px 10px 12px;
+    font-size: 0.85em;
+    font-weight: 600;
+    color: #5b2c6f;
+    background-color: #f4ecf7;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%235b2c6f' d='M2 4l4 4 4-4'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 12px;
+    border: 2px solid #b795c9;
+    border-radius: 8px;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(155, 89, 182, 0.12);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+    -webkit-appearance: none;
+    appearance: none;
+}
+.control-group-dep .dep-select:hover {
+    border-color: #9b59b6;
+    box-shadow: 0 2px 6px rgba(155, 89, 182, 0.2);
+}
+.control-group-dep .dep-select:focus {
+    outline: none;
+    border-color: #9b59b6;
+    box-shadow: 0 0 0 3px rgba(155, 89, 182, 0.25);
+}
+body.dark-mode .control-group-dep .dep-select {
+    color: #e8daef;
+    background-color: #2d1f3a;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23e8daef' d='M2 4l4 4 4-4'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 12px;
+    border-color: #7d3c98;
+}
+body.dark-mode .control-group-dep .dep-select:hover {
+    border-color: #9b59b6;
 }
 .control-group-dep .btn-add-dep {
-    flex: 0 0 48px;
-    min-width: 48px;
-    padding-left: 8px;
-    padding-right: 8px;
+    flex: 0 0 52px;
+    min-width: 52px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: #9b59b6;
+    box-shadow: 0 2px 0 #7d3c98;
+    align-self: stretch;
+}
+.control-group-dep .btn-add-dep:hover {
+    background: #8e44ad;
+    box-shadow: 0 2px 0 #6c3483;
+}
+.control-group-dep .btn-add-dep:active {
+    transform: translateY(1px);
+    box-shadow: 0 1px 0 #6c3483;
 }
 .btn-add { flex: 1; border: none; padding: 10px; border-radius: 5px; cursor: pointer; color: white; font-weight: bold; font-size: 0.85em; transition:0.2s; min-width: 80px;}
 .btn-add:hover { opacity: 0.9; transform: translateY(-1px); }
@@ -215,6 +262,37 @@ body.dark-mode .comp-item input {
 .comp-item input.val-input.error { border: 2px solid #e74c3c; background-color: #fee; }
 body.dark-mode .comp-item input.val-input.error { background-color: #4a1f1f; }
 .comp-item input.val-input.error:focus { outline: none; box-shadow: 0 0 0 2px rgba(231, 76, 60, 0.3); }
+
+/* Alvo (CCVS / CCCS): alinhado ao card, texto centrado */
+.comp-item input.alvo-comp {
+    flex: 1 1 7.5rem;
+    min-width: 6.5rem;
+    max-width: 10rem;
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(155, 89, 182, 0.4);
+    text-align: center;
+    font-size: 0.85em;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    background: rgba(255, 255, 255, 0.95);
+    color: var(--text-primary);
+}
+.comp-item input.alvo-comp::placeholder {
+    font-weight: 500;
+    color: var(--text-secondary);
+    letter-spacing: 0;
+}
+.comp-item input.alvo-comp:focus {
+    outline: none;
+    border-color: #9b59b6;
+    box-shadow: 0 0 0 2px rgba(155, 89, 182, 0.2);
+}
+body.dark-mode .comp-item input.alvo-comp {
+    background: rgba(45, 31, 58, 0.85);
+    border-color: rgba(187, 134, 252, 0.45);
+    color: var(--text-primary);
+}
 
 /* Tooltip de erro */
 .val-input-wrapper { position: relative; display: inline-block; }
@@ -302,15 +380,32 @@ body.dark-mode .type-CurrentSource .comp-badge {
     color: #fff;
 }
 
-/* Dependente (Roxo) - Esse já estava certo, mantive igual */
-.type-VCVS { border-left-color: #9b59b6; background-color: #f4ecf7; }
-.type-VCVS .comp-badge { background-color: #9b59b6; }
-
-body.dark-mode .type-VCVS { 
-    background-color: #2d1f3a; 
+/* Fontes dependentes (roxo): mesma identidade visual para E, G, H, F */
+.type-VCVS,
+.type-VCCS,
+.type-CCVS,
+.type-CCCS {
+    border-left-color: #9b59b6;
+    background-color: #f4ecf7;
 }
-body.dark-mode .type-VCVS .comp-badge { 
-    background-color: #9b59b6; 
+.type-VCVS .comp-badge,
+.type-VCCS .comp-badge,
+.type-CCVS .comp-badge,
+.type-CCCS .comp-badge {
+    background-color: #9b59b6;
+}
+
+body.dark-mode .type-VCVS,
+body.dark-mode .type-VCCS,
+body.dark-mode .type-CCVS,
+body.dark-mode .type-CCCS {
+    background-color: #2d1f3a;
+}
+body.dark-mode .type-VCVS .comp-badge,
+body.dark-mode .type-VCCS .comp-badge,
+body.dark-mode .type-CCVS .comp-badge,
+body.dark-mode .type-CCCS .comp-badge {
+    background-color: #9b59b6;
     color: #fff;
 }
 

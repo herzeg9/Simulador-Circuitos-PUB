@@ -43,13 +43,13 @@
                 <button class="btn-add" style="background:#e74c3c" onclick="add('VoltageSource')">+ V</button>
                 <button class="btn-add" style="background:#2ecc71" onclick="add('CurrentSource')">+ I</button>
                 <div class="control-group-dep">
-                    <select id="selectTipoDependente" class="example-select dep-select" aria-label="Tipo de fonte dependente">
+                    <select id="selectTipoDependente" class="dep-select" aria-label="Tipo de fonte dependente">
                         <option value="VCVS">VCVS (E)</option>
                         <option value="VCCS">VCCS (G)</option>
                         <option value="CCVS">CCVS (H)</option>
                         <option value="CCCS">CCCS (F)</option>
                     </select>
-                    <button type="button" class="btn-add btn-add-dep" style="background:#9b59b6" onclick="add(document.getElementById('selectTipoDependente').value)" aria-label="Adicionar fonte dependente">+</button>
+                    <button type="button" class="btn-add btn-add-dep" onclick="add(document.getElementById('selectTipoDependente').value)" aria-label="Adicionar fonte dependente">+</button>
                 </div>
                 <button class="btn-add" style="background:#ff6b35" onclick="add('Capacitor')">+ C</button>
                 <button class="btn-add" style="background:#4a5568" onclick="add('Inductor')">+ L</button>

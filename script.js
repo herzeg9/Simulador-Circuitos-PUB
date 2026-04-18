@@ -222,7 +222,7 @@ function add(tipo, nomeFixo=null, nosInput=null, val=null, alvo=null) {
         <span style="font-size:0.7em; color:#9b59b6;">Out:</span>
         <input type="number" class="no-a" value="${nA}" style="width:30px">
         <input type="number" class="no-b" value="${nB}" style="width:30px">
-        <input type="text" class="alvo-comp" placeholder="Comp. Alvo (ex: R1)" style="width:120px">`;
+        <input type="text" class="alvo-comp" placeholder="Comp. Alvo (ex: R1)">`;
     }
     if (tipo === 'CCCS') {
         label = 'F';
@@ -232,7 +232,7 @@ function add(tipo, nomeFixo=null, nosInput=null, val=null, alvo=null) {
         <span style="font-size:0.7em; color:#9b59b6;">Out:</span>
         <input type="number" class="no-a" value="${nA}" style="width:30px">
         <input type="number" class="no-b" value="${nB}" style="width:30px">
-        <input type="text" class="alvo-comp" placeholder="Comp. Alvo (ex: R1)" style="width:120px">`;
+        <input type="text" class="alvo-comp" placeholder="Comp. Alvo (ex: R1)">`;
     }
 
     // Estrutura HTML personalizada do componente na interface
