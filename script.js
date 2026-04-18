@@ -534,7 +534,9 @@ async function calcular() {
     load.style.display = "block";
     
     const formData = new FormData();
-    formData.append("netlist", JSON.stringify(netlistObj));
+    // A API Wolfram atual espera "netlist" como JSON array de componentes (ListQ no ImportString).
+    // gerarJSON() devolve { Config, Netlist }; só o array é enviado aqui até o backend aceitar o objeto completo.
+    formData.append("netlist", JSON.stringify(listaComp));
 
     try {
         const resp = await fetch(API_URL, { method: "POST", body: formData });
