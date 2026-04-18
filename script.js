@@ -54,7 +54,7 @@ const exemplos = {
         {"Componente": "I_Base", "Tipo": "CurrentSource", "Valor": "1m", "Nos": [1, 0]},
         {"Componente": "R_Base", "Tipo": "Resistor", "Valor": "1k", "Nos": [1, 0]},
         {"Componente": "F_BJT", "Tipo": "CCCS", "Valor": "100", "Nos": [2, 0], "Alvo": "R_Base"},
-        {"Componente": "R_Coletor", "Tipo": "Resistor", "Valor": "10", "Nos": [2, 0]}
+        {"Componente": "R_Col", "Tipo": "Resistor", "Valor": "10", "Nos": [2, 0]}
     ]
 };
 
