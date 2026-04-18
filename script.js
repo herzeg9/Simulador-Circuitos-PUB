@@ -177,6 +177,77 @@ function validarInputValor(input, tipo) {
     }
 }
 
+/** @returns {'DC'|'AC'} */
+function getModoSimulacao() {
+    const el = document.getElementById('toggleModoAc');
+    return el && el.checked ? 'AC' : 'DC';
+}
+
+function escapeAttr(s) {
+    return String(s ?? '').replace(/"/g, '&quot;').replace(/</g, '\u003c');
+}
+
+function defaultValPorTipo(tipo, val) {
+    if (val != null && val !== '') return String(val);
+    if (tipo === 'VCVS' || tipo === 'VCCS' || tipo === 'CCVS' || tipo === 'CCCS') return '2';
+    if (tipo === 'Capacitor') return '100u';
+    if (tipo === 'Inductor') return '1m';
+    return '1k';
+}
+
+/**
+ * HTML dos controles de valor para VoltageSource / CurrentSource (blocos DC e AC no mesmo card).
+ */
+function buildFonteIndepValorHtml(tipo, val) {
+    const v = defaultValPorTipo(tipo, val);
+    return `
+    <span class="src-val-dc">
+        <span class="label-val">Val</span>
+        <span class="val-input-wrapper"><input type="text" class="val-input val-input-dc" value="${escapeAttr(v)}" data-tipo="${tipo}"></span>
+    </span>
+    <span class="src-val-ac">
+        <span class="label-val">Módulo</span>
+        <span class="val-input-wrapper"><input type="text" class="val-input val-input-mod" value="${escapeAttr(v)}" data-tipo="${tipo}"></span>
+        <span class="label-val">Fase (°)</span>
+        <span class="val-input-wrapper"><input type="text" class="val-input val-input-fase" value="0" data-tipo="${tipo}"></span>
+    </span>`;
+}
+
+function aplicarSufixosValor(valRaw) {
+    if (!valRaw || !String(valRaw).trim()) return valRaw;
+    return String(valRaw)
+        .replace(/k/g, '*1000')
+        .replace(/M/g, '*1000000')
+        .replace(/m/g, '*0.001')
+        .replace(/u/g, '*0.000001')
+        .replace(/n/g, '*0.000000001')
+        .replace(/p/g, '*0.000000000001');
+}
+
+/**
+ * Sincroniza classe no body, painel de frequência e persistência do modo DC/AC.
+ */
+function sincronizarModoSimulacao() {
+    const ac = getModoSimulacao() === 'AC';
+    document.body.classList.toggle('modo-ac', ac);
+    const painel = document.getElementById('painelConfigAc');
+    if (painel) painel.hidden = !ac;
+    try {
+        localStorage.setItem('simModoAc', ac ? '1' : '0');
+    } catch (e) { /* ignore */ }
+}
+
+function anexarListenersValorFonte(li, tipo) {
+    li.querySelectorAll('.val-input-dc, .val-input-mod, .val-input-fase').forEach(inp => {
+        inp.addEventListener('input', function() {
+            validarInputValor(this, tipo);
+        });
+        inp.addEventListener('blur', function() {
+            validarInputValor(this, tipo);
+        });
+    });
+}
+
 /**
  * Adiciona um componente à interface com base nos parâmetros especificados.
  * @param {string} tipo - O tipo de componente ('Resistor', 'VoltageSource', 'VCVS', etc).
@@ -256,16 +327,22 @@ function add(tipo, nomeFixo=null, nosInput=null, val=null, alvo=null) {
         <input type="text" class="alvo-comp" placeholder="Comp. Alvo (ex: R1)">`;
     }
 
+    const defVal = defaultValPorTipo(tipo, val);
+    let valorSecaoHtml = `
+        <span style="font-size:0.8em; color:#999; margin-left:5px">${valLabel}</span>
+        <span class="val-input-wrapper">
+            <input type="text" class="val-input" value="${escapeAttr(defVal)}" data-tipo="${tipo}">
+        </span>`;
+    if (tipo === 'VoltageSource' || tipo === 'CurrentSource') {
+        valorSecaoHtml = buildFonteIndepValorHtml(tipo, val);
+    }
+
     // Estrutura HTML personalizada do componente na interface
-    // Envolvendo o input de valor em uma div wrapper para suportar tooltip
     li.innerHTML = `
         <span class="comp-badge">${label}</span>
         <input type="text" class="nome-comp" value="${nomeFixo || nome}" style="width:50px; font-weight:bold;">
         <div class="nodes-group">${inputsNos}</div>
-        <span style="font-size:0.8em; color:#999; margin-left:5px">${valLabel}</span>
-        <span class="val-input-wrapper">
-            <input type="text" class="val-input" value="${val || ((tipo==='VCVS' || tipo==='VCCS' || tipo==='CCVS' || tipo==='CCCS') ? '2' : (tipo==='Capacitor'?'100u':(tipo==='Inductor'?'1m':'1k')))}" data-tipo="${tipo}">
-        </span>
+        ${valorSecaoHtml}
         <button class="btn-del" onclick="this.parentElement.remove()">×</button>
     `;
     lista.appendChild(li);
@@ -274,68 +351,49 @@ function add(tipo, nomeFixo=null, nosInput=null, val=null, alvo=null) {
     if (alvoInput && alvo != null && alvo !== '') {
         alvoInput.value = String(alvo);
     }
-    
-    // Adiciona event listeners para validação em tempo real
-    const valInput = li.querySelector('.val-input');
-    if (valInput) {
-        // Valida ao digitar
-        valInput.addEventListener('input', function() {
-            validarInputValor(this, tipo);
-        });
-        
-        // Valida ao perder o foco
-        valInput.addEventListener('blur', function() {
-            validarInputValor(this, tipo);
-        });
-        
-        // Valida valor inicial se houver
+
+    if (tipo === 'VoltageSource' || tipo === 'CurrentSource') {
+        anexarListenersValorFonte(li, tipo);
         if (val) {
-            validarInputValor(valInput, tipo);
+            const dc = li.querySelector('.val-input-dc');
+            const mod = li.querySelector('.val-input-mod');
+            if (dc) validarInputValor(dc, tipo);
+            if (mod) validarInputValor(mod, tipo);
+        }
+    } else {
+        const valInput = li.querySelector('.val-input');
+        if (valInput) {
+            valInput.addEventListener('input', function() {
+                validarInputValor(this, tipo);
+            });
+            valInput.addEventListener('blur', function() {
+                validarInputValor(this, tipo);
+            });
+            if (val) {
+                validarInputValor(valInput, tipo);
+            }
         }
     }
 }
 
 /**
- * Gera um array de objetos com a descrição dos componentes do circuito,
- * extraindo os valores dos campos da UI (nome, valor, tipo, e nós).
- * 
- * Sobre a lógica de substituição dos sufixos: para campos de valor (val-input), 
- * realiza-se uma substituição para transformar sufixos comuns de eletrônica (k, m, M, u, n, p)
- * em fatores numéricos multiplicativos:
- * - 'k' é substituído por '*1000'
- * - 'M' (maiúsculo) por '*1000000'
- * - 'm' (minúsculo) por '*0.001'
- * - 'u' por '*0.000001'
- * - 'n' por '*0.000000001'
- * - 'p' por '*0.000000000001'
- * Desta forma, o valor "1k" se torna "1*1000" e pode ser avaliado/multiplicado corretamente no backend.
- * Se o valor está vazio, utiliza o nome do componente como valor.
- * 
- * @returns {Array<Object>} Array de objetos do netlist para uso posterior (envio à API). Para CCVS e CCCS, cada objeto inclui a chave "Alvo" (texto do componente de referência da corrente).
+ * Monta o payload de simulação: Config (modo DC/AC, frequência em AC) + Netlist.
+ * Em AC, fontes independentes usam chaves Modulo e Fase (graus); nos demais casos, Valor.
+ * Sufixos k, M, m, u, n, p aplicam-se a Valor/Modulo via aplicarSufixosValor.
+ *
+ * @returns {{ Config: { Modo: string, Frequencia?: number }, Netlist: Array<Object> }}
  */
 function gerarJSON() {
+    const modo = getModoSimulacao();
     const itens = document.querySelectorAll('.comp-item');
     const netlist = [];
+    const nomeComp = (item) => item.querySelector('.nome-comp').value;
+
     itens.forEach(item => {
-        let tipo = item.dataset.tipo;
-        let valRaw = item.querySelector('.val-input').value;
-        // Caso o valor esteja em branco, usa o nome do componente como valor padrão
-        if(!valRaw) {
-            valRaw = item.querySelector('.nome-comp').value;
-        } else {
-            // Lógica de substituição dos sufixos: transforma "1k", "1M", "1m", "1u", "1n", "1p" em expressões numéricas
-            // Ordem importante: M (mega) antes de m (mili) para evitar substituições incorretas
-            valRaw = valRaw
-                .replace(/k/g, "*1000")
-                .replace(/M/g, "*1000000")
-                .replace(/m/g, "*0.001")
-                .replace(/u/g, "*0.000001")
-                .replace(/n/g, "*0.000000001")
-                .replace(/p/g, "*0.000000000001");
-        }
+        const tipo = item.dataset.tipo;
+        const fonteIndep = tipo === 'VoltageSource' || tipo === 'CurrentSource';
 
         let nos = [];
-        // VCVS e VCCS: quatro nós — saída+, saída-, entrada+, entrada-
         if (tipo === 'VCVS' || tipo === 'VCCS') {
             nos = [
                 parseInt(item.querySelector('.no-a').value, 10),
@@ -349,7 +407,6 @@ function gerarJSON() {
                 parseInt(item.querySelector('.no-b').value, 10)
             ];
         } else {
-            // Resistor, fontes, C, L: dois nós [no+, no-]
             nos = [
                 parseInt(item.querySelector('.no-a').value, 10),
                 parseInt(item.querySelector('.no-b').value, 10)
@@ -357,18 +414,51 @@ function gerarJSON() {
         }
 
         const compObj = {
-            "Componente": item.querySelector('.nome-comp').value,
+            "Componente": nomeComp(item),
             "Tipo": tipo,
-            "Valor": valRaw,
             "Nos": nos
         };
+
+        if (modo === 'AC' && fonteIndep) {
+            const modIn = item.querySelector('.val-input-mod');
+            const faseIn = item.querySelector('.val-input-fase');
+            let modRaw = (modIn && modIn.value.trim()) ? modIn.value.trim() : '';
+            if (!modRaw) {
+                modRaw = nomeComp(item);
+            } else {
+                modRaw = aplicarSufixosValor(modRaw);
+            }
+            const faseStr = (faseIn && faseIn.value.trim()) ? faseIn.value.trim() : '0';
+            compObj["Modulo"] = modRaw;
+            compObj["Fase"] = faseStr;
+        } else {
+            const valEl = fonteIndep
+                ? item.querySelector('.val-input-dc')
+                : item.querySelector('.val-input');
+            let valRaw = valEl ? valEl.value.trim() : '';
+            if (!valRaw) {
+                valRaw = nomeComp(item);
+            } else {
+                valRaw = aplicarSufixosValor(valRaw);
+            }
+            compObj["Valor"] = valRaw;
+        }
+
         if (tipo === 'CCVS' || tipo === 'CCCS') {
             const alvoEl = item.querySelector('.alvo-comp');
             compObj["Alvo"] = alvoEl ? alvoEl.value.trim() : '';
         }
         netlist.push(compObj);
     });
-    return netlist;
+
+    const config = { "Modo": modo };
+    if (modo === 'AC') {
+        const freqEl = document.getElementById('inputFrequenciaAc');
+        const f = freqEl ? parseFloat(freqEl.value) : NaN;
+        config["Frequencia"] = Number.isFinite(f) ? f : 60;
+    }
+
+    return { "Config": config, "Netlist": netlist };
 }
 
 /**
@@ -380,17 +470,19 @@ function validarAntesEnvio() {
     const erros = [];
     const itens = document.querySelectorAll('.comp-item');
     
+    const modoAc = getModoSimulacao() === 'AC';
     itens.forEach(item => {
         const tipo = item.dataset.tipo;
-        const valInput = item.querySelector('.val-input');
-        
+        const fonteIndep = tipo === 'VoltageSource' || tipo === 'CurrentSource';
+        const valInput = fonteIndep
+            ? (modoAc ? item.querySelector('.val-input-mod') : item.querySelector('.val-input-dc'))
+            : item.querySelector('.val-input');
+
         if (valInput) {
             const valor = valInput.value.trim();
             if (validarValorNegativo(tipo, valor)) {
-                const nomeComp = item.querySelector('.nome-comp').value || 'Componente sem nome';
-                erros.push(`${nomeComp} (${tipo}): valor não pode ser negativo`);
-                
-                // Garante que o erro visual está visível
+                const nomeC = item.querySelector('.nome-comp').value || 'Componente sem nome';
+                erros.push(`${nomeC} (${tipo}): valor não pode ser negativo`);
                 validarInputValor(valInput, tipo);
             }
         }
@@ -425,9 +517,10 @@ async function calcular() {
     }
 
     const netlistObj = gerarJSON();
-    
+    const listaComp = netlistObj.Netlist;
+
     // --- NOVO CÓDIGO DE BLOQUEIO AQUI ---
-    if (netlistObj.length === 0) {
+    if (!listaComp || listaComp.length === 0) {
         divRes.innerHTML = `<div class="card" style="color:#e67e22; border-left: 5px solid #e67e22;">
             <h3 style="margin-top:0;">⚠️ Circuito Vazio</h3>
             <p>Adicione pelo menos um componente à área de trabalho antes de analisar.</p>
@@ -437,7 +530,7 @@ async function calcular() {
     // ------------------------------------
     
     // Verifica se o circuito possui componentes reativos (Capacitor ou Indutor)
-    const temComponentesReativos = netlistObj.some(comp => comp.Tipo === 'Capacitor' || comp.Tipo === 'Inductor');
+    const temComponentesReativos = listaComp.some(comp => comp.Tipo === 'Capacitor' || comp.Tipo === 'Inductor');
     load.style.display = "block";
     
     const formData = new FormData();
@@ -473,7 +566,7 @@ async function calcular() {
             divRes.innerHTML += html + `</div></div>`;
         } else if (dados.Superposicao) {
             // Conta quantas fontes independentes existem na netlist enviada
-            const qtdFontes = netlistObj.filter(c => c.Tipo === 'VoltageSource' || c.Tipo === 'CurrentSource').length;
+            const qtdFontes = listaComp.filter(c => c.Tipo === 'VoltageSource' || c.Tipo === 'CurrentSource').length;
             
             if (qtdFontes <= 1 && !temComponentesReativos) {
                 divRes.innerHTML += `<div class="card" style="background:#fffcf5; border-left:5px solid #f1c40f"><p>⚠️ <em>A Superposição não é aplicável pois o circuito possui apenas uma fonte independente.</em></p></div>`;
@@ -529,11 +622,22 @@ function toggleDarkMode() {
 document.addEventListener('DOMContentLoaded', function() {
     const darkMode = localStorage.getItem('darkMode');
     const switchElement = document.getElementById('darkModeSwitch');
-    
+
     if (darkMode === 'enabled') {
         document.body.classList.add('dark-mode');
         if (switchElement) {
             switchElement.checked = true;
         }
+    }
+
+    const toggleAc = document.getElementById('toggleModoAc');
+    if (toggleAc) {
+        try {
+            if (localStorage.getItem('simModoAc') === '1') {
+                toggleAc.checked = true;
+            }
+        } catch (e) { /* ignore */ }
+        toggleAc.addEventListener('change', sincronizarModoSimulacao);
+        sincronizarModoSimulacao();
     }
 });

@@ -26,6 +26,22 @@
 
     <div class="main-layout">
         <div class="input-panel">
+            <div class="panel-top-bar">
+                <div class="modo-sim-toggle-wrap" title="Modo de simulação">
+                    <span class="modo-sim-text modo-sim-text--dc">DC</span>
+                    <label class="switch switch-modo-sim">
+                        <input type="checkbox" id="toggleModoAc" aria-label="Alternar entre modo DC e AC">
+                        <span class="slider slider-modo-sim"></span>
+                    </label>
+                    <span class="modo-sim-text modo-sim-text--ac">AC</span>
+                </div>
+            </div>
+
+            <div id="painelConfigAc" class="sim-config-ac" hidden>
+                <div class="sim-config-ac__title">Configurações de Simulação</div>
+                <label class="sim-config-ac__label" for="inputFrequenciaAc">Frequência (Hz)</label>
+                <input type="number" class="sim-config-ac__input" id="inputFrequenciaAc" min="0" step="any" value="60" placeholder="60">
+            </div>
             
             <label style="font-weight:bold; color:#3498db;">📚 Biblioteca:</label>
             <select class="example-select" onchange="carregarExemplo(this.value)">
@@ -76,6 +92,6 @@
         </div>
     </div>
 
-    <script src="script.js?v=20260420"></script>
+    <script src="script.js?v=20260421"></script>
 </body>
 </html>
