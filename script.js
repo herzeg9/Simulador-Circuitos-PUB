@@ -38,12 +38,29 @@ const exemplos = {
         {"Componente": "V1", "Tipo": "VoltageSource", "Valor": "10", "Nos": [1, 0]},
         {"Componente": "R1", "Tipo": "Resistor", "Valor": "100", "Nos": [1, 2]},
         {"Componente": "L1", "Tipo": "Inductor", "Valor": "100m", "Nos": [2, 0]}
+    ],
+    "vccs_amp": [
+        {"Componente": "V_In", "Tipo": "VoltageSource", "Valor": "5", "Nos": [1, 0]},
+        {"Componente": "R_In", "Tipo": "Resistor", "Valor": "1k", "Nos": [1, 0]},
+        {"Componente": "G_Amp", "Tipo": "VCCS", "Valor": "0.01", "Nos": [2, 0, 1, 0]},
+        {"Componente": "R_Carga", "Tipo": "Resistor", "Valor": "100", "Nos": [2, 0]}
+    ],
+    "ccvs_teste": [
+        {"Componente": "V1", "Tipo": "VoltageSource", "Valor": "10", "Nos": [1, 0]},
+        {"Componente": "R1", "Tipo": "Resistor", "Valor": "5", "Nos": [1, 2]},
+        {"Componente": "H1", "Tipo": "CCVS", "Valor": "2", "Nos": [2, 0], "Alvo": "R1"}
+    ],
+    "cccs_bjt": [
+        {"Componente": "I_Base", "Tipo": "CurrentSource", "Valor": "1m", "Nos": [1, 0]},
+        {"Componente": "R_Base", "Tipo": "Resistor", "Valor": "1k", "Nos": [1, 0]},
+        {"Componente": "F_BJT", "Tipo": "CCCS", "Valor": "100", "Nos": [2, 0], "Alvo": "R_Base"},
+        {"Componente": "R_Coletor", "Tipo": "Resistor", "Valor": "10", "Nos": [2, 0]}
     ]
 };
 
 /**
  * Carrega um exemplo de circuito, limpando a lista atual e preenchendo com os componentes do exemplo selecionado.
- * @param {string} chave - Chave do exemplo a ser carregado ('divisor', 'ponte', 'amp', 'misto', 'capacitor_dc', 'indutor_dc').
+ * @param {string} chave - Chave do exemplo a ser carregado (ex.: 'divisor', 'ponte', 'vccs_amp', 'ccvs_teste', 'cccs_bjt', ...).
  * @returns {void}
  */
 function carregarExemplo(chave) {
