@@ -553,7 +553,8 @@ async function calcular() {
             divRes.innerHTML += html + `</div>`;
         }
 
-        if (dados.Superposicao && dados.Superposicao.length > 0) {
+        // Superposição: a API pode omitir a chave, enviar null ou [] — ainda assim mostramos o bloco 2 com passos ou avisos locais.
+        if (Array.isArray(dados.Superposicao) && dados.Superposicao.length > 0) {
             let html = `<div class="card"><h3 class="section-title">🧩 2. Superposição</h3><div class="super-container">`;
             dados.Superposicao.forEach(passo => {
                 html += `<div class="super-card"><div class="didactic-text">Fonte Ativa: <strong>${passo.FonteAtiva}</strong></div>`;
@@ -564,17 +565,23 @@ async function calcular() {
                 html += `</div>`;
             });
             divRes.innerHTML += html + `</div></div>`;
-        } else if (dados.Superposicao) {
-            // Conta quantas fontes independentes existem na netlist enviada
+        } else {
             const qtdFontes = listaComp.filter(c => c.Tipo === 'VoltageSource' || c.Tipo === 'CurrentSource').length;
-            
+            const temFontesDependentes = listaComp.some(c =>
+                c.Tipo === 'VCVS' || c.Tipo === 'VCCS' || c.Tipo === 'CCVS' || c.Tipo === 'CCCS'
+            );
+
+            const avisoSuper = (msg) => `<div class="card"><h3 class="section-title">🧩 2. Superposição</h3><div style="background:#fffcf5; border-left:5px solid #f1c40f; padding:12px; border-radius:6px;"><p style="margin:0;">⚠️ <em>${msg}</em></p></div></div>`;
+
             if (qtdFontes <= 1 && !temComponentesReativos) {
-                divRes.innerHTML += `<div class="card" style="background:#fffcf5; border-left:5px solid #f1c40f"><p>⚠️ <em>A Superposição não é aplicável pois o circuito possui apenas uma fonte independente.</em></p></div>`;
-            } else {
+                divRes.innerHTML += avisoSuper('A Superposição não é aplicável pois o circuito possui apenas uma fonte independente.');
+            } else if (temComponentesReativos || temFontesDependentes) {
                 const msgSuperposicao = temComponentesReativos
                     ? 'A Superposição passo-a-passo foi ocultada pois o circuito contém Fontes Dependentes ou Componentes Reativos (L/C).'
                     : 'A Superposição passo-a-passo foi ocultada pois o circuito contém Fontes Dependentes.';
-                divRes.innerHTML += `<div class="card" style="background:#fffcf5; border-left:5px solid #f1c40f"><p>⚠️ <em>${msgSuperposicao}</em></p></div>`;
+                divRes.innerHTML += avisoSuper(msgSuperposicao);
+            } else {
+                divRes.innerHTML += avisoSuper('Os dados de superposição passo-a-passo não vieram na resposta do servidor (lista vazia ou campo ausente), embora o circuito tenha várias fontes independentes.');
             }
         }
 
