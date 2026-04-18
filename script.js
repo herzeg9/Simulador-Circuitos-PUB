@@ -53,8 +53,7 @@ function carregarExemplo(chave) {
     if(!chave || !exemplos[chave]) return;
 
     exemplos[chave].forEach(comp => {
-        // Neste contexto, tanto para 'VCVS' quanto para outros tipos, a chamada é idêntica.
-        add(comp.Tipo, comp.Componente, comp.Nos, comp.Valor);
+        add(comp.Tipo, comp.Componente, comp.Nos, comp.Valor, comp.Alvo);
     });
 }
 
@@ -161,11 +160,12 @@ function validarInputValor(input, tipo) {
  * Adiciona um componente à interface com base nos parâmetros especificados.
  * @param {string} tipo - O tipo de componente ('Resistor', 'VoltageSource', 'VCVS', etc).
  * @param {?string} nomeFixo - Um nome pré-definido para o componente, se existir.
- * @param {?Array<number>} nosInput - Array de nós para o componente, por exemplo: [1,0] para fontes e resistores; [out+,out-,in+,in-] para VCVS.
+ * @param {?Array<number>} nosInput - Array de nós para o componente, por exemplo: [1,0] para fontes e resistores; [out+,out-,in+,in-] para VCVS/VCCS; [out+,out-] para CCVS/CCCS.
  * @param {?string|number} val - O valor do componente (resistência, tensão, ganho...).
+ * @param {?string} alvo - Para CCVS/CCCS: nome do componente alvo da corrente de controle (ex.: R1).
  * @returns {void}
  */
-function add(tipo, nomeFixo=null, nosInput=null, val=null) {
+function add(tipo, nomeFixo=null, nosInput=null, val=null, alvo=null) {
     const lista = document.getElementById('listaComponentes');
     const id = idCounter++;
     const li = document.createElement('li');
@@ -190,9 +190,10 @@ function add(tipo, nomeFixo=null, nosInput=null, val=null) {
     if (tipo === 'CurrentSource') { label='A'; nome=`I${id}`; }
     if (tipo === 'Capacitor') { label='C'; nome=`C${id}`; }
     if (tipo === 'Inductor') { label='L'; nome=`L${id}`; }
-    if (tipo === 'VCVS') { 
-        label='G'; nome=`E${id}`; valLabel="Ganho";
-        // Para VCVS, há 4 nós: saída+ saída- entrada+ entrada-
+    if (tipo === 'VCVS') {
+        label = 'G';
+        nome = `E${id}`;
+        valLabel = 'Ganho';
         inputsNos = `
         <span style="font-size:0.7em; color:#9b59b6;">Out:</span>
         <input type="number" class="no-a" value="${nA}" style="width:30px">
@@ -200,6 +201,38 @@ function add(tipo, nomeFixo=null, nosInput=null, val=null) {
         <span style="font-size:0.7em; color:#9b59b6;">In:</span>
         <input type="number" class="no-c" value="${nC}" style="width:30px">
         <input type="number" class="no-d" value="${nD}" style="width:30px">`;
+    }
+    if (tipo === 'VCCS') {
+        label = 'G';
+        nome = `G${id}`;
+        valLabel = 'Transcond.';
+        inputsNos = `
+        <span style="font-size:0.7em; color:#9b59b6;">Out:</span>
+        <input type="number" class="no-a" value="${nA}" style="width:30px">
+        <input type="number" class="no-b" value="${nB}" style="width:30px">
+        <span style="font-size:0.7em; color:#9b59b6;">In:</span>
+        <input type="number" class="no-c" value="${nC}" style="width:30px">
+        <input type="number" class="no-d" value="${nD}" style="width:30px">`;
+    }
+    if (tipo === 'CCVS') {
+        label = 'H';
+        nome = `H${id}`;
+        valLabel = 'Transres.';
+        inputsNos = `
+        <span style="font-size:0.7em; color:#9b59b6;">Out:</span>
+        <input type="number" class="no-a" value="${nA}" style="width:30px">
+        <input type="number" class="no-b" value="${nB}" style="width:30px">
+        <input type="text" class="alvo-comp" placeholder="Comp. Alvo (ex: R1)" style="width:120px">`;
+    }
+    if (tipo === 'CCCS') {
+        label = 'F';
+        nome = `F${id}`;
+        valLabel = 'Ganho';
+        inputsNos = `
+        <span style="font-size:0.7em; color:#9b59b6;">Out:</span>
+        <input type="number" class="no-a" value="${nA}" style="width:30px">
+        <input type="number" class="no-b" value="${nB}" style="width:30px">
+        <input type="text" class="alvo-comp" placeholder="Comp. Alvo (ex: R1)" style="width:120px">`;
     }
 
     // Estrutura HTML personalizada do componente na interface
@@ -210,11 +243,16 @@ function add(tipo, nomeFixo=null, nosInput=null, val=null) {
         <div class="nodes-group">${inputsNos}</div>
         <span style="font-size:0.8em; color:#999; margin-left:5px">${valLabel}</span>
         <span class="val-input-wrapper">
-            <input type="text" class="val-input" value="${val || (tipo==='VCVS'?'2':(tipo==='Capacitor'?'100u':(tipo==='Inductor'?'1m':'1k')))}" data-tipo="${tipo}">
+            <input type="text" class="val-input" value="${val || ((tipo==='VCVS' || tipo==='VCCS' || tipo==='CCVS' || tipo==='CCCS') ? '2' : (tipo==='Capacitor'?'100u':(tipo==='Inductor'?'1m':'1k')))}" data-tipo="${tipo}">
         </span>
         <button class="btn-del" onclick="this.parentElement.remove()">×</button>
     `;
     lista.appendChild(li);
+
+    const alvoInput = li.querySelector('.alvo-comp');
+    if (alvoInput && alvo != null && alvo !== '') {
+        alvoInput.value = String(alvo);
+    }
     
     // Adiciona event listeners para validação em tempo real
     const valInput = li.querySelector('.val-input');
@@ -252,7 +290,7 @@ function add(tipo, nomeFixo=null, nosInput=null, val=null) {
  * Desta forma, o valor "1k" se torna "1*1000" e pode ser avaliado/multiplicado corretamente no backend.
  * Se o valor está vazio, utiliza o nome do componente como valor.
  * 
- * @returns {Array<Object>} Array de objetos do netlist para uso posterior (envio à API).
+ * @returns {Array<Object>} Array de objetos do netlist para uso posterior (envio à API). Para CCVS e CCCS, cada objeto inclui a chave "Alvo" (texto do componente de referência da corrente).
  */
 function gerarJSON() {
     const itens = document.querySelectorAll('.comp-item');
@@ -276,28 +314,38 @@ function gerarJSON() {
         }
 
         let nos = [];
-        // Para VCVS, espera-se 4 nós, nas posições: saída+, saída-, entrada+, entrada-
-        if (tipo === 'VCVS') {
+        // VCVS e VCCS: quatro nós — saída+, saída-, entrada+, entrada-
+        if (tipo === 'VCVS' || tipo === 'VCCS') {
             nos = [
-                parseInt(item.querySelector('.no-a').value), 
-                parseInt(item.querySelector('.no-b').value),
-                parseInt(item.querySelector('.no-c').value), 
-                parseInt(item.querySelector('.no-d').value)
+                parseInt(item.querySelector('.no-a').value, 10),
+                parseInt(item.querySelector('.no-b').value, 10),
+                parseInt(item.querySelector('.no-c').value, 10),
+                parseInt(item.querySelector('.no-d').value, 10)
+            ];
+        } else if (tipo === 'CCVS' || tipo === 'CCCS') {
+            nos = [
+                parseInt(item.querySelector('.no-a').value, 10),
+                parseInt(item.querySelector('.no-b').value, 10)
             ];
         } else {
-            // Para outros tipos (Resistor, Fontes), dois nós: [no+, no-]
+            // Resistor, fontes, C, L: dois nós [no+, no-]
             nos = [
-                parseInt(item.querySelector('.no-a').value), 
-                parseInt(item.querySelector('.no-b').value)
+                parseInt(item.querySelector('.no-a').value, 10),
+                parseInt(item.querySelector('.no-b').value, 10)
             ];
         }
 
-        netlist.push({ 
-            "Componente": item.querySelector('.nome-comp').value, 
-            "Tipo": tipo, 
-            "Valor": valRaw, 
-            "Nos": nos 
-        });
+        const compObj = {
+            "Componente": item.querySelector('.nome-comp').value,
+            "Tipo": tipo,
+            "Valor": valRaw,
+            "Nos": nos
+        };
+        if (tipo === 'CCVS' || tipo === 'CCCS') {
+            const alvoEl = item.querySelector('.alvo-comp');
+            compObj["Alvo"] = alvoEl ? alvoEl.value.trim() : '';
+        }
+        netlist.push(compObj);
     });
     return netlist;
 }
