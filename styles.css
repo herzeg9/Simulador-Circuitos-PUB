@@ -149,6 +149,26 @@ body.dark-mode .example-select {
 
 /* Botões */
 .control-group { display: flex; gap: 5px; margin-bottom: 15px; flex-wrap: wrap; }
+/* Linha compacta: tipo de fonte dependente + botão adicionar */
+.control-group-dep {
+    display: flex;
+    flex: 1 1 200px;
+    gap: 5px;
+    align-items: stretch;
+    min-width: 0;
+}
+.control-group-dep .dep-select {
+    width: auto;
+    flex: 1;
+    min-width: 0;
+    margin-bottom: 0;
+}
+.control-group-dep .btn-add-dep {
+    flex: 0 0 48px;
+    min-width: 48px;
+    padding-left: 8px;
+    padding-right: 8px;
+}
 .btn-add { flex: 1; border: none; padding: 10px; border-radius: 5px; cursor: pointer; color: white; font-weight: bold; font-size: 0.85em; transition:0.2s; min-width: 80px;}
 .btn-add:hover { opacity: 0.9; transform: translateY(-1px); }
 .button-group { display: flex; gap: 10px; margin-top: 10px; }
