@@ -64,12 +64,16 @@ const exemplos = {
  * @returns {void}
  */
 function carregarExemplo(chave) {
-    const lista = document.getElementById('listaComponentes');
-    lista.innerHTML = ""; 
-    idCounter = 1;
-    if(!chave || !exemplos[chave]) return;
+    const ch = (chave == null ? '' : String(chave)).trim();
+    if (!ch || !Object.prototype.hasOwnProperty.call(exemplos, ch)) return;
 
-    exemplos[chave].forEach(comp => {
+    const lista = document.getElementById('listaComponentes');
+    if (!lista) return;
+
+    lista.innerHTML = '';
+    idCounter = 1;
+
+    exemplos[ch].forEach(comp => {
         add(comp.Tipo, comp.Componente, comp.Nos, comp.Valor, comp.Alvo);
     });
 }
