@@ -1041,6 +1041,113 @@ function assignSeriesRows(series) {
     }
 }
 
+/**
+ * Consolida componentes série em "chains": cada chain é uma sequência de
+ * componentes que atravessam nós internos (grau 2 no subgrafo sem terra,
+ * sem shunts). Esses nós internos são considerados invisíveis no
+ * esquemático — viram apenas continuação de fio entre componentes em série.
+ *
+ * Os dois nós das extremidades de uma chain são sempre "visíveis"
+ * (não-internos). Para uma chain de 1 componente, o resultado é
+ * equivalente ao componente série isolado, mantendo compatibilidade.
+ *
+ * @param {Array} series - Componentes série brutos (saída de analyzeTopology).
+ * @param {Array} shunts - Componentes a terra (saída de analyzeTopology).
+ * @param {number[]} nonGroundNodes - Lista de nós não-terra.
+ * @returns {{ visibleNodes: number[], hiddenNodes: number[], chains: Array }}
+ */
+function consolidateSeries(series, shunts, nonGroundNodes) {
+    const degSeries = {};
+    series.forEach(c => {
+        degSeries[c.nA] = (degSeries[c.nA] || 0) + 1;
+        degSeries[c.nB] = (degSeries[c.nB] || 0) + 1;
+    });
+    const hasShunt = new Set();
+    shunts.forEach(s => hasShunt.add(s.nodeUp));
+
+    const isInternal = (n) => degSeries[n] === 2 && !hasShunt.has(n) && n !== 0;
+
+    const adj = new Map();
+    series.forEach(c => {
+        if (!adj.has(c.nA)) adj.set(c.nA, []);
+        if (!adj.has(c.nB)) adj.set(c.nB, []);
+        adj.get(c.nA).push({ comp: c, otherEnd: c.nB });
+        adj.get(c.nB).push({ comp: c, otherEnd: c.nA });
+    });
+
+    const used = new Set();
+
+    function walkChain(startNode, firstComp) {
+        const list = [];
+        let cur = startNode;
+        let lastComp = firstComp;
+        const seenNodes = new Set();
+        while (isInternal(cur) && !seenNodes.has(cur)) {
+            seenNodes.add(cur);
+            const candidates = adj.get(cur) || [];
+            const next = candidates.find(x => x.comp !== lastComp && !used.has(x.comp));
+            if (!next) break;
+            used.add(next.comp);
+            const incoming = (next.comp.nA === cur) ? 'A' : 'B';
+            list.push({ comp: next.comp, incomingTerminal: incoming });
+            cur = next.otherEnd;
+            lastComp = next.comp;
+        }
+        return { list, endNode: cur };
+    }
+
+    const chains = [];
+    for (const c of series) {
+        if (used.has(c)) continue;
+        used.add(c);
+
+        const rightWalk = walkChain(c.nB, c);
+        const leftWalk = walkChain(c.nA, c);
+
+        const comps = [];
+        [...leftWalk.list].reverse().forEach(w => {
+            comps.push({
+                comp: w.comp,
+                leftTerminal: w.incomingTerminal === 'A' ? 'B' : 'A',
+                rightTerminal: w.incomingTerminal
+            });
+        });
+        comps.push({ comp: c, leftTerminal: 'A', rightTerminal: 'B' });
+        rightWalk.list.forEach(w => {
+            comps.push({
+                comp: w.comp,
+                leftTerminal: w.incomingTerminal,
+                rightTerminal: w.incomingTerminal === 'A' ? 'B' : 'A'
+            });
+        });
+
+        let leftNode = leftWalk.endNode;
+        let rightNode = rightWalk.endNode;
+        if (leftNode > rightNode) {
+            comps.reverse();
+            comps.forEach(x => {
+                const t = x.leftTerminal;
+                x.leftTerminal = x.rightTerminal;
+                x.rightTerminal = t;
+            });
+            const t = leftNode; leftNode = rightNode; rightNode = t;
+        }
+
+        chains.push({
+            leftNode,
+            rightNode,
+            components: comps,
+            left: Math.min(leftNode, rightNode),
+            right: Math.max(leftNode, rightNode),
+            _row: 0
+        });
+    }
+
+    const visibleNodes = nonGroundNodes.filter(n => !isInternal(n));
+    const hiddenNodes = nonGroundNodes.filter(n => isInternal(n));
+    return { visibleNodes, hiddenNodes, chains };
+}
+
 function assignShuntLanes(shunts) {
     const byNode = new Map();
     shunts.forEach(s => {
@@ -1053,9 +1160,19 @@ function assignShuntLanes(shunts) {
     });
 }
 
-function nodePositions(nonGroundNodes, shunts) {
+function nodePositions(nonGroundNodes, shunts, chains) {
     const counts = new Map(nonGroundNodes.map(n => [n, 0]));
     shunts.forEach(s => counts.set(s.nodeUp, (counts.get(s.nodeUp) || 0) + 1));
+
+    const chainKey = (a, b) => `${Math.min(a, b)}-${Math.max(a, b)}`;
+    const chainMinW = new Map();
+    (chains || []).forEach(ch => {
+        const K = ch.components.length;
+        if (K <= 1) return;
+        const needed = K * ESQ.BODY + (K + 1) * 28;
+        const key = chainKey(ch.leftNode, ch.rightNode);
+        chainMinW.set(key, Math.max(chainMinW.get(key) || 0, needed));
+    });
 
     const pos = new Map();
     let xCursor = ESQ.MARGIN_X;
@@ -1069,7 +1186,9 @@ function nodePositions(nonGroundNodes, shunts) {
             const prev = nonGroundNodes[i - 1];
             const prevSh = counts.get(prev) || 0;
             const prevRightLanes = Math.ceil(Math.max(0, prevSh - 1) / 2);
-            const spacing = Math.max(ESQ.SPACING_MIN, (prevRightLanes + curLeftLanes) * ESQ.LANE_W + 60);
+            const baseSpacing = Math.max(ESQ.SPACING_MIN, (prevRightLanes + curLeftLanes) * ESQ.LANE_W + 60);
+            const chainW = chainMinW.get(chainKey(prev, n)) || 0;
+            const spacing = Math.max(baseSpacing, chainW);
             xCursor += spacing;
         }
         pos.set(n, xCursor);
@@ -1294,12 +1413,14 @@ function renderEsquematico() {
         return;
     }
 
-    assignSeriesRows(series);
+    const { visibleNodes, chains } = consolidateSeries(series, shunts, nonGroundNodes);
+
+    assignSeriesRows(chains);
     assignShuntLanes(shunts);
 
-    const { pos: nodeX, totalW } = nodePositions(nonGroundNodes, shunts);
+    const { pos: nodeX, totalW } = nodePositions(visibleNodes, shunts, chains);
 
-    const maxRow = series.reduce((m, s) => Math.max(m, s._row), -1);
+    const maxRow = chains.reduce((m, s) => Math.max(m, s._row), -1);
     const topAboveNodes = (maxRow + 1) * ESQ.SERIES_ROW_H + 40;
     const NODE_Y = topAboveNodes + 50;
     const GND_Y = NODE_Y + ESQ.SHUNT_HEIGHT;
@@ -1325,19 +1446,28 @@ function renderEsquematico() {
         <text x="${gx + 22}" y="${GND_Y + 14}" font-size="11" fill="var(--esq-gnd)" dominant-baseline="central">GND</text>
     </g>`);
 
-    series.forEach(s => {
-        const xL = nodeX.get(s.left);
-        const xR = nodeX.get(s.right);
-        const y = NODE_Y - ESQ.SERIES_BASE_OFFSET - s._row * ESQ.SERIES_ROW_H;
-        const midX = (xL + xR) / 2;
+    chains.forEach(chain => {
+        const xL = nodeX.get(chain.leftNode);
+        const xR = nodeX.get(chain.rightNode);
+        if (xL == null || xR == null) return;
+        const y = NODE_Y - ESQ.SERIES_BASE_OFFSET - chain._row * ESQ.SERIES_ROW_H;
+        const halfBody = ESQ.BODY / 2;
+        const K = chain.components.length;
+
         parts.push(`<line x1="${xL}" y1="${NODE_Y - ESQ.NODE_R}" x2="${xL}" y2="${y}" stroke="var(--esq-wire)" stroke-width="2"/>`);
         parts.push(`<line x1="${xR}" y1="${NODE_Y - ESQ.NODE_R}" x2="${xR}" y2="${y}" stroke="var(--esq-wire)" stroke-width="2"/>`);
-        const halfBody = ESQ.BODY / 2;
-        parts.push(`<line x1="${xL}" y1="${y}" x2="${midX - halfBody}" y2="${y}" stroke="var(--esq-wire)" stroke-width="2"/>`);
-        parts.push(`<line x1="${midX + halfBody}" y1="${y}" x2="${xR}" y2="${y}" stroke="var(--esq-wire)" stroke-width="2"/>`);
-        s._positiveOnA = (s.nA === s.left);
-        s._fromAtoB = (s.nA === s.left);
-        parts.push(drawSimbolo(s, midX, y, 'H'));
+
+        let lastEndX = xL;
+        for (let i = 0; i < K; i++) {
+            const cx = xL + (i + 0.5) * (xR - xL) / K;
+            parts.push(`<line x1="${lastEndX}" y1="${y}" x2="${cx - halfBody}" y2="${y}" stroke="var(--esq-wire)" stroke-width="2"/>`);
+            const item = chain.components[i];
+            item.comp._positiveOnA = (item.leftTerminal === 'A');
+            item.comp._fromAtoB = (item.leftTerminal === 'A');
+            parts.push(drawSimbolo(item.comp, cx, y, 'H'));
+            lastEndX = cx + halfBody;
+        }
+        parts.push(`<line x1="${lastEndX}" y1="${y}" x2="${xR}" y2="${y}" stroke="var(--esq-wire)" stroke-width="2"/>`);
     });
 
     shunts.forEach(s => {
@@ -1355,8 +1485,9 @@ function renderEsquematico() {
         parts.push(drawSimbolo(s, laneX, midY, 'V'));
     });
 
-    nonGroundNodes.forEach(n => {
+    visibleNodes.forEach(n => {
         const x = nodeX.get(n);
+        if (x == null) return;
         parts.push(`<circle cx="${x}" cy="${NODE_Y}" r="${ESQ.NODE_R}" fill="var(--esq-node-fill)" stroke="var(--esq-node-stroke)" stroke-width="2"/>`);
         parts.push(`<text x="${x}" y="${NODE_Y}" class="esq-label--node">${n}</text>`);
     });
