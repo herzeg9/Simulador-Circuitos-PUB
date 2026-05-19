@@ -495,6 +495,94 @@ function validarAntesEnvio() {
 }
 
 /**
+ * Tabela de prefixos SI usada por `formatMagnitudeEng`.
+ * Ordem decrescente: o primeiro prefixo cuja base é <= |valor| ganha.
+ */
+const ENG_PREFIXES = [
+    { v: 1e12, s: 'T' },
+    { v: 1e9,  s: 'G' },
+    { v: 1e6,  s: 'M' },
+    { v: 1e3,  s: 'k' },
+    { v: 1,    s: ''  },
+    { v: 1e-3, s: 'm' },
+    { v: 1e-6, s: 'µ' },
+    { v: 1e-9, s: 'n' },
+    { v: 1e-12,s: 'p' }
+];
+
+/**
+ * Converte um número para notação de engenharia (mantissa em [1, 1000)) com
+ * 3 algarismos significativos e o prefixo SI correspondente.
+ *
+ * - 0.0015   -> { mantissa: '1.50', prefix: 'm' }
+ * - 3000     -> { mantissa: '3.00', prefix: 'k' }
+ * - 20       -> { mantissa: '20.0', prefix: ''  }
+ * - 1234567  -> { mantissa: '1.23', prefix: 'M' }
+ * - 5e-7     -> { mantissa: '500',  prefix: 'n' }
+ * - 0        -> { mantissa: '0',    prefix: ''  }
+ *
+ * @param {number} num
+ * @returns {{mantissa:string, prefix:string}}
+ */
+function formatMagnitudeEng(num) {
+    if (!Number.isFinite(num)) return { mantissa: String(num), prefix: '' };
+    const abs = Math.abs(num);
+    if (abs === 0) return { mantissa: '0', prefix: '' };
+    const sign = num < 0 ? '-' : '';
+    const rounded = Number(abs.toPrecision(3));
+    let selected = ENG_PREFIXES[ENG_PREFIXES.length - 1];
+    for (const p of ENG_PREFIXES) {
+        if (rounded >= p.v) { selected = p; break; }
+    }
+    const mantissa = rounded / selected.v;
+    return { mantissa: sign + mantissa.toPrecision(3), prefix: selected.s };
+}
+
+/**
+ * Formata uma fase (em graus) com no máximo 2 casas decimais, removendo zeros
+ * e ponto desnecessários ao final.
+ *
+ * - 60.0   -> '60'
+ * - -97.38 -> '-97.38'
+ * - -8.2   -> '-8.2'
+ *
+ * @param {number} fase
+ * @returns {string}
+ */
+function formatFaseLimpa(fase) {
+    if (!Number.isFinite(fase)) return String(fase);
+    return String(parseFloat(fase.toFixed(2)));
+}
+
+/**
+ * Reformata um par (ValorNumerico, Unidade) vindo da API para notação de
+ * engenharia com prefixo SI concatenado à unidade.
+ *
+ * - ('0.0015 ∠ -8.2°', 'A') -> { valor: '1.50 ∠ -8.2°', unidade: 'mA' }
+ * - ('3000.', 'V')          -> { valor: '3.00',         unidade: 'kV' }
+ * - ('20. ∠ 60.°', 'V')     -> { valor: '20.0 ∠ 60°',   unidade: 'V'  }
+ *
+ * Se o valor não puder ser interpretado, devolve a string original.
+ *
+ * @param {string} valorStr
+ * @param {string} unidade
+ * @returns {{valor:string, unidade:string}}
+ */
+function formatarResultadoEng(valorStr, unidade) {
+    const polar = parsePolar(valorStr);
+    if (!polar) return { valor: valorStr, unidade: unidade || '' };
+    const isPolar = /[\u2220<]/.test(String(valorStr || ''));
+    if (isPolar) {
+        const { mantissa, prefix } = formatMagnitudeEng(polar.mod);
+        const fase = formatFaseLimpa(polar.fase);
+        return { valor: `${mantissa} ∠ ${fase}°`, unidade: prefix + (unidade || '') };
+    }
+    const signed = polar.fase === 180 ? -polar.mod : polar.mod;
+    const { mantissa, prefix } = formatMagnitudeEng(signed);
+    return { valor: mantissa, unidade: prefix + (unidade || '') };
+}
+
+/**
  * Sanitiza equações vindas do backend em modo AC para renderização AsciiMath.
  *
  * Motivação: o cleanTeX do Wolfram (IC_1905.nb) faz StringReplace["}" -> ""],
@@ -672,13 +760,12 @@ function renderFasorial(resultados, container) {
     const plotI = drawPhasorPlot(fI, '#27ae60', 'Correntes de ramo (A)');
 
     const itemLegenda = (f, cor) => {
-        const fmtMod = (Math.abs(f.mod) >= 1e-3 && Math.abs(f.mod) < 1e6)
-            ? f.mod.toPrecision(4)
-            : f.mod.toExponential(3);
+        const { mantissa, prefix } = formatMagnitudeEng(f.mod);
+        const fase = formatFaseLimpa(f.fase);
         return `<div class="fasor-legend-item">
             <span class="fasor-legend-dot" style="background:${cor}"></span>
             <span class="fasor-legend-name">${f.local}</span>
-            <span class="fasor-legend-val">${fmtMod} ∠ ${f.fase.toFixed(2)}° ${f.unidade || ''}</span>
+            <span class="fasor-legend-val">${mantissa} ∠ ${fase}° ${prefix}${f.unidade || ''}</span>
         </div>`;
     };
 
@@ -800,7 +887,10 @@ async function calcular() {
 
         if (dados.Resultados) {
             let html = `<div class="card"><h3 class="section-title">🎯 3. Resultados Finais</h3>`;
-            dados.Resultados.forEach(r => html += `<div style="border-bottom:1px solid #eee; margin-bottom:10px;"><strong>${r.Local}:</strong><div class="numeric-result">= ${r.ValorNumerico} ${r.Unidade}</div></div>`);
+            dados.Resultados.forEach(r => {
+                const f = formatarResultadoEng(r.ValorNumerico, r.Unidade);
+                html += `<div style="border-bottom:1px solid #eee; margin-bottom:10px;"><strong>${r.Local}:</strong><div class="numeric-result">= ${f.valor} ${f.unidade}</div></div>`;
+            });
             divRes.innerHTML += html + `</div>`;
         }
 
