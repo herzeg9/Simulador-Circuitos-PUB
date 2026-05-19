@@ -83,15 +83,32 @@
             <div id="loading" class="loading">Processando na Wolfram Cloud...</div>
         </div>
 
-        <div class="output-panel" id="resultado">
-            <div class="card" style="text-align:center; color:#999; padding: 60px;">
-                <p><strong>Bem-vindo!</strong></p>
-                <p>Adicione componentes ou escolha um exemplo.</p>
-                <p style="font-size:0.8em">Agora com suporte a Fontes Dependentes e Malhas.</p>
+        <div class="output-panel">
+            <div class="output-tabs" role="tablist" aria-label="Vis\u00f5es do circuito">
+                <button type="button" class="output-tab is-active" role="tab" aria-selected="true" aria-controls="resultado" id="tabBtnResultados" data-tab="resultados">📊 Resultados</button>
+                <button type="button" class="output-tab" role="tab" aria-selected="false" aria-controls="painelEsquematico" id="tabBtnEsquematico" data-tab="esquematico">🔌 Esquemático</button>
+            </div>
+
+            <div class="output-tab-panel is-active" id="resultado" role="tabpanel" aria-labelledby="tabBtnResultados">
+                <div class="card" style="text-align:center; color:#999; padding: 60px;">
+                    <p><strong>Bem-vindo!</strong></p>
+                    <p>Adicione componentes ou escolha um exemplo.</p>
+                    <p style="font-size:0.8em">Agora com suporte a Fontes Dependentes e Malhas.</p>
+                </div>
+            </div>
+
+            <div class="output-tab-panel" id="painelEsquematico" role="tabpanel" aria-labelledby="tabBtnEsquematico" hidden>
+                <div class="card card-esquematico">
+                    <h3 class="section-title">🔌 Esquemático do Circuito</h3>
+                    <p class="esq-note">Renderização em tempo real conforme você monta o circuito. Os valores exibidos refletem o que você digitou no painel à esquerda.</p>
+                    <div id="esquematicoWrap" class="esq-wrap">
+                        <div class="esq-empty">Adicione componentes para visualizar o esquemático.</div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
-    <script src="script.js?v=20260426"></script>
+    <script src="script.js?v=20260519-fase3b"></script>
 </body>
 </html>

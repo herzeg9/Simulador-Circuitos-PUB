@@ -1,4 +1,4 @@
-const API_URL = "https://www.wolframcloud.com/obj/4f882d1f-21ea-4737-8eae-1f68dda55314"; 
+const API_URL = "https://www.wolframcloud.com/obj/f4e13c39-ac72-4d0c-a5ce-43474d36f88f"; 
 
 let idCounter = 1;
 
@@ -494,6 +494,184 @@ function validarAntesEnvio() {
     };
 }
 
+/* ============================================================
+ * FASE 3.A — Diagrama Fasorial (SVG nativo)
+ * Consome dados.Resultados; ativa-se apenas em modo AC.
+ * ============================================================ */
+
+/**
+ * Converte uma string em coordenadas polares para {mod, fase} (fase em graus).
+ * Aceita formatos: "10 ∠ 45°", "10∠45°", "10 < 45", "5.5e-3 ∠ -90°".
+ * Para números puros, devolve {mod: |x|, fase: 0 (ou 180 se negativo)}.
+ *
+ * @param {string|number} s
+ * @returns {?{mod:number, fase:number, isPolar:boolean}}
+ */
+function parsePolar(s) {
+    if (s == null) return null;
+    const str = String(s).trim();
+    if (!str) return null;
+
+    // Aceita formatos do Wolfram N[]: "10.", "10.5", ".5", "10e-3", "5.5e3"
+    const numPart = '-?(?:\\d+\\.?\\d*|\\.\\d+)(?:[eE][+-]?\\d+)?';
+    const reAng = new RegExp('^(' + numPart + ')\\s*[\\u2220<]\\s*(' + numPart + ')\\s*[°º]?$');
+    const m = str.match(reAng);
+    if (m) {
+        const mod = parseFloat(m[1]);
+        const fase = parseFloat(m[2]);
+        if (Number.isFinite(mod) && Number.isFinite(fase)) {
+            return { mod: Math.abs(mod), fase: mod < 0 ? fase + 180 : fase, isPolar: true };
+        }
+    }
+
+    const num = parseFloat(str);
+    if (Number.isFinite(num)) {
+        return { mod: Math.abs(num), fase: num < 0 ? 180 : 0, isPolar: false };
+    }
+    return null;
+}
+
+/**
+ * Classifica um resultado como 'V' (tensão) ou 'I' (corrente)
+ * inspecionando Unidade e Local.
+ *
+ * @param {{Local:string, Unidade:string}} r
+ * @returns {'V'|'I'}
+ */
+function classificarFasor(r) {
+    const u = String(r.Unidade || '').trim();
+    if (/^A\b|amp/i.test(u)) return 'I';
+    if (/^V\b|volt/i.test(u)) return 'V';
+    return /^i[_\W]/i.test(r.Local || '') ? 'I' : 'V';
+}
+
+/**
+ * Desenha um único plot fasorial em SVG, normalizado pelo maior módulo do grupo.
+ *
+ * @param {Array<{mod:number, fase:number, local:string, unidade:string}>} fasores
+ * @param {string} cor - cor base dos vetores (hex)
+ * @param {string} titulo - título do plot
+ * @returns {string} - HTML string do bloco SVG
+ */
+function drawPhasorPlot(fasores, cor, titulo) {
+    if (!fasores.length) return '';
+
+    const W = 460, H = 460;
+    const cx = W / 2, cy = H / 2;
+    const R = 180;
+    const maxMod = Math.max(...fasores.map(f => f.mod), Number.EPSILON);
+    const scale = R / maxMod;
+
+    const markerId = `arrow-${cor.replace('#', '')}`;
+    const parts = [];
+
+    parts.push(`<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" class="fasorial-svg" role="img" aria-label="${titulo}">`);
+    parts.push(`<defs><marker id="${markerId}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="${cor}"/></marker></defs>`);
+
+    [0.25, 0.5, 0.75, 1].forEach(frac => {
+        parts.push(`<circle cx="${cx}" cy="${cy}" r="${(R * frac).toFixed(2)}" fill="none" stroke="var(--fasor-grid)" stroke-dasharray="3 3" stroke-width="1"/>`);
+    });
+
+    for (let ang = 0; ang < 360; ang += 30) {
+        const rad = ang * Math.PI / 180;
+        const x2 = cx + R * Math.cos(rad);
+        const y2 = cy - R * Math.sin(rad);
+        parts.push(`<line x1="${cx}" y1="${cy}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}" stroke="var(--fasor-grid)" stroke-dasharray="2 5" stroke-width="0.6"/>`);
+    }
+
+    parts.push(`<line x1="${cx - R - 28}" y1="${cy}" x2="${cx + R + 28}" y2="${cy}" stroke="var(--fasor-axis)" stroke-width="1.4"/>`);
+    parts.push(`<line x1="${cx}" y1="${cy - R - 28}" x2="${cx}" y2="${cy + R + 28}" stroke="var(--fasor-axis)" stroke-width="1.4"/>`);
+
+    parts.push(`<text x="${cx + R + 30}" y="${cy + 5}" font-size="14" font-style="italic" fill="var(--fasor-axis-label)">Re</text>`);
+    parts.push(`<text x="${cx - 8}" y="${cy - R - 30}" font-size="14" font-style="italic" fill="var(--fasor-axis-label)" text-anchor="end">Im</text>`);
+    parts.push(`<text x="${cx + R + 8}" y="${cy - 6}" font-size="10" fill="var(--fasor-axis-label)">${maxMod.toPrecision(3)}</text>`);
+    parts.push(`<text x="${cx + (R / 2) + 4}" y="${cy - 6}" font-size="10" fill="var(--fasor-axis-label)">${(maxMod / 2).toPrecision(3)}</text>`);
+
+    const tipLabels = [];
+    fasores.forEach(f => {
+        if (!Number.isFinite(f.mod) || !Number.isFinite(f.fase)) return;
+        const rad = f.fase * Math.PI / 180;
+        const x2 = cx + f.mod * scale * Math.cos(rad);
+        const y2 = cy - f.mod * scale * Math.sin(rad);
+        parts.push(`<line x1="${cx}" y1="${cy}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}" stroke="${cor}" stroke-width="2.6" marker-end="url(#${markerId})" stroke-linecap="round"/>`);
+
+        const offset = 16;
+        const lx = x2 + offset * Math.cos(rad);
+        const ly = y2 - offset * Math.sin(rad);
+        const anchor = Math.cos(rad) > 0.3 ? 'start' : (Math.cos(rad) < -0.3 ? 'end' : 'middle');
+        tipLabels.push(`<text x="${lx.toFixed(2)}" y="${ly.toFixed(2)}" font-size="12" fill="${cor}" font-weight="700" text-anchor="${anchor}" dominant-baseline="middle" paint-order="stroke" stroke="var(--bg-card)" stroke-width="3">${f.local}</text>`);
+    });
+    parts.push(tipLabels.join(''));
+
+    parts.push(`<text x="${cx}" y="20" font-size="13" font-weight="700" text-anchor="middle" fill="${cor}">${titulo}</text>`);
+
+    parts.push(`</svg>`);
+    return parts.join('');
+}
+
+/**
+ * Constrói o card de Diagrama Fasorial a partir dos Resultados da API.
+ * Separa em até dois plots (tensões e correntes) com escalas independentes.
+ *
+ * @param {Array<{Local:string, ValorNumerico:string, Unidade:string}>} resultados
+ * @param {HTMLElement} container
+ * @returns {void}
+ */
+function renderFasorial(resultados, container) {
+    if (!Array.isArray(resultados) || !resultados.length) return;
+
+    /** @type {Array<{mod:number, fase:number, local:string, unidade:string, tipo:'V'|'I'}>} */
+    const fasores = [];
+    resultados.forEach(r => {
+        const p = parsePolar(r.ValorNumerico);
+        if (!p || !(p.mod > 0)) return;
+        fasores.push({
+            mod: p.mod,
+            fase: p.fase,
+            local: String(r.Local || ''),
+            unidade: r.Unidade || '',
+            tipo: classificarFasor(r)
+        });
+    });
+    if (!fasores.length) return;
+
+    const fV = fasores.filter(f => f.tipo === 'V');
+    const fI = fasores.filter(f => f.tipo === 'I');
+
+    const plotV = drawPhasorPlot(fV, '#e74c3c', 'Tensões nodais (V)');
+    const plotI = drawPhasorPlot(fI, '#27ae60', 'Correntes de ramo (A)');
+
+    const itemLegenda = (f, cor) => {
+        const fmtMod = (Math.abs(f.mod) >= 1e-3 && Math.abs(f.mod) < 1e6)
+            ? f.mod.toPrecision(4)
+            : f.mod.toExponential(3);
+        return `<div class="fasor-legend-item">
+            <span class="fasor-legend-dot" style="background:${cor}"></span>
+            <span class="fasor-legend-name">${f.local}</span>
+            <span class="fasor-legend-val">${fmtMod} ∠ ${f.fase.toFixed(2)}° ${f.unidade || ''}</span>
+        </div>`;
+    };
+
+    const legendV = fV.map(f => itemLegenda(f, '#e74c3c')).join('');
+    const legendI = fI.map(f => itemLegenda(f, '#27ae60')).join('');
+
+    const escalaNote = (fV.length > 0 && fI.length > 0)
+        ? `<p class="fasor-note">As escalas de tensão e corrente são normalizadas independentemente para preservar a leitura angular. Os módulos absolutos aparecem na legenda.</p>`
+        : `<p class="fasor-note">Os vetores estão normalizados pelo maior módulo do grupo. Confira os valores absolutos na legenda.</p>`;
+
+    const card = document.createElement('div');
+    card.className = 'card card-fasorial';
+    card.innerHTML = `
+        <h3 class="section-title">📐 5. Diagrama Fasorial</h3>
+        ${escalaNote}
+        <div class="fasorial-grid${(fV.length && fI.length) ? ' fasorial-grid--dual' : ''}">
+            ${fV.length ? `<div class="fasorial-cell"><div class="fasorial-svg-wrap">${plotV}</div><div class="fasorial-legend fasorial-legend--v">${legendV}</div></div>` : ''}
+            ${fI.length ? `<div class="fasorial-cell"><div class="fasorial-svg-wrap">${plotI}</div><div class="fasorial-legend fasorial-legend--i">${legendI}</div></div>` : ''}
+        </div>
+    `;
+    container.appendChild(card);
+}
+
 /**
  * Realiza o envio do circuito (netlist) para a API Wolfram Cloud e exibe os resultados processados na interface.
  * Exibe também indicadores de carregamento, trata erros e mostra resultados múltiplos (equações, superposição, malhas etc.).
@@ -502,7 +680,9 @@ function validarAntesEnvio() {
 async function calcular() {
     const divRes = document.getElementById('resultado');
     const load = document.getElementById('loading');
-    
+
+    if (typeof ativarTab === 'function') ativarTab('resultados');
+
     // Validação antes de enviar
     const validacao = validarAntesEnvio();
     if (!validacao.valido) {
@@ -591,6 +771,10 @@ async function calcular() {
             divRes.innerHTML += html + `</div>`;
         }
 
+        if (getModoSimulacao() === 'AC' && Array.isArray(dados.Resultados)) {
+            renderFasorial(dados.Resultados, divRes);
+        }
+
         if (dados.Malhas) {
             let html = `<div class="card" style="border-left: 5px solid #8e44ad;"><h3 class="section-title" style="color: #8e44ad;">🔄 4. Análise de Malhas</h3>`;
             if (dados.Malhas.length === 0) {
@@ -607,6 +791,506 @@ async function calcular() {
         load.style.display = "none";
         divRes.innerHTML = `<div class="card" style="color:red">❌ ${e.message}</div>`;
     }
+}
+
+/* ============================================================
+ * FASE 3.B — Esquemático ao vivo (SVG nativo, símbolos IEEE)
+ * Consome o estado atual do DOM via getTopologiaAtual().
+ * Não altera gerarJSON nem o contrato com a API.
+ * ============================================================ */
+
+const ESQ = {
+    LANE_W: 90,
+    SERIES_ROW_H: 55,
+    SERIES_BASE_OFFSET: 50,
+    BODY: 50,
+    MARGIN_X: 80,
+    SPACING_MIN: 200,
+    NODE_R: 14,
+    SHUNT_HEIGHT: 220
+};
+
+function escapeXml(s) {
+    return String(s ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+/**
+ * Lê o DOM e devolve a topologia atual do circuito (sem validação).
+ * Ignora itens com nós inválidos. Usado pelo preview ao vivo.
+ *
+ * @returns {Array<{tipo:string, nome:string, nA:number, nB:number, nC:?number, nD:?number, valor:string, alvo:?string}>}
+ */
+function getTopologiaAtual() {
+    const itens = document.querySelectorAll('.comp-item');
+    const lista = [];
+    const modoAc = getModoSimulacao() === 'AC';
+    itens.forEach(item => {
+        const tipo = item.dataset.tipo;
+        const nomeEl = item.querySelector('.nome-comp');
+        const nome = nomeEl ? (nomeEl.value || '?').trim() : '?';
+        const nA = parseInt((item.querySelector('.no-a')?.value ?? '').trim(), 10);
+        const nB = parseInt((item.querySelector('.no-b')?.value ?? '').trim(), 10);
+        if (!Number.isFinite(nA) || !Number.isFinite(nB)) return;
+        if (nA === nB) return;
+        let nC = null, nD = null;
+        if (tipo === 'VCVS' || tipo === 'VCCS') {
+            const ncv = parseInt((item.querySelector('.no-c')?.value ?? '').trim(), 10);
+            const ndv = parseInt((item.querySelector('.no-d')?.value ?? '').trim(), 10);
+            if (Number.isFinite(ncv) && Number.isFinite(ndv)) { nC = ncv; nD = ndv; }
+        }
+        const fonteIndep = tipo === 'VoltageSource' || tipo === 'CurrentSource';
+        let valor = '';
+        if (fonteIndep) {
+            const dc = item.querySelector('.val-input-dc');
+            const mod = item.querySelector('.val-input-mod');
+            const fas = item.querySelector('.val-input-fase');
+            if (modoAc) {
+                const m = (mod?.value || '').trim();
+                const f = (fas?.value || '0').trim();
+                valor = m ? (f && f !== '0' ? `${m}∠${f}°` : m) : '';
+            } else {
+                valor = (dc?.value || '').trim();
+            }
+        } else {
+            valor = (item.querySelector('.val-input')?.value || '').trim();
+        }
+        const alvoEl = item.querySelector('.alvo-comp');
+        const alvo = alvoEl ? alvoEl.value.trim() : null;
+        lista.push({ tipo, nome, nA, nB, nC, nD, valor, alvo });
+    });
+    return lista;
+}
+
+/**
+ * Classifica componentes em shunts (um terminal no GND) e series (entre dois nós não-GND).
+ * @param {Array} topologia
+ */
+function analyzeTopology(topologia) {
+    const nodesSet = new Set();
+    topologia.forEach(c => {
+        nodesSet.add(c.nA); nodesSet.add(c.nB);
+        if (c.nC != null) nodesSet.add(c.nC);
+        if (c.nD != null) nodesSet.add(c.nD);
+    });
+    const nonGroundNodes = [...nodesSet].filter(n => n !== 0).sort((a, b) => a - b);
+
+    const shunts = [];
+    const series = [];
+
+    topologia.forEach(c => {
+        const aIsGnd = c.nA === 0;
+        const bIsGnd = c.nB === 0;
+        if (aIsGnd && bIsGnd) return;
+        if (aIsGnd || bIsGnd) {
+            shunts.push({
+                ...c,
+                nodeUp: aIsGnd ? c.nB : c.nA,
+                positiveOnTop: !aIsGnd
+            });
+        } else {
+            series.push({
+                ...c,
+                left: Math.min(c.nA, c.nB),
+                right: Math.max(c.nA, c.nB),
+                positiveOnLeft: c.nA < c.nB
+            });
+        }
+    });
+
+    return { nonGroundNodes, shunts, series };
+}
+
+function assignSeriesRows(series) {
+    series.sort((a, b) => a.left - b.left || a.right - b.right);
+    series.forEach(s => { s._row = 0; });
+    for (let i = 0; i < series.length; i++) {
+        const s = series[i];
+        let row = 0;
+        while (series.some((o, idx) => idx < i && o._row === row && !(o.right <= s.left || o.left >= s.right))) {
+            row++;
+        }
+        s._row = row;
+    }
+}
+
+function assignShuntLanes(shunts) {
+    const byNode = new Map();
+    shunts.forEach(s => {
+        if (!byNode.has(s.nodeUp)) byNode.set(s.nodeUp, []);
+        byNode.get(s.nodeUp).push(s);
+    });
+    byNode.forEach(group => {
+        const n = group.length;
+        group.forEach((s, i) => { s._lane = i - (n - 1) / 2; });
+    });
+}
+
+function nodePositions(nonGroundNodes, shunts) {
+    const counts = new Map(nonGroundNodes.map(n => [n, 0]));
+    shunts.forEach(s => counts.set(s.nodeUp, (counts.get(s.nodeUp) || 0) + 1));
+
+    const pos = new Map();
+    let xCursor = ESQ.MARGIN_X;
+
+    nonGroundNodes.forEach((n, i) => {
+        const curSh = counts.get(n) || 0;
+        const curLeftLanes = Math.ceil(Math.max(0, curSh - 1) / 2);
+        if (i === 0) {
+            xCursor += curLeftLanes * ESQ.LANE_W;
+        } else {
+            const prev = nonGroundNodes[i - 1];
+            const prevSh = counts.get(prev) || 0;
+            const prevRightLanes = Math.ceil(Math.max(0, prevSh - 1) / 2);
+            const spacing = Math.max(ESQ.SPACING_MIN, (prevRightLanes + curLeftLanes) * ESQ.LANE_W + 60);
+            xCursor += spacing;
+        }
+        pos.set(n, xCursor);
+    });
+
+    const lastN = nonGroundNodes[nonGroundNodes.length - 1];
+    const lastSh = counts.get(lastN) || 0;
+    const lastRightLanes = Math.ceil(Math.max(0, lastSh - 1) / 2);
+    let totalW = xCursor + lastRightLanes * ESQ.LANE_W + ESQ.MARGIN_X;
+    totalW = Math.max(totalW, 600);
+
+    if (nonGroundNodes.length === 1) {
+        pos.set(nonGroundNodes[0], totalW / 2);
+    }
+
+    return { pos, totalW };
+}
+
+/* ---------- Símbolos IEEE ---------- */
+
+function textosSym(cx, cy, orient, label, valor, unit) {
+    const off = 14;
+    if (orient === 'H') {
+        return `
+            <text x="${cx}" y="${cy - off}" text-anchor="middle" dominant-baseline="auto" class="esq-label--name">${escapeXml(label)}</text>
+            ${valor ? `<text x="${cx}" y="${cy + off + 4}" text-anchor="middle" dominant-baseline="hanging" class="esq-label--val">${escapeXml(valor)}${unit}</text>` : ''}
+        `;
+    }
+    return `
+        <text x="${cx + off}" y="${cy - 6}" text-anchor="start" dominant-baseline="auto" class="esq-label--name">${escapeXml(label)}</text>
+        ${valor ? `<text x="${cx + off}" y="${cy + 8}" text-anchor="start" dominant-baseline="hanging" class="esq-label--val">${escapeXml(valor)}${unit}</text>` : ''}
+    `;
+}
+
+function textosSymCircle(cx, cy, r, orient, label, valor, unit) {
+    const off = r + 6;
+    if (orient === 'H') {
+        return `
+            <text x="${cx}" y="${cy - off}" text-anchor="middle" dominant-baseline="auto" class="esq-label--name">${escapeXml(label)}</text>
+            ${valor ? `<text x="${cx}" y="${cy + off}" text-anchor="middle" dominant-baseline="hanging" class="esq-label--val">${escapeXml(valor)}${unit}</text>` : ''}
+        `;
+    }
+    return `
+        <text x="${cx + off}" y="${cy - 6}" text-anchor="start" dominant-baseline="auto" class="esq-label--name">${escapeXml(label)}</text>
+        ${valor ? `<text x="${cx + off}" y="${cy + 8}" text-anchor="start" dominant-baseline="hanging" class="esq-label--val">${escapeXml(valor)}${unit}</text>` : ''}
+    `;
+}
+
+function symResistor(cx, cy, orient, label, valor) {
+    const len = ESQ.BODY;
+    const half = len / 2;
+    const peaks = 6;
+    const amp = 6;
+    const segs = peaks + 1;
+    const step = len / segs;
+    const pts = [];
+    for (let i = 0; i <= segs; i++) {
+        const t = -half + i * step;
+        const offset = (i === 0 || i === segs) ? 0 : ((i % 2 === 1) ? -amp : amp);
+        if (orient === 'H') pts.push([cx + t, cy + offset]);
+        else pts.push([cx + offset, cy + t]);
+    }
+    const d = pts.map((p, i) => (i === 0 ? 'M ' : 'L ') + p[0].toFixed(2) + ',' + p[1].toFixed(2)).join(' ');
+    return `<g class="esq-sym">
+        <path d="${d}" fill="none" stroke="var(--esq-stroke)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+        ${textosSym(cx, cy, orient, label, valor, 'Ω')}
+    </g>`;
+}
+
+function symCapacitor(cx, cy, orient, label, valor) {
+    const half = ESQ.BODY / 2;
+    const gap = 4;
+    const plateLen = 18;
+    if (orient === 'H') {
+        return `<g class="esq-sym">
+            <line x1="${cx - half}" y1="${cy}" x2="${cx - gap}" y2="${cy}" stroke="var(--esq-wire)" stroke-width="2"/>
+            <line x1="${cx + gap}" y1="${cy}" x2="${cx + half}" y2="${cy}" stroke="var(--esq-wire)" stroke-width="2"/>
+            <line x1="${cx - gap}" y1="${cy - plateLen / 2}" x2="${cx - gap}" y2="${cy + plateLen / 2}" stroke="var(--esq-stroke)" stroke-width="2.5" stroke-linecap="round"/>
+            <line x1="${cx + gap}" y1="${cy - plateLen / 2}" x2="${cx + gap}" y2="${cy + plateLen / 2}" stroke="var(--esq-stroke)" stroke-width="2.5" stroke-linecap="round"/>
+            ${textosSym(cx, cy, orient, label, valor, 'F')}
+        </g>`;
+    }
+    return `<g class="esq-sym">
+        <line x1="${cx}" y1="${cy - half}" x2="${cx}" y2="${cy - gap}" stroke="var(--esq-wire)" stroke-width="2"/>
+        <line x1="${cx}" y1="${cy + gap}" x2="${cx}" y2="${cy + half}" stroke="var(--esq-wire)" stroke-width="2"/>
+        <line x1="${cx - plateLen / 2}" y1="${cy - gap}" x2="${cx + plateLen / 2}" y2="${cy - gap}" stroke="var(--esq-stroke)" stroke-width="2.5" stroke-linecap="round"/>
+        <line x1="${cx - plateLen / 2}" y1="${cy + gap}" x2="${cx + plateLen / 2}" y2="${cy + gap}" stroke="var(--esq-stroke)" stroke-width="2.5" stroke-linecap="round"/>
+        ${textosSym(cx, cy, orient, label, valor, 'F')}
+    </g>`;
+}
+
+function symInductor(cx, cy, orient, label, valor) {
+    const half = ESQ.BODY / 2;
+    const arcs = 4;
+    const arcW = ESQ.BODY / arcs;
+    const r = arcW / 2;
+    let d;
+    if (orient === 'H') {
+        d = `M ${cx - half} ${cy}`;
+        for (let i = 0; i < arcs; i++) d += ` a ${r},${r} 0 0,1 ${arcW},0`;
+    } else {
+        d = `M ${cx} ${cy - half}`;
+        for (let i = 0; i < arcs; i++) d += ` a ${r},${r} 0 0,0 0,${arcW}`;
+    }
+    return `<g class="esq-sym">
+        <path d="${d}" fill="none" stroke="var(--esq-stroke)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+        ${textosSym(cx, cy, orient, label, valor, 'H')}
+    </g>`;
+}
+
+function symVoltageSource(cx, cy, orient, label, valor, positiveOnA) {
+    const r = 18;
+    const half = ESQ.BODY / 2;
+    let plus, minus;
+    if (orient === 'H') {
+        plus = positiveOnA ? [cx - 8, cy] : [cx + 8, cy];
+        minus = positiveOnA ? [cx + 8, cy] : [cx - 8, cy];
+    } else {
+        plus = positiveOnA ? [cx, cy - 8] : [cx, cy + 8];
+        minus = positiveOnA ? [cx, cy + 8] : [cx, cy - 8];
+    }
+    const leadA = orient === 'H'
+        ? `<line x1="${cx - half}" y1="${cy}" x2="${cx - r}" y2="${cy}" stroke="var(--esq-wire)" stroke-width="2"/>`
+        : `<line x1="${cx}" y1="${cy - half}" x2="${cx}" y2="${cy - r}" stroke="var(--esq-wire)" stroke-width="2"/>`;
+    const leadB = orient === 'H'
+        ? `<line x1="${cx + r}" y1="${cy}" x2="${cx + half}" y2="${cy}" stroke="var(--esq-wire)" stroke-width="2"/>`
+        : `<line x1="${cx}" y1="${cy + r}" x2="${cx}" y2="${cy + half}" stroke="var(--esq-wire)" stroke-width="2"/>`;
+    return `<g class="esq-sym">
+        ${leadA}${leadB}
+        <circle cx="${cx}" cy="${cy}" r="${r}" fill="var(--esq-bg)" stroke="var(--esq-stroke)" stroke-width="2"/>
+        <text x="${plus[0]}" y="${plus[1]}" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="700" fill="var(--esq-stroke)">+</text>
+        <text x="${minus[0]}" y="${minus[1]}" text-anchor="middle" dominant-baseline="central" font-size="16" font-weight="700" fill="var(--esq-stroke)">−</text>
+        ${textosSymCircle(cx, cy, r, orient, label, valor, 'V')}
+    </g>`;
+}
+
+function symCurrentSource(cx, cy, orient, label, valor, fromAtoB) {
+    const r = 18;
+    const half = ESQ.BODY / 2;
+    let arrowD;
+    if (orient === 'H') {
+        const x1 = fromAtoB ? cx + r * 0.55 : cx - r * 0.55;
+        const x2 = fromAtoB ? cx - r * 0.55 : cx + r * 0.55;
+        arrowD = `<line x1="${x1}" y1="${cy}" x2="${x2}" y2="${cy}" stroke="var(--esq-stroke)" stroke-width="2" marker-end="url(#esq-arrow-curr)"/>`;
+    } else {
+        const y1 = fromAtoB ? cy + r * 0.55 : cy - r * 0.55;
+        const y2 = fromAtoB ? cy - r * 0.55 : cy + r * 0.55;
+        arrowD = `<line x1="${cx}" y1="${y1}" x2="${cx}" y2="${y2}" stroke="var(--esq-stroke)" stroke-width="2" marker-end="url(#esq-arrow-curr)"/>`;
+    }
+    const leadA = orient === 'H'
+        ? `<line x1="${cx - half}" y1="${cy}" x2="${cx - r}" y2="${cy}" stroke="var(--esq-wire)" stroke-width="2"/>`
+        : `<line x1="${cx}" y1="${cy - half}" x2="${cx}" y2="${cy - r}" stroke="var(--esq-wire)" stroke-width="2"/>`;
+    const leadB = orient === 'H'
+        ? `<line x1="${cx + r}" y1="${cy}" x2="${cx + half}" y2="${cy}" stroke="var(--esq-wire)" stroke-width="2"/>`
+        : `<line x1="${cx}" y1="${cy + r}" x2="${cx}" y2="${cy + half}" stroke="var(--esq-wire)" stroke-width="2"/>`;
+    return `<g class="esq-sym">
+        ${leadA}${leadB}
+        <circle cx="${cx}" cy="${cy}" r="${r}" fill="var(--esq-bg)" stroke="var(--esq-stroke)" stroke-width="2"/>
+        ${arrowD}
+        ${textosSymCircle(cx, cy, r, orient, label, valor, 'A')}
+    </g>`;
+}
+
+function symDependentSource(tipo, cx, cy, orient, label, valor, alvoCtrl) {
+    const half = ESQ.BODY / 2;
+    const size = 18;
+    const letter = { VCVS: 'E', VCCS: 'G', CCVS: 'H', CCCS: 'F' }[tipo] || '?';
+    const leadA = orient === 'H'
+        ? `<line x1="${cx - half}" y1="${cy}" x2="${cx - size}" y2="${cy}" stroke="var(--esq-wire)" stroke-width="2"/>`
+        : `<line x1="${cx}" y1="${cy - half}" x2="${cx}" y2="${cy - size}" stroke="var(--esq-wire)" stroke-width="2"/>`;
+    const leadB = orient === 'H'
+        ? `<line x1="${cx + size}" y1="${cy}" x2="${cx + half}" y2="${cy}" stroke="var(--esq-wire)" stroke-width="2"/>`
+        : `<line x1="${cx}" y1="${cy + size}" x2="${cx}" y2="${cy + half}" stroke="var(--esq-wire)" stroke-width="2"/>`;
+    const diamond = `<polygon points="${cx - size},${cy} ${cx},${cy - size} ${cx + size},${cy} ${cx},${cy + size}" fill="var(--esq-bg)" stroke="var(--esq-stroke)" stroke-width="2"/>`;
+    const lett = `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="700" fill="var(--esq-ctrl)">${letter}</text>`;
+    let ctrlText = '';
+    if (alvoCtrl) {
+        const cx2 = orient === 'H' ? cx : cx + size + 30;
+        const cy2 = orient === 'H' ? cy + half + 18 : cy + 14;
+        ctrlText = `<text x="${cx2}" y="${cy2}" text-anchor="${orient === 'H' ? 'middle' : 'start'}" dominant-baseline="${orient === 'H' ? 'hanging' : 'central'}" class="esq-label--ctrl">ctrl: ${escapeXml(alvoCtrl)}</text>`;
+    }
+    return `<g class="esq-sym">
+        ${leadA}${leadB}${diamond}${lett}
+        ${textosSymCircle(cx, cy, size, orient, label, valor, '')}
+        ${ctrlText}
+    </g>`;
+}
+
+function drawSimbolo(comp, cx, cy, orient) {
+    const t = comp.tipo;
+    if (t === 'Resistor') return symResistor(cx, cy, orient, comp.nome, comp.valor);
+    if (t === 'Capacitor') return symCapacitor(cx, cy, orient, comp.nome, comp.valor);
+    if (t === 'Inductor') return symInductor(cx, cy, orient, comp.nome, comp.valor);
+    if (t === 'VoltageSource') return symVoltageSource(cx, cy, orient, comp.nome, comp.valor, comp._positiveOnA);
+    if (t === 'CurrentSource') return symCurrentSource(cx, cy, orient, comp.nome, comp.valor, comp._fromAtoB);
+    if (t === 'VCVS' || t === 'VCCS' || t === 'CCVS' || t === 'CCCS') {
+        const ctrl = (t === 'VCVS' || t === 'VCCS')
+            ? (comp.nC != null && comp.nD != null ? `v(${comp.nC},${comp.nD})` : null)
+            : (comp.alvo || null);
+        return symDependentSource(t, cx, cy, orient, comp.nome, comp.valor, ctrl);
+    }
+    return '';
+}
+
+/**
+ * Renderiza o esquemático com base no estado atual do DOM, dentro do contêiner #esquematicoWrap.
+ */
+function renderEsquematico() {
+    const wrap = document.getElementById('esquematicoWrap');
+    if (!wrap) return;
+
+    const topologia = getTopologiaAtual();
+    if (!topologia.length) {
+        wrap.innerHTML = '<div class="esq-empty">Adicione componentes para visualizar o esquemático.</div>';
+        return;
+    }
+
+    const { nonGroundNodes, shunts, series } = analyzeTopology(topologia);
+
+    if (!nonGroundNodes.length) {
+        wrap.innerHTML = '<div class="esq-empty">Topologia degenerada: todos os terminais estão no terra. Conecte ao menos um nó não-zero.</div>';
+        return;
+    }
+
+    assignSeriesRows(series);
+    assignShuntLanes(shunts);
+
+    const { pos: nodeX, totalW } = nodePositions(nonGroundNodes, shunts);
+
+    const maxRow = series.reduce((m, s) => Math.max(m, s._row), -1);
+    const topAboveNodes = (maxRow + 1) * ESQ.SERIES_ROW_H + 40;
+    const NODE_Y = topAboveNodes + 50;
+    const GND_Y = NODE_Y + ESQ.SHUNT_HEIGHT;
+    const H = GND_Y + 80;
+
+    const parts = [];
+    parts.push(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${totalW} ${H}" class="esq-svg" role="img" aria-label="Esquemático do circuito">`);
+    parts.push(`<defs>
+        <marker id="esq-arrow-curr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--esq-stroke)"/>
+        </marker>
+    </defs>`);
+
+    const gndStart = ESQ.MARGIN_X / 2;
+    const gndEnd = totalW - ESQ.MARGIN_X / 2;
+    parts.push(`<line x1="${gndStart}" y1="${GND_Y}" x2="${gndEnd}" y2="${GND_Y}" stroke="var(--esq-wire)" stroke-width="2"/>`);
+
+    const gx = (gndStart + gndEnd) / 2;
+    parts.push(`<g class="esq-gnd">
+        <line x1="${gx - 14}" y1="${GND_Y + 8}" x2="${gx + 14}" y2="${GND_Y + 8}" stroke="var(--esq-gnd)" stroke-width="2.5" stroke-linecap="round"/>
+        <line x1="${gx - 9}" y1="${GND_Y + 14}" x2="${gx + 9}" y2="${GND_Y + 14}" stroke="var(--esq-gnd)" stroke-width="2.5" stroke-linecap="round"/>
+        <line x1="${gx - 4}" y1="${GND_Y + 20}" x2="${gx + 4}" y2="${GND_Y + 20}" stroke="var(--esq-gnd)" stroke-width="2.5" stroke-linecap="round"/>
+        <text x="${gx + 22}" y="${GND_Y + 14}" font-size="11" fill="var(--esq-gnd)" dominant-baseline="central">GND</text>
+    </g>`);
+
+    series.forEach(s => {
+        const xL = nodeX.get(s.left);
+        const xR = nodeX.get(s.right);
+        const y = NODE_Y - ESQ.SERIES_BASE_OFFSET - s._row * ESQ.SERIES_ROW_H;
+        const midX = (xL + xR) / 2;
+        parts.push(`<line x1="${xL}" y1="${NODE_Y - ESQ.NODE_R}" x2="${xL}" y2="${y}" stroke="var(--esq-wire)" stroke-width="2"/>`);
+        parts.push(`<line x1="${xR}" y1="${NODE_Y - ESQ.NODE_R}" x2="${xR}" y2="${y}" stroke="var(--esq-wire)" stroke-width="2"/>`);
+        const halfBody = ESQ.BODY / 2;
+        parts.push(`<line x1="${xL}" y1="${y}" x2="${midX - halfBody}" y2="${y}" stroke="var(--esq-wire)" stroke-width="2"/>`);
+        parts.push(`<line x1="${midX + halfBody}" y1="${y}" x2="${xR}" y2="${y}" stroke="var(--esq-wire)" stroke-width="2"/>`);
+        s._positiveOnA = (s.nA === s.left);
+        s._fromAtoB = (s.nA === s.left);
+        parts.push(drawSimbolo(s, midX, y, 'H'));
+    });
+
+    shunts.forEach(s => {
+        const xN = nodeX.get(s.nodeUp);
+        const laneX = xN + s._lane * ESQ.LANE_W;
+        if (Math.abs(laneX - xN) > 0.5) {
+            parts.push(`<line x1="${xN}" y1="${NODE_Y}" x2="${laneX}" y2="${NODE_Y}" stroke="var(--esq-wire)" stroke-width="2"/>`);
+        }
+        const midY = (NODE_Y + GND_Y) / 2;
+        const halfBody = ESQ.BODY / 2;
+        parts.push(`<line x1="${laneX}" y1="${NODE_Y}" x2="${laneX}" y2="${midY - halfBody}" stroke="var(--esq-wire)" stroke-width="2"/>`);
+        parts.push(`<line x1="${laneX}" y1="${midY + halfBody}" x2="${laneX}" y2="${GND_Y}" stroke="var(--esq-wire)" stroke-width="2"/>`);
+        s._positiveOnA = s.positiveOnTop;
+        s._fromAtoB = s.positiveOnTop;
+        parts.push(drawSimbolo(s, laneX, midY, 'V'));
+    });
+
+    nonGroundNodes.forEach(n => {
+        const x = nodeX.get(n);
+        parts.push(`<circle cx="${x}" cy="${NODE_Y}" r="${ESQ.NODE_R}" fill="var(--esq-node-fill)" stroke="var(--esq-node-stroke)" stroke-width="2"/>`);
+        parts.push(`<text x="${x}" y="${NODE_Y}" class="esq-label--node">${n}</text>`);
+    });
+
+    parts.push(`</svg>`);
+    wrap.innerHTML = parts.join('');
+}
+
+/* ---------- Live preview & tabs ---------- */
+
+let _esqDebounceTimer = null;
+function agendarRerenderEsquematico() {
+    if (_esqDebounceTimer) clearTimeout(_esqDebounceTimer);
+    _esqDebounceTimer = setTimeout(() => {
+        try { renderEsquematico(); }
+        catch (e) { /* preview não pode quebrar a UI; falha silenciosa */ }
+    }, 180);
+}
+
+function setupEsquematicoLive() {
+    const lista = document.getElementById('listaComponentes');
+    if (!lista) return;
+    const obs = new MutationObserver(agendarRerenderEsquematico);
+    obs.observe(lista, { childList: true, subtree: true });
+    lista.addEventListener('input', agendarRerenderEsquematico);
+    lista.addEventListener('change', agendarRerenderEsquematico);
+    const toggleAc = document.getElementById('toggleModoAc');
+    if (toggleAc) toggleAc.addEventListener('change', agendarRerenderEsquematico);
+    renderEsquematico();
+}
+
+function setupOutputTabs() {
+    const tabs = document.querySelectorAll('.output-tab');
+    const panels = {
+        'resultados': document.getElementById('resultado'),
+        'esquematico': document.getElementById('painelEsquematico')
+    };
+    tabs.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const target = btn.dataset.tab;
+            tabs.forEach(b => {
+                const isActive = b === btn;
+                b.classList.toggle('is-active', isActive);
+                b.setAttribute('aria-selected', isActive ? 'true' : 'false');
+            });
+            Object.entries(panels).forEach(([k, el]) => {
+                if (!el) return;
+                const isActive = k === target;
+                el.classList.toggle('is-active', isActive);
+                el.hidden = !isActive;
+            });
+        });
+    });
+}
+
+function ativarTab(tabId) {
+    const btn = document.getElementById(tabId === 'resultados' ? 'tabBtnResultados' : 'tabBtnEsquematico');
+    if (btn) btn.click();
 }
 
 /**
@@ -647,4 +1331,7 @@ document.addEventListener('DOMContentLoaded', function() {
         toggleAc.addEventListener('change', sincronizarModoSimulacao);
         sincronizarModoSimulacao();
     }
+
+    setupOutputTabs();
+    setupEsquematicoLive();
 });

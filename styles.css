@@ -680,6 +680,292 @@ body.dark-mode span[style*="color:#999"] {
     color: var(--text-secondary) !important;
 }
 
+/* ============================================================
+ * FASE 3.A — Diagrama Fasorial
+ * ============================================================ */
+:root {
+    --fasor-grid: #d6dbe0;
+    --fasor-axis: #95a5a6;
+    --fasor-axis-label: #7f8c8d;
+    --fasor-note-bg: #f4f6f8;
+    --fasor-note-border: #d0d6dc;
+    --fasor-cell-bg: #fafbfc;
+    --fasor-cell-border: #e6eaee;
+}
+body.dark-mode {
+    --fasor-grid: #3a3f47;
+    --fasor-axis: #6c7682;
+    --fasor-axis-label: #95a5a6;
+    --fasor-note-bg: #242830;
+    --fasor-note-border: #3a3f47;
+    --fasor-cell-bg: #262a32;
+    --fasor-cell-border: #353a44;
+}
+
+.card-fasorial { border-left: 5px solid #16a085; }
+.card-fasorial .section-title { color: #117864; }
+body.dark-mode .card-fasorial .section-title { color: #76d7c4; }
+
+.fasor-note {
+    margin: 0 0 14px;
+    padding: 10px 14px;
+    background: var(--fasor-note-bg);
+    border-left: 4px solid #16a085;
+    border-radius: 6px;
+    font-size: 0.85em;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+.fasorial-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 18px;
+}
+.fasorial-grid--dual { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+.fasorial-cell {
+    background: var(--fasor-cell-bg);
+    border: 1px solid var(--fasor-cell-border);
+    border-radius: 10px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.fasorial-svg-wrap {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.fasorial-svg {
+    width: 100%;
+    height: 100%;
+    max-height: 460px;
+    display: block;
+    overflow: visible;
+}
+
+.fasorial-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 0.85em;
+    border-top: 1px dashed var(--fasor-cell-border);
+    padding-top: 10px;
+}
+
+.fasor-legend-item {
+    display: grid;
+    grid-template-columns: 14px minmax(60px, max-content) 1fr;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 6px;
+    border-radius: 4px;
+    transition: background-color 0.15s ease;
+}
+.fasor-legend-item:hover { background: rgba(22, 160, 133, 0.08); }
+
+.fasor-legend-dot {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    box-shadow: 0 0 0 2px var(--bg-card);
+}
+
+.fasor-legend-name {
+    font-weight: 700;
+    color: var(--text-primary);
+    font-family: 'Segoe UI', Roboto, sans-serif;
+}
+
+.fasor-legend-val {
+    font-family: 'Courier New', monospace;
+    color: var(--text-secondary);
+    font-size: 0.95em;
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+@media (max-width: 900px) {
+    .fasorial-grid--dual { grid-template-columns: 1fr; }
+}
+
+/* ============================================================
+ * FASE 3.B — Tabs + Esquemático ao vivo
+ * ============================================================ */
+:root {
+    --tab-bg: #ecf0f3;
+    --tab-bg-active: #ffffff;
+    --tab-border: #d0d6dc;
+    --tab-text: #7f8c8d;
+    --tab-text-active: #16a085;
+    --esq-stroke: #2c3e50;
+    --esq-wire: #34495e;
+    --esq-node-fill: #3498db;
+    --esq-node-stroke: #1f6692;
+    --esq-gnd: #7f8c8d;
+    --esq-bg: #fdfefe;
+    --esq-bg-grid: #f0f3f5;
+    --esq-label-name: #2c3e50;
+    --esq-label-val: #7f8c8d;
+    --esq-ctrl: #9b59b6;
+}
+body.dark-mode {
+    --tab-bg: #1f2128;
+    --tab-bg-active: #2d2d2d;
+    --tab-border: #3a3f47;
+    --tab-text: #95a5a6;
+    --tab-text-active: #76d7c4;
+    --esq-stroke: #ecf0f1;
+    --esq-wire: #d5dbdb;
+    --esq-node-fill: #5dade2;
+    --esq-node-stroke: #aed6f1;
+    --esq-gnd: #bdc3c7;
+    --esq-bg: #232730;
+    --esq-bg-grid: #2a2e38;
+    --esq-label-name: #ecf0f1;
+    --esq-label-val: #bdc3c7;
+    --esq-ctrl: #bb86fc;
+}
+
+.output-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 6px 6px 0 6px;
+    background: var(--tab-bg);
+    border-radius: 12px 12px 0 0;
+    border: 1px solid var(--tab-border);
+    border-bottom: none;
+    margin-bottom: -1px;
+}
+.output-tab {
+    flex: 0 0 auto;
+    padding: 10px 18px;
+    background: transparent;
+    color: var(--tab-text);
+    border: none;
+    border-radius: 8px 8px 0 0;
+    cursor: pointer;
+    font-size: 0.92em;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+    position: relative;
+    top: 1px;
+}
+.output-tab:hover {
+    background: rgba(22, 160, 133, 0.08);
+    color: var(--tab-text-active);
+}
+.output-tab.is-active {
+    background: var(--tab-bg-active);
+    color: var(--tab-text-active);
+    box-shadow: 0 -2px 0 0 #16a085 inset;
+    border: 1px solid var(--tab-border);
+    border-bottom: 1px solid var(--tab-bg-active);
+}
+.output-tab:focus-visible {
+    outline: 2px solid #16a085;
+    outline-offset: -4px;
+}
+
+.output-tab-panel {
+    display: none;
+    animation: fadeIn 0.25s;
+}
+.output-tab-panel.is-active { display: block; }
+
+.card-esquematico { border-left: 5px solid #3498db; }
+.card-esquematico .section-title { color: #2980b9; }
+body.dark-mode .card-esquematico .section-title { color: #85c1e9; }
+
+.esq-note {
+    margin: 0 0 14px;
+    padding: 10px 14px;
+    background: var(--fasor-note-bg, #f4f6f8);
+    border-left: 4px solid #3498db;
+    border-radius: 6px;
+    font-size: 0.85em;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+.esq-wrap {
+    width: 100%;
+    background: var(--esq-bg);
+    border: 1px solid var(--tab-border);
+    border-radius: 8px;
+    padding: 14px;
+    overflow-x: auto;
+    background-image:
+        linear-gradient(var(--esq-bg-grid) 1px, transparent 1px),
+        linear-gradient(90deg, var(--esq-bg-grid) 1px, transparent 1px);
+    background-size: 20px 20px;
+}
+
+.esq-empty {
+    padding: 40px 20px;
+    text-align: center;
+    color: var(--text-secondary);
+    font-style: italic;
+    font-size: 0.95em;
+}
+
+.esq-svg {
+    width: 100%;
+    height: auto;
+    display: block;
+    min-width: 600px;
+}
+
+.esq-label--name {
+    font-family: 'Segoe UI', Roboto, sans-serif;
+    font-weight: 700;
+    font-size: 12px;
+    fill: var(--esq-label-name);
+    paint-order: stroke;
+    stroke: var(--esq-bg);
+    stroke-width: 3px;
+    stroke-linejoin: round;
+}
+.esq-label--val {
+    font-family: 'Courier New', monospace;
+    font-weight: 500;
+    font-size: 11px;
+    fill: var(--esq-label-val);
+    paint-order: stroke;
+    stroke: var(--esq-bg);
+    stroke-width: 3px;
+    stroke-linejoin: round;
+}
+.esq-label--node {
+    font-family: 'Segoe UI', Roboto, sans-serif;
+    font-weight: 700;
+    font-size: 11px;
+    fill: #ffffff;
+    text-anchor: middle;
+    dominant-baseline: central;
+}
+.esq-label--ctrl {
+    font-family: 'Segoe UI', Roboto, sans-serif;
+    font-weight: 600;
+    font-size: 10px;
+    fill: var(--esq-ctrl);
+    font-style: italic;
+    paint-order: stroke;
+    stroke: var(--esq-bg);
+    stroke-width: 3px;
+    stroke-linejoin: round;
+}
+
 /* Ajustes responsivos */
 @media (max-width: 800px) { 
     .main-layout { flex-direction: column; } 
@@ -691,4 +977,5 @@ body.dark-mode span[style*="color:#999"] {
         margin-bottom: 15px;
         align-self: flex-end;
     }
+    .output-tab { padding: 9px 12px; font-size: 0.85em; }
 }
