@@ -494,6 +494,36 @@ function validarAntesEnvio() {
     };
 }
 
+/**
+ * Sanitiza equações vindas do backend em modo AC para renderização AsciiMath.
+ *
+ * Motivação: o cleanTeX do Wolfram (IC_1905.nb) faz StringReplace["}" -> ""],
+ * que elimina TODAS as chaves fechadas do output do TeXForm. Em DC isso é
+ * inofensivo, mas fontes fasoriais geram saídas como
+ *     20 e^{60 i {}^{\circ }}
+ * que após o strip viram
+ *     20 e^{60 i {{\circ
+ * (chaves desbalanceadas + \circ pendurado), e o MathJax/AsciiMath renderiza
+ * isso como uma sopa visual (ex: "20e^{60i{ˆ{o").
+ *
+ * Esta função detecta a forma corrompida e a substitui pela notação polar
+ * AsciiMath /_ (que renderiza como ∠), didaticamente mais clara.
+ * Não altera o backend (consome o que ele já manda).
+ *
+ * @param {string} eq
+ * @returns {string}
+ */
+function limparEquacaoAC(eq) {
+    let s = String(eq);
+    s = s.replace(/\{*\s*\^?\s*\{*\\circ\b\s*\}*/g, '°');
+    s = s.replace(/\{*\s*\^?\s*\{*\\degree\b\s*\}*/g, '°');
+    s = s.replace(
+        /(\d+(?:\.\d+)?)\s*e\^\{(-?\d+(?:\.\d+)?)\s*i\s*°\s*\}?/g,
+        '$1 /_ ($2°)'
+    );
+    return s;
+}
+
 /* ============================================================
  * FASE 3.A — Diagrama Fasorial (SVG nativo)
  * Consome dados.Resultados; ativa-se apenas em modo AC.
@@ -729,7 +759,10 @@ async function calcular() {
 
         if (dados.Equacoes) {
             let html = `<div class="card"><h3 class="section-title">📝 1. Equações do Sistema (MNA)</h3>`;
-            dados.Equacoes.forEach(eq => html += `<div class="formula">\` ${eq.replace("==", "=")} \`</div>`);
+            dados.Equacoes.forEach(eq => {
+                const limpa = limparEquacaoAC(eq).replace("==", "=");
+                html += `<div class="formula">\` ${limpa} \`</div>`;
+            });
             divRes.innerHTML += html + `</div>`;
         }
 
