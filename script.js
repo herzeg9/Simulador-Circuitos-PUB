@@ -343,6 +343,7 @@ function add(tipo, nomeFixo=null, nosInput=null, val=null, alvo=null) {
         <input type="text" class="nome-comp" value="${nomeFixo || nome}" style="width:50px; font-weight:bold;">
         <div class="nodes-group">${inputsNos}</div>
         ${valorSecaoHtml}
+        <button type="button" class="btn-relacionar" onclick="abrirDialogoRelacionar(this.parentElement)" title="Adicionar componente relacionado (s\u00e9rie / paralelo)" aria-label="Adicionar componente em s\u00e9rie ou paralelo">+</button>
         <button class="btn-del" onclick="this.parentElement.remove()">×</button>
     `;
     lista.appendChild(li);
@@ -1416,6 +1417,165 @@ function ativarTab(tabId) {
     if (btn) btn.click();
 }
 
+/* ============================================================
+ * FASE 3.C — Adicionar em Série/Paralelo via diálogo
+ * Não altera a lógica matemática nem o gerador de JSON.
+ * Apenas reescreve nós do componente de referência e/ou
+ * cria um novo componente com nós pré-calculados via add().
+ * ============================================================ */
+
+/** @type {?HTMLLIElement} */
+let _dlgRefItem = null;
+
+/**
+ * Retorna o próximo número de nó livre no circuito (max + 1, sempre >= 1).
+ * Inspeciona todos os campos no-a / no-b / no-c / no-d das comp-item.
+ *
+ * @returns {number}
+ */
+function obterProximoNo() {
+    const todos = new Set();
+    document.querySelectorAll('.comp-item').forEach(item => {
+        ['no-a', 'no-b', 'no-c', 'no-d'].forEach(cls => {
+            const el = item.querySelector('.' + cls);
+            if (el) {
+                const n = parseInt(el.value, 10);
+                if (Number.isFinite(n)) todos.add(n);
+            }
+        });
+    });
+    let max = -1;
+    todos.forEach(n => { if (n > max) max = n; });
+    return Math.max(max + 1, 1);
+}
+
+/**
+ * Abre o diálogo de "componente relacionado" para o card de comp-item passado.
+ * Popula os labels com os nós atuais da referência e reseta o estado do form.
+ *
+ * @param {HTMLLIElement} compItemEl - O elemento .comp-item de referência.
+ */
+function abrirDialogoRelacionar(compItemEl) {
+    const dlg = document.getElementById('dlgRelacionar');
+    if (!dlg || !compItemEl) return;
+    const nomeEl = compItemEl.querySelector('.nome-comp');
+    const noAEl = compItemEl.querySelector('.no-a');
+    const noBEl = compItemEl.querySelector('.no-b');
+    if (!nomeEl || !noAEl || !noBEl) return;
+
+    _dlgRefItem = compItemEl;
+
+    document.getElementById('dlgRefNome').textContent = nomeEl.value || '?';
+    document.getElementById('dlgLadoANome').textContent = noAEl.value || '?';
+    document.getElementById('dlgLadoBNome').textContent = noBEl.value || '?';
+
+    const radParalelo = dlg.querySelector('input[name="modo"][value="paralelo"]');
+    if (radParalelo) radParalelo.checked = true;
+    const radLadoA = dlg.querySelector('input[name="lado"][value="A"]');
+    if (radLadoA) radLadoA.checked = true;
+    const ladoSecao = document.getElementById('dlgLadoSecao');
+    if (ladoSecao) ladoSecao.hidden = true;
+
+    dlg.querySelectorAll('.dlg-tipo-btn').forEach(b => b.classList.remove('is-selected'));
+    const tipoDefault = dlg.querySelector('.dlg-tipo-btn[data-tipo="Resistor"]');
+    if (tipoDefault) tipoDefault.classList.add('is-selected');
+
+    if (typeof dlg.showModal === 'function') {
+        dlg.showModal();
+    } else {
+        dlg.setAttribute('open', '');
+    }
+}
+
+/**
+ * Executa a inserção do novo componente segundo o modo escolhido.
+ * - Paralelo: novo componente com os mesmos (nA, nB) da referência.
+ * - Série lado A: cria nó M novo; ref vira (M, nB); novo é (nA, M).
+ * - Série lado B: cria nó M novo; ref vira (nA, M); novo é (M, nB).
+ *
+ * Em ambos os casos de série, o disparo de evento 'input' garante que o
+ * preview ao vivo do esquemático perceba a mudança e re-renderize.
+ *
+ * @param {'paralelo'|'serie'} modo
+ * @param {string} tipo - Tipo do novo componente (Resistor, VoltageSource, ...)
+ * @param {'A'|'B'} lado - Lado da inserção (somente se modo='serie').
+ */
+function executarAdicaoRelacionada(modo, tipo, lado) {
+    const refItem = _dlgRefItem;
+    if (!refItem) return;
+    const refNoAEl = refItem.querySelector('.no-a');
+    const refNoBEl = refItem.querySelector('.no-b');
+    const refNA = parseInt(refNoAEl?.value, 10);
+    const refNB = parseInt(refNoBEl?.value, 10);
+    if (!Number.isFinite(refNA) || !Number.isFinite(refNB)) return;
+
+    if (modo === 'paralelo') {
+        add(tipo, null, [refNA, refNB]);
+        return;
+    }
+
+    const novoNo = obterProximoNo();
+    if (lado === 'A') {
+        refNoAEl.value = String(novoNo);
+        refNoAEl.dispatchEvent(new Event('input', { bubbles: true }));
+        add(tipo, null, [refNA, novoNo]);
+    } else {
+        refNoBEl.value = String(novoNo);
+        refNoBEl.dispatchEvent(new Event('input', { bubbles: true }));
+        add(tipo, null, [novoNo, refNB]);
+    }
+}
+
+/**
+ * Instala os event listeners do diálogo: troca de modo, seleção de tipo,
+ * cancelamento e submissão. Idempotente.
+ */
+function setupDialogoRelacionar() {
+    const dlg = document.getElementById('dlgRelacionar');
+    if (!dlg || dlg.dataset.setupDone === '1') return;
+    dlg.dataset.setupDone = '1';
+
+    dlg.querySelectorAll('input[name="modo"]').forEach(r => {
+        r.addEventListener('change', () => {
+            const checked = dlg.querySelector('input[name="modo"]:checked');
+            const isSerie = !!checked && checked.value === 'serie';
+            const ladoSecao = document.getElementById('dlgLadoSecao');
+            if (ladoSecao) ladoSecao.hidden = !isSerie;
+        });
+    });
+
+    dlg.querySelectorAll('.dlg-tipo-btn').forEach(b => {
+        b.addEventListener('click', () => {
+            dlg.querySelectorAll('.dlg-tipo-btn').forEach(x => x.classList.remove('is-selected'));
+            b.classList.add('is-selected');
+        });
+    });
+
+    const cancelar = dlg.querySelector('.dlg-btn-cancel');
+    if (cancelar) {
+        cancelar.addEventListener('click', () => {
+            if (typeof dlg.close === 'function') dlg.close('cancel');
+            else dlg.removeAttribute('open');
+        });
+    }
+
+    const form = document.getElementById('formRelacionar');
+    if (form) {
+        form.addEventListener('submit', e => {
+            e.preventDefault();
+            const modoEl = dlg.querySelector('input[name="modo"]:checked');
+            const ladoEl = dlg.querySelector('input[name="lado"]:checked');
+            const tipoEl = dlg.querySelector('.dlg-tipo-btn.is-selected');
+            const modo = modoEl ? modoEl.value : 'paralelo';
+            const lado = ladoEl ? ladoEl.value : 'A';
+            const tipo = tipoEl ? tipoEl.dataset.tipo : 'Resistor';
+            executarAdicaoRelacionada(modo, tipo, lado);
+            if (typeof dlg.close === 'function') dlg.close('ok');
+            else dlg.removeAttribute('open');
+        });
+    }
+}
+
 /**
  * Alterna entre modo claro e escuro
  */
@@ -1457,4 +1617,5 @@ document.addEventListener('DOMContentLoaded', function() {
 
     setupOutputTabs();
     setupEsquematicoLive();
+    setupDialogoRelacionar();
 });

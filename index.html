@@ -109,6 +109,65 @@
         </div>
     </div>
 
-    <script src="script.js?v=20260519-eng"></script>
+    <dialog id="dlgRelacionar" class="dlg-relacionar" aria-labelledby="dlgTituloRelacionar">
+        <form method="dialog" id="formRelacionar" class="dlg-form">
+            <header class="dlg-header">
+                <h3 class="dlg-titulo" id="dlgTituloRelacionar">Adicionar componente relacionado</h3>
+                <p class="dlg-subtitulo">Refer&ecirc;ncia: <strong id="dlgRefNome">&mdash;</strong></p>
+            </header>
+
+            <fieldset class="dlg-section">
+                <legend>Conex&atilde;o</legend>
+                <div class="dlg-radio-row">
+                    <label class="dlg-radio">
+                        <input type="radio" name="modo" value="paralelo" checked>
+                        <span class="dlg-radio-icon">&parallel;</span>
+                        <span class="dlg-radio-label">Em paralelo</span>
+                        <span class="dlg-radio-hint">mesmos n&oacute;s da refer&ecirc;ncia</span>
+                    </label>
+                    <label class="dlg-radio">
+                        <input type="radio" name="modo" value="serie">
+                        <span class="dlg-radio-icon">&mdash;</span>
+                        <span class="dlg-radio-label">Em s&eacute;rie</span>
+                        <span class="dlg-radio-hint">com um n&oacute; intermedi&aacute;rio novo</span>
+                    </label>
+                </div>
+            </fieldset>
+
+            <fieldset class="dlg-section" id="dlgLadoSecao" hidden>
+                <legend>Lado da inser&ccedil;&atilde;o</legend>
+                <div class="dlg-radio-row">
+                    <label class="dlg-radio">
+                        <input type="radio" name="lado" value="A" checked>
+                        <span class="dlg-radio-label">Lado A</span>
+                        <span class="dlg-radio-hint">entre n&oacute; <strong id="dlgLadoANome">?</strong> e o novo n&oacute;</span>
+                    </label>
+                    <label class="dlg-radio">
+                        <input type="radio" name="lado" value="B">
+                        <span class="dlg-radio-label">Lado B</span>
+                        <span class="dlg-radio-hint">entre o novo n&oacute; e n&oacute; <strong id="dlgLadoBNome">?</strong></span>
+                    </label>
+                </div>
+            </fieldset>
+
+            <fieldset class="dlg-section">
+                <legend>Tipo do novo componente</legend>
+                <div class="dlg-tipo-grid">
+                    <button type="button" data-tipo="Resistor" class="dlg-tipo-btn dlg-tipo-R is-selected">R<small>resistor</small></button>
+                    <button type="button" data-tipo="VoltageSource" class="dlg-tipo-btn dlg-tipo-V">V<small>tens&atilde;o</small></button>
+                    <button type="button" data-tipo="CurrentSource" class="dlg-tipo-btn dlg-tipo-I">I<small>corrente</small></button>
+                    <button type="button" data-tipo="Capacitor" class="dlg-tipo-btn dlg-tipo-C">C<small>capacitor</small></button>
+                    <button type="button" data-tipo="Inductor" class="dlg-tipo-btn dlg-tipo-L">L<small>indutor</small></button>
+                </div>
+            </fieldset>
+
+            <footer class="dlg-footer">
+                <button type="button" class="dlg-btn dlg-btn-cancel">Cancelar</button>
+                <button type="submit" class="dlg-btn dlg-btn-confirm">Confirmar</button>
+            </footer>
+        </form>
+    </dialog>
+
+    <script src="script.js?v=20260519-rel"></script>
 </body>
 </html>
