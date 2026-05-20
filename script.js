@@ -263,6 +263,7 @@ function add(tipo, nomeFixo=null, nosInput=null, val=null, alvo=null) {
     const li = document.createElement('li');
     li.className = `comp-item type-${tipo}`;
     li.dataset.tipo = tipo;
+    li.dataset.uid = 'cuid-' + id;
 
     // Setups dos nomes, rótulos, e quantidade/ordem de nós por tipo
     let label = 'Ω'; let nome = `R${id}`; let valLabel = "Val";
@@ -344,7 +345,7 @@ function add(tipo, nomeFixo=null, nosInput=null, val=null, alvo=null) {
         <div class="nodes-group">${inputsNos}</div>
         ${valorSecaoHtml}
         <button type="button" class="btn-relacionar" onclick="abrirDialogoRelacionar(this.parentElement)" title="Adicionar componente relacionado (s\u00e9rie / paralelo)" aria-label="Adicionar componente em s\u00e9rie ou paralelo">+</button>
-        <button class="btn-del" onclick="this.parentElement.remove()">×</button>
+        <button class="btn-del" onclick="removerComponente(this.parentElement)">×</button>
     `;
     lista.appendChild(li);
 
@@ -1624,8 +1625,13 @@ function abrirDialogoRelacionar(compItemEl) {
  * - Série lado A: cria nó M novo; ref vira (M, nB); novo é (nA, M).
  * - Série lado B: cria nó M novo; ref vira (nA, M); novo é (M, nB).
  *
- * Em ambos os casos de série, o disparo de evento 'input' garante que o
- * preview ao vivo do esquemático perceba a mudança e re-renderize.
+ * Em série, o NOVO componente recebe atributos data-series-* contendo:
+ *  - refUid: identificador estável do componente de referência
+ *  - side:   'A' ou 'B' (qual lado da ref foi reescrito)
+ *  - oldValue: valor original do nó da ref (a ser restaurado se possível)
+ *  - newNode: o nó intermediário criado
+ * Esses metadados permitem que removerComponente() restaure a ref ao
+ * estado pré-inserção quando o novo componente é deletado.
  *
  * @param {'paralelo'|'serie'} modo
  * @param {string} tipo - Tipo do novo componente (Resistor, VoltageSource, ...)
@@ -1645,16 +1651,60 @@ function executarAdicaoRelacionada(modo, tipo, lado) {
         return;
     }
 
+    const refUid = refItem.dataset.uid || '';
     const novoNo = obterProximoNo();
+    let oldValue;
     if (lado === 'A') {
+        oldValue = refNA;
         refNoAEl.value = String(novoNo);
         refNoAEl.dispatchEvent(new Event('input', { bubbles: true }));
         add(tipo, null, [refNA, novoNo]);
     } else {
+        oldValue = refNB;
         refNoBEl.value = String(novoNo);
         refNoBEl.dispatchEvent(new Event('input', { bubbles: true }));
         add(tipo, null, [novoNo, refNB]);
     }
+
+    const lista = document.getElementById('listaComponentes');
+    const novoEl = lista ? lista.lastElementChild : null;
+    if (novoEl && refUid) {
+        novoEl.dataset.seriesRefUid = refUid;
+        novoEl.dataset.seriesSide = lado;
+        novoEl.dataset.seriesOldValue = String(oldValue);
+        novoEl.dataset.seriesNewNode = String(novoNo);
+    }
+}
+
+/**
+ * Remove o componente do DOM. Se foi inserido em série via diálogo, tenta
+ * restaurar o nó original do componente de referência — mas apenas se a
+ * referência ainda usa o nó intermediário (i.e., o usuário não editou
+ * manualmente a referência depois da inserção).
+ *
+ * @param {HTMLLIElement} li - O elemento .comp-item a remover.
+ */
+function removerComponente(li) {
+    if (!li) return;
+    const refUid = li.dataset.seriesRefUid;
+    const side = li.dataset.seriesSide;
+    const newNode = parseInt(li.dataset.seriesNewNode, 10);
+    const oldValue = parseInt(li.dataset.seriesOldValue, 10);
+
+    if (refUid && (side === 'A' || side === 'B') && Number.isFinite(newNode) && Number.isFinite(oldValue)) {
+        const refEl = document.querySelector('.comp-item[data-uid="' + refUid + '"]');
+        if (refEl) {
+            const sideEl = refEl.querySelector(side === 'A' ? '.no-a' : '.no-b');
+            if (sideEl) {
+                const curValue = parseInt(sideEl.value, 10);
+                if (curValue === newNode) {
+                    sideEl.value = String(oldValue);
+                    sideEl.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+            }
+        }
+    }
+    li.remove();
 }
 
 /**
