@@ -86,6 +86,7 @@ function limparTudo() {
     const lista = document.getElementById('listaComponentes');
     lista.innerHTML = "";
     idCounter = 1;
+    try { localStorage.removeItem(_STORAGE_KEY_CIRCUITO); } catch (e) { /* ignore */ }
 }
 
 /**
@@ -1508,6 +1509,8 @@ function agendarRerenderEsquematico() {
         catch (e) { /* preview não pode quebrar a UI; falha silenciosa */ }
         try { validarTopologia(); }
         catch (e) { /* validação não pode quebrar a UI; falha silenciosa */ }
+        try { salvarEstadoLocal(); }
+        catch (e) { /* persistência não pode quebrar a UI; falha silenciosa */ }
     }, 180);
 }
 
@@ -1817,6 +1820,305 @@ function setupDialogoRelacionar() {
 }
 
 /* ============================================================
+ * FASE 5.A — Persistência local + Exportação SVG/PNG
+ * Salva o circuito automaticamente em localStorage e oferece
+ * restauração via banner. Permite baixar o esquemático em SVG ou PNG.
+ * Não toca no contrato com o backend Wolfram.
+ * ============================================================ */
+
+const _STORAGE_KEY_CIRCUITO = 'circuitoSalvo';
+const _STATE_VERSION = 1;
+
+/**
+ * Serializa todo o estado do circuito (modo, frequência, lista de
+ * componentes com nós/valores/metadados de série) em um objeto plano.
+ *
+ * @returns {Object} estado serializado, pronto para JSON.stringify.
+ */
+function coletarEstadoCompleto() {
+    const componentes = [];
+    document.querySelectorAll('.comp-item').forEach(item => {
+        const tipo = item.dataset.tipo;
+        const ds = item.dataset;
+        const seriesMeta = ds.seriesRefUid ? {
+            refUid: ds.seriesRefUid,
+            side: ds.seriesSide || null,
+            oldValue: ds.seriesOldValue || null,
+            newNode: ds.seriesNewNode || null
+        } : null;
+
+        componentes.push({
+            uid: ds.uid || null,
+            tipo,
+            nome: (item.querySelector('.nome-comp')?.value || '').trim(),
+            nos: {
+                a: item.querySelector('.no-a')?.value ?? null,
+                b: item.querySelector('.no-b')?.value ?? null,
+                c: item.querySelector('.no-c')?.value ?? null,
+                d: item.querySelector('.no-d')?.value ?? null
+            },
+            valor: item.querySelector('.val-input:not(.val-input-dc):not(.val-input-mod):not(.val-input-fase)')?.value ?? null,
+            valorDc: item.querySelector('.val-input-dc')?.value ?? null,
+            valorMod: item.querySelector('.val-input-mod')?.value ?? null,
+            valorFase: item.querySelector('.val-input-fase')?.value ?? null,
+            alvo: item.querySelector('.alvo-comp')?.value ?? null,
+            seriesMeta
+        });
+    });
+
+    return {
+        version: _STATE_VERSION,
+        timestamp: Date.now(),
+        modo: getModoSimulacao(),
+        frequencia: document.getElementById('inputFrequenciaAc')?.value || '60',
+        componentes
+    };
+}
+
+let _saveDebounceTimer = null;
+/**
+ * Salva o estado atual no localStorage com debounce de 500ms.
+ * Se não houver componentes, remove a chave (em vez de salvar lista vazia).
+ */
+function salvarEstadoLocal() {
+    if (_saveDebounceTimer) clearTimeout(_saveDebounceTimer);
+    _saveDebounceTimer = setTimeout(() => {
+        try {
+            const state = coletarEstadoCompleto();
+            if (!state.componentes.length) {
+                localStorage.removeItem(_STORAGE_KEY_CIRCUITO);
+                return;
+            }
+            localStorage.setItem(_STORAGE_KEY_CIRCUITO, JSON.stringify(state));
+        } catch (e) { /* localStorage cheio/desabilitado: falha silenciosa */ }
+    }, 500);
+}
+
+function lerEstadoSalvo() {
+    try {
+        const raw = localStorage.getItem(_STORAGE_KEY_CIRCUITO);
+        if (!raw) return null;
+        const state = JSON.parse(raw);
+        if (!state || state.version !== _STATE_VERSION) return null;
+        if (!Array.isArray(state.componentes) || !state.componentes.length) return null;
+        return state;
+    } catch (e) { return null; }
+}
+
+function descartarEstadoSalvo() {
+    try { localStorage.removeItem(_STORAGE_KEY_CIRCUITO); }
+    catch (e) { /* ignore */ }
+}
+
+/**
+ * Recria todos os componentes a partir de um estado serializado.
+ * Restaura também os metadados de inserção em série (para que a função
+ * de splice/restore na deleção continue funcionando).
+ *
+ * @param {Object} state - Estado lido via lerEstadoSalvo().
+ */
+function restaurarEstadoSalvo(state) {
+    if (!state || !Array.isArray(state.componentes)) return;
+
+    limparTudo();
+
+    const toggleAc = document.getElementById('toggleModoAc');
+    if (toggleAc) {
+        toggleAc.checked = state.modo === 'AC';
+        sincronizarModoSimulacao();
+    }
+    const freqEl = document.getElementById('inputFrequenciaAc');
+    if (freqEl && state.frequencia != null) freqEl.value = state.frequencia;
+
+    state.componentes.forEach(comp => {
+        const nos = [parseInt(comp.nos.a, 10), parseInt(comp.nos.b, 10)];
+        if (comp.tipo === 'VCVS' || comp.tipo === 'VCCS') {
+            nos.push(parseInt(comp.nos.c, 10), parseInt(comp.nos.d, 10));
+        }
+
+        let valArg = null;
+        if (comp.tipo === 'VoltageSource' || comp.tipo === 'CurrentSource') {
+            valArg = state.modo === 'AC' ? comp.valorMod : comp.valorDc;
+        } else {
+            valArg = comp.valor;
+        }
+
+        add(comp.tipo, comp.nome, nos, valArg, comp.alvo);
+
+        const li = document.getElementById('listaComponentes').lastElementChild;
+        if (!li) return;
+
+        if (comp.tipo === 'VoltageSource' || comp.tipo === 'CurrentSource') {
+            const dcEl = li.querySelector('.val-input-dc');
+            const modEl = li.querySelector('.val-input-mod');
+            const faseEl = li.querySelector('.val-input-fase');
+            if (dcEl && comp.valorDc != null) dcEl.value = comp.valorDc;
+            if (modEl && comp.valorMod != null) modEl.value = comp.valorMod;
+            if (faseEl && comp.valorFase != null) faseEl.value = comp.valorFase;
+        }
+
+        if (comp.uid) li.dataset.uid = comp.uid;
+
+        if (comp.seriesMeta) {
+            li.dataset._pendingSeriesRefUid = comp.seriesMeta.refUid;
+            if (comp.seriesMeta.side) li.dataset._pendingSeriesSide = comp.seriesMeta.side;
+            if (comp.seriesMeta.oldValue != null) li.dataset._pendingSeriesOldValue = comp.seriesMeta.oldValue;
+            if (comp.seriesMeta.newNode != null) li.dataset._pendingSeriesNewNode = comp.seriesMeta.newNode;
+        }
+    });
+
+    document.querySelectorAll('.comp-item').forEach(li => {
+        if (li.dataset._pendingSeriesRefUid) {
+            li.dataset.seriesRefUid = li.dataset._pendingSeriesRefUid;
+            li.dataset.seriesSide = li.dataset._pendingSeriesSide || '';
+            li.dataset.seriesOldValue = li.dataset._pendingSeriesOldValue || '';
+            li.dataset.seriesNewNode = li.dataset._pendingSeriesNewNode || '';
+            delete li.dataset._pendingSeriesRefUid;
+            delete li.dataset._pendingSeriesSide;
+            delete li.dataset._pendingSeriesOldValue;
+            delete li.dataset._pendingSeriesNewNode;
+        }
+    });
+}
+
+function mostrarBannerRestauracao(state) {
+    const banner = document.getElementById('bannerRestaurarCircuito');
+    if (!banner || !state) return;
+    const dt = new Date(state.timestamp || Date.now());
+    const dataFmt = dt.toLocaleDateString('pt-BR') + ' às ' + dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const n = state.componentes.length;
+    const compTexto = n === 1 ? '1 componente' : n + ' componentes';
+    const msgEl = banner.querySelector('.banner-msg');
+    if (msgEl) {
+        msgEl.innerHTML = `Encontramos um circuito salvo automaticamente (<strong>${compTexto}</strong>, ${escapeXml(dataFmt)}).`;
+    }
+    banner.hidden = false;
+}
+
+function escondeBannerRestauracao() {
+    const banner = document.getElementById('bannerRestaurarCircuito');
+    if (banner) banner.hidden = true;
+}
+
+function onRestaurarCircuitoClick() {
+    const state = lerEstadoSalvo();
+    if (state) restaurarEstadoSalvo(state);
+    escondeBannerRestauracao();
+}
+
+function onDescartarCircuitoClick() {
+    descartarEstadoSalvo();
+    escondeBannerRestauracao();
+}
+
+/* ---------- Exportação SVG / PNG ---------- */
+
+const _CSS_VARS_PARA_EXPORT = [
+    '--esq-stroke', '--esq-wire', '--esq-node-fill', '--esq-node-stroke',
+    '--esq-gnd', '--esq-bg', '--esq-label-name', '--esq-label-val', '--esq-ctrl',
+    '--text-primary', '--text-title'
+];
+
+function resolverVariaveisCss() {
+    const cs = getComputedStyle(document.documentElement);
+    const out = {};
+    _CSS_VARS_PARA_EXPORT.forEach(v => {
+        out[v] = (cs.getPropertyValue(v) || '').trim() || '#000000';
+    });
+    return out;
+}
+
+function exportarSvgString() {
+    const svgEl = document.querySelector('#esquematicoWrap svg');
+    if (!svgEl) return null;
+    const clone = svgEl.cloneNode(true);
+    clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+
+    const vars = resolverVariaveisCss();
+    const vb = (clone.getAttribute('viewBox') || '0 0 600 400').split(/\s+/).map(Number);
+    const widthVB = vb[2] || 600;
+    const heightVB = vb[3] || 400;
+    clone.setAttribute('width', widthVB);
+    clone.setAttribute('height', heightVB);
+
+    const styleEl = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+    styleEl.textContent = `
+        .esq-label--name { font-family: 'Segoe UI', Roboto, Arial, sans-serif; font-weight: 700; font-size: 12px; fill: ${vars['--esq-label-name']}; paint-order: stroke; stroke: ${vars['--esq-bg']}; stroke-width: 3px; stroke-linejoin: round; }
+        .esq-label--val  { font-family: 'Courier New', monospace; font-weight: 500; font-size: 11px; fill: ${vars['--esq-label-val']}; paint-order: stroke; stroke: ${vars['--esq-bg']}; stroke-width: 3px; stroke-linejoin: round; }
+        .esq-label--node { font-family: 'Segoe UI', Roboto, Arial, sans-serif; font-weight: 700; font-size: 11px; fill: #ffffff; text-anchor: middle; dominant-baseline: central; }
+        .esq-label--ctrl { font-family: 'Segoe UI', Roboto, Arial, sans-serif; font-weight: 600; font-size: 10px; fill: ${vars['--esq-ctrl']}; font-style: italic; paint-order: stroke; stroke: ${vars['--esq-bg']}; stroke-width: 3px; stroke-linejoin: round; }
+    `;
+    clone.insertBefore(styleEl, clone.firstChild);
+
+    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    rect.setAttribute('x', 0);
+    rect.setAttribute('y', 0);
+    rect.setAttribute('width', widthVB);
+    rect.setAttribute('height', heightVB);
+    rect.setAttribute('fill', vars['--esq-bg']);
+    clone.insertBefore(rect, styleEl.nextSibling);
+
+    let str = new XMLSerializer().serializeToString(clone);
+    Object.keys(vars).forEach(v => {
+        const safe = v.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+        const re = new RegExp('var\\(\\s*' + safe + '\\s*\\)', 'g');
+        str = str.replace(re, vars[v]);
+    });
+    return { svg: str, width: widthVB, height: heightVB };
+}
+
+function nomeArquivoExport(ext) {
+    const d = new Date();
+    const p = n => String(n).padStart(2, '0');
+    return `esquematico-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}.${ext}`;
+}
+
+function baixarBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
+function baixarEsquematicoSvg() {
+    const out = exportarSvgString();
+    if (!out) { alert('Adicione componentes para gerar o esquemático.'); return; }
+    const blob = new Blob([out.svg], { type: 'image/svg+xml;charset=utf-8' });
+    baixarBlob(blob, nomeArquivoExport('svg'));
+}
+
+function baixarEsquematicoPng() {
+    const out = exportarSvgString();
+    if (!out) { alert('Adicione componentes para gerar o esquemático.'); return; }
+    const scale = 2;
+    const blob = new Blob([out.svg], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(out.width * scale);
+        canvas.height = Math.round(out.height * scale);
+        const ctx = canvas.getContext('2d');
+        ctx.scale(scale, scale);
+        ctx.drawImage(img, 0, 0);
+        canvas.toBlob(b => {
+            URL.revokeObjectURL(url);
+            if (b) baixarBlob(b, nomeArquivoExport('png'));
+            else alert('Falha ao gerar o PNG.');
+        }, 'image/png');
+    };
+    img.onerror = () => {
+        URL.revokeObjectURL(url);
+        alert('Falha ao gerar o PNG. Use o SVG.');
+    };
+    img.src = url;
+}
+
+/* ============================================================
  * FASE 4 — Acessibilidade: atalhos, tooltips inline, validações
  * Não interfere na lógica de simulação nem no contrato JSON.
  * ============================================================ */
@@ -2022,6 +2324,9 @@ document.addEventListener('DOMContentLoaded', function() {
     setupDialogoRelacionar();
     setupAtalhosTeclado();
     aplicarTooltipsGlobais();
+
+    const estadoSalvo = lerEstadoSalvo();
+    if (estadoSalvo) mostrarBannerRestauracao(estadoSalvo);
 });
 
 function aplicarTooltipsGlobais() {

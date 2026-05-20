@@ -99,6 +99,15 @@
         </details>
     </section>
 
+    <div id="bannerRestaurarCircuito" class="banner-restaurar" role="alert" hidden>
+        <span class="banner-icon" aria-hidden="true">&#128190;</span>
+        <p class="banner-msg">Encontramos um circuito salvo.</p>
+        <div class="banner-actions">
+            <button type="button" class="banner-btn banner-btn-restaurar" onclick="onRestaurarCircuitoClick()">Restaurar</button>
+            <button type="button" class="banner-btn banner-btn-descartar" onclick="onDescartarCircuitoClick()">Descartar</button>
+        </div>
+    </div>
+
     <div class="main-layout">
         <div class="input-panel">
             <div class="panel-top-bar">
@@ -176,7 +185,17 @@
 
             <div class="output-tab-panel" id="painelEsquematico" role="tabpanel" aria-labelledby="tabBtnEsquematico" hidden>
                 <div class="card card-esquematico">
-                    <h3 class="section-title">🔌 Esquemático do Circuito</h3>
+                    <div class="esq-header">
+                        <h3 class="section-title">🔌 Esquemático do Circuito</h3>
+                        <div class="esq-export-bar">
+                            <button type="button" class="esq-export-btn" onclick="baixarEsquematicoSvg()" title="Baixar como SVG (vetorial, ideal para edi&ccedil;&atilde;o)">
+                                <span class="esq-export-icon" aria-hidden="true">&#128229;</span> SVG
+                            </button>
+                            <button type="button" class="esq-export-btn" onclick="baixarEsquematicoPng()" title="Baixar como PNG (imagem rasterizada, alta resolu&ccedil;&atilde;o)">
+                                <span class="esq-export-icon" aria-hidden="true">&#128229;</span> PNG
+                            </button>
+                        </div>
+                    </div>
                     <p class="esq-note">Renderização em tempo real conforme você monta o circuito. Os valores exibidos refletem o que você digitou no painel à esquerda.</p>
                     <div id="esquematicoWrap" class="esq-wrap">
                         <div class="esq-empty">Adicione componentes para visualizar o esquemático.</div>
@@ -245,6 +264,6 @@
         </form>
     </dialog>
 
-    <script src="script.js?v=20260520-fase4"></script>
+    <script src="script.js?v=20260520-fase5a"></script>
 </body>
 </html>

@@ -1394,3 +1394,111 @@ body.dark-mode .topologia-avisos[data-severity="error"] h4 { color: #ec7063; }
 .comp-item.has-error {
     box-shadow: inset 3px 0 0 #e74c3c;
 }
+
+/* ============================================================
+ * FASE 5.A — Banner de restauração + barra de exportação
+ * ============================================================ */
+.banner-restaurar {
+    max-width: 1200px;
+    margin: 0 auto 18px;
+    padding: 12px 18px;
+    background: rgba(52, 152, 219, 0.08);
+    border: 1px solid rgba(52, 152, 219, 0.35);
+    border-left: 4px solid #3498db;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    color: var(--text-primary);
+    font-size: 0.92em;
+}
+body.dark-mode .banner-restaurar {
+    background: rgba(93, 173, 226, 0.08);
+    border-color: rgba(93, 173, 226, 0.4);
+}
+.banner-icon {
+    font-size: 1.4em;
+    flex-shrink: 0;
+}
+.banner-msg {
+    flex: 1;
+    margin: 0;
+    line-height: 1.4;
+}
+.banner-msg strong { color: #2980b9; }
+body.dark-mode .banner-msg strong { color: #5dade2; }
+.banner-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+}
+.banner-btn {
+    padding: 7px 14px;
+    border: 1.5px solid transparent;
+    border-radius: 5px;
+    font-size: 0.88em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.1s ease;
+}
+.banner-btn-restaurar {
+    background: #3498db;
+    color: white;
+    box-shadow: 0 1px 0 #2876a8;
+}
+.banner-btn-restaurar:hover { background: #2980b9; }
+.banner-btn-restaurar:active { transform: translateY(1px); box-shadow: none; }
+.banner-btn-descartar {
+    background: transparent;
+    color: var(--text-secondary);
+    border-color: var(--border-color);
+}
+.banner-btn-descartar:hover {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+/* Barra de exportação SVG/PNG no card do esquemático */
+.esq-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 4px;
+}
+.esq-header .section-title { margin: 0; }
+.esq-export-bar {
+    display: flex;
+    gap: 6px;
+}
+.esq-export-btn {
+    padding: 6px 12px;
+    background: var(--bg-card);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    font-size: 0.82em;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+.esq-export-btn:hover {
+    background: rgba(22, 160, 133, 0.08);
+    border-color: #16a085;
+    color: #16a085;
+}
+body.dark-mode .esq-export-btn:hover {
+    background: rgba(118, 215, 196, 0.1);
+    border-color: #76d7c4;
+    color: #76d7c4;
+}
+.esq-export-btn:active { transform: translateY(1px); }
+.esq-export-btn:focus-visible {
+    outline: 2px solid #16a085;
+    outline-offset: 2px;
+}
+.esq-export-icon { font-size: 0.9em; }
