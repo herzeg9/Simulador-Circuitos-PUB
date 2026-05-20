@@ -24,6 +24,81 @@
     <h1> Laboratório Virtual de Circuitos</h1>
     <p class="subtitle">Análise Nodal, Malhas e Fontes Controladas</p>
 
+    <section class="ajuda-box" aria-label="Guia de uso do simulador">
+        <details class="ajuda-section" open>
+            <summary class="ajuda-summary">
+                <span class="ajuda-icon" aria-hidden="true">&#128218;</span>
+                <span>Conven&ccedil;&otilde;es b&aacute;sicas</span>
+            </summary>
+            <div class="ajuda-content">
+                <ul>
+                    <li>O <strong>n&oacute; 0</strong> &eacute; sempre o <strong>terra (GND)</strong> de refer&ecirc;ncia &mdash; toda tens&atilde;o calculada &eacute; relativa a ele.</li>
+                    <li>Os demais n&oacute;s s&atilde;o numerados livremente (1, 2, 3, ...). Mantenha a mesma numera&ccedil;&atilde;o para terminais que se conectam fisicamente.</li>
+                    <li>O <strong>nome</strong> de cada componente (R1, V1, etc.) &eacute; edit&aacute;vel mas deve ser &uacute;nico.</li>
+                    <li>No modo <strong>AC</strong>, fontes independentes recebem <strong>m&oacute;dulo</strong> (amplitude) e <strong>fase</strong> em graus.</li>
+                    <li>No modo <strong>DC</strong>, fontes t&ecirc;m um &uacute;nico valor num&eacute;rico.</li>
+                    <li>O bot&atilde;o <strong>+</strong> em cada card abre um di&aacute;logo para inserir um novo componente <em>em s&eacute;rie</em> ou <em>em paralelo</em> com o atual &mdash; sem precisar gerenciar n&oacute;s manualmente.</li>
+                </ul>
+            </div>
+        </details>
+
+        <details class="ajuda-section">
+            <summary class="ajuda-summary">
+                <span class="ajuda-icon" aria-hidden="true">&#9881;&#65039;</span>
+                <span>Sufixos de unidades</span>
+            </summary>
+            <div class="ajuda-content">
+                <p>Voc&ecirc; pode escrever valores com sufixos de engenharia. <strong class="ajuda-aviso">Aten&ccedil;&atilde;o: o sistema diferencia <code>M</code> (Mega) de <code>m</code> (mili) &mdash; um erro comum!</strong></p>
+                <table class="ajuda-tabela">
+                    <thead>
+                        <tr><th>Sufixo</th><th>Multiplicador</th><th>Exemplo</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><code>k</code></td><td>10<sup>3</sup></td><td><code>5k</code> &rarr; 5 000 &Omega;</td></tr>
+                        <tr><td><code>M</code></td><td>10<sup>6</sup> (Mega &mdash; <strong>mai&uacute;sculo</strong>)</td><td><code>2.2M</code> &rarr; 2,2 M&Omega;</td></tr>
+                        <tr><td><code>m</code></td><td>10<sup>-3</sup> (mili &mdash; <strong>min&uacute;sculo</strong>)</td><td><code>100m</code> &rarr; 0,1 H</td></tr>
+                        <tr><td><code>u</code></td><td>10<sup>-6</sup> (micro)</td><td><code>47u</code> &rarr; 47 &mu;F</td></tr>
+                        <tr><td><code>n</code></td><td>10<sup>-9</sup> (nano)</td><td><code>10n</code> &rarr; 10 nF</td></tr>
+                        <tr><td><code>p</code></td><td>10<sup>-12</sup> (pico)</td><td><code>2.2p</code> &rarr; 2,2 pF</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </details>
+
+        <details class="ajuda-section">
+            <summary class="ajuda-summary">
+                <span class="ajuda-icon" aria-hidden="true">&#128257;</span>
+                <span>Fontes dependentes (controladas)</span>
+            </summary>
+            <div class="ajuda-content">
+                <p>S&atilde;o fontes cuja sa&iacute;da depende de uma grandeza medida em outro ponto do circuito. Existem 4 tipos:</p>
+                <ul class="ajuda-lista-dep">
+                    <li><strong>VCVS (E)</strong> &mdash; <code>V<sub>out</sub> = E &middot; V<sub>ctrl</sub></code>. Tens&atilde;o controlada por tens&atilde;o. Voc&ecirc; informa os 2 n&oacute;s de sa&iacute;da (<em>Out</em>) e os 2 n&oacute;s de controle (<em>onde se mede a tens&atilde;o de refer&ecirc;ncia</em>).</li>
+                    <li><strong>VCCS (G)</strong> &mdash; <code>I<sub>out</sub> = G &middot; V<sub>ctrl</sub></code>. Corrente controlada por tens&atilde;o (transcondut&acirc;ncia, g<sub>m</sub>).</li>
+                    <li><strong>CCVS (H)</strong> &mdash; <code>V<sub>out</sub> = H &middot; I<sub>ctrl</sub></code>. Tens&atilde;o controlada por corrente. No campo <strong>Alvo</strong>, digite o <em>nome</em> do componente cuja corrente serve de refer&ecirc;ncia.</li>
+                    <li><strong>CCCS (F)</strong> &mdash; <code>I<sub>out</sub> = F &middot; I<sub>ctrl</sub></code>. Corrente controlada por corrente. Ex.: ganho &beta; de BJT em pequenos sinais.</li>
+                </ul>
+                <p class="ajuda-nota"><strong>Importante para CCVS/CCCS:</strong> o nome no campo <em>Alvo</em> deve corresponder exatamente a um componente <strong>j&aacute; existente</strong> na lista (case-sensitive). Esse componente deve ter corrente bem definida &mdash; geralmente uma fonte de tens&atilde;o ou um resistor cuja corrente se queira "espelhar".</p>
+            </div>
+        </details>
+
+        <details class="ajuda-section">
+            <summary class="ajuda-summary">
+                <span class="ajuda-icon" aria-hidden="true">&#9000;&#65039;</span>
+                <span>Atalhos de teclado</span>
+            </summary>
+            <div class="ajuda-content">
+                <table class="ajuda-tabela ajuda-tabela--atalhos">
+                    <tbody>
+                        <tr><td><kbd>Ctrl</kbd> + <kbd>Enter</kbd></td><td>Executa <strong>Analisar Completo</strong> (atalho para o bot&atilde;o principal)</td></tr>
+                        <tr><td><kbd>Esc</kbd></td><td>Fecha o di&aacute;logo de adi&ccedil;&atilde;o em s&eacute;rie/paralelo</td></tr>
+                        <tr><td><kbd>Tab</kbd> &nbsp;/&nbsp; <kbd>Shift</kbd>+<kbd>Tab</kbd></td><td>Navega entre os campos dos componentes</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </details>
+    </section>
+
     <div class="main-layout">
         <div class="input-panel">
             <div class="panel-top-bar">
@@ -76,8 +151,10 @@
 
             <ul id="listaComponentes"></ul>
 
+            <div id="painelAvisosTopologia" class="topologia-avisos" hidden></div>
+
             <div class="button-group">
-                <button class="btn-calc" onclick="calcular()"> Analisar Completo</button>
+                <button class="btn-calc" id="btnAnalisarCompleto" onclick="calcular()" title="Atalho: Ctrl+Enter"> Analisar Completo</button>
                 <button class="btn-clear" onclick="limparTudo()"> Limpar Tudo</button>
             </div>
             <div id="loading" class="loading">Processando na Wolfram Cloud...</div>
@@ -168,6 +245,6 @@
         </form>
     </dialog>
 
-    <script src="script.js?v=20260520-splice"></script>
+    <script src="script.js?v=20260520-fase4"></script>
 </body>
 </html>

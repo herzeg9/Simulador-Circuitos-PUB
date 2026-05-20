@@ -348,6 +348,7 @@ function add(tipo, nomeFixo=null, nosInput=null, val=null, alvo=null) {
         <button class="btn-del" onclick="removerComponente(this.parentElement)">×</button>
     `;
     lista.appendChild(li);
+    aplicarTooltipsComponente(li);
 
     const alvoInput = li.querySelector('.alvo-comp');
     if (alvoInput && alvo != null && alvo !== '') {
@@ -1505,6 +1506,8 @@ function agendarRerenderEsquematico() {
     _esqDebounceTimer = setTimeout(() => {
         try { renderEsquematico(); }
         catch (e) { /* preview não pode quebrar a UI; falha silenciosa */ }
+        try { validarTopologia(); }
+        catch (e) { /* validação não pode quebrar a UI; falha silenciosa */ }
     }, 180);
 }
 
@@ -1813,6 +1816,168 @@ function setupDialogoRelacionar() {
     }
 }
 
+/* ============================================================
+ * FASE 4 — Acessibilidade: atalhos, tooltips inline, validações
+ * Não interfere na lógica de simulação nem no contrato JSON.
+ * ============================================================ */
+
+/**
+ * Tabela de tooltips por classe de input. O atributo `title` nativo
+ * fornece o hint quando o usuário passa o mouse sobre o campo.
+ */
+const _TOOLTIPS = {
+    'no-a': 'Nó positivo (terminal A). Use 0 para terra (GND).',
+    'no-b': 'Nó negativo (terminal B). Use 0 para terra (GND).',
+    'no-c': 'Nó positivo do controle (entrada da fonte dependente).',
+    'no-d': 'Nó negativo do controle (entrada da fonte dependente).',
+    'val-input': 'Valor numérico. Aceita sufixos: k (10³), M (10⁶ — maiúsculo), m (10⁻³ — minúsculo), u (10⁻⁶), n (10⁻⁹), p (10⁻¹²).',
+    'val-input-dc': 'Valor DC. Aceita sufixos k/M/m/u/n/p.',
+    'val-input-mod': 'Módulo (amplitude) da fonte AC. Aceita sufixos k/M/m/u/n/p.',
+    'val-input-fase': 'Fase em graus. Pode ser negativa (ex: -30).',
+    'nome-comp': 'Nome do componente. Deve ser único.',
+    'alvo-comp': 'Nome do componente cuja corrente serve de referência. Deve existir na lista.'
+};
+
+/**
+ * Atribui `title` aos inputs do comp-item recém-criado, conforme a tabela
+ * acima. Não sobrescreve titles previamente definidos.
+ *
+ * @param {HTMLLIElement} li
+ */
+function aplicarTooltipsComponente(li) {
+    if (!li) return;
+    Object.keys(_TOOLTIPS).forEach(cls => {
+        li.querySelectorAll('.' + cls).forEach(el => {
+            if (!el.title) el.title = _TOOLTIPS[cls];
+        });
+    });
+}
+
+/**
+ * Valida topologia em tempo real e marca visualmente os componentes
+ * problemáticos. Emite avisos (amarelo) e erros (vermelho) no painel
+ * #painelAvisosTopologia.
+ *
+ * Checagens:
+ *  - Nomes duplicados (erro)
+ *  - Curto-circuito interno (nA === nB) — erro, ou aviso se ambos == 0
+ *  - CCVS/CCCS com Alvo vazio ou apontando para nome inexistente (erro)
+ *  - Nó isolado (grau 1 no grafo completo, exceto GND) — aviso
+ */
+function validarTopologia() {
+    const painel = document.getElementById('painelAvisosTopologia');
+    if (!painel) return;
+    const items = Array.from(document.querySelectorAll('.comp-item'));
+    items.forEach(it => it.classList.remove('has-error', 'has-warning'));
+
+    const erros = [];
+    const avisos = [];
+
+    const seen = new Map();
+    items.forEach(it => {
+        const nome = (it.querySelector('.nome-comp')?.value || '').trim();
+        if (!nome) return;
+        if (seen.has(nome)) {
+            erros.push(`Nome duplicado: <code>${escapeXml(nome)}</code>`);
+            it.classList.add('has-error');
+            seen.get(nome).classList.add('has-error');
+        } else {
+            seen.set(nome, it);
+        }
+    });
+
+    items.forEach(it => {
+        const a = parseInt(it.querySelector('.no-a')?.value, 10);
+        const b = parseInt(it.querySelector('.no-b')?.value, 10);
+        if (!Number.isFinite(a) || !Number.isFinite(b)) return;
+        if (a !== b) return;
+        const nome = (it.querySelector('.nome-comp')?.value || '?').trim();
+        if (a === 0) {
+            avisos.push(`<code>${escapeXml(nome)}</code> tem ambos os terminais no GND (sem efeito no circuito).`);
+            it.classList.add('has-warning');
+        } else {
+            erros.push(`<code>${escapeXml(nome)}</code> tem terminais idênticos (curto interno no nó ${a}).`);
+            it.classList.add('has-error');
+        }
+    });
+
+    items.forEach(it => {
+        const tipo = it.dataset.tipo;
+        if (tipo !== 'CCVS' && tipo !== 'CCCS') return;
+        const alvoEl = it.querySelector('.alvo-comp');
+        const alvo = alvoEl ? alvoEl.value.trim() : '';
+        const nome = (it.querySelector('.nome-comp')?.value || '?').trim();
+        if (!alvo) {
+            erros.push(`<code>${escapeXml(nome)}</code> está sem o componente de <em>Alvo</em> (corrente de referência).`);
+            it.classList.add('has-error');
+            return;
+        }
+        const existe = items.some(o => o !== it && (o.querySelector('.nome-comp')?.value || '').trim() === alvo);
+        if (!existe) {
+            erros.push(`<code>${escapeXml(nome)}</code> referencia <code>${escapeXml(alvo)}</code>, mas esse componente não existe.`);
+            it.classList.add('has-error');
+        }
+    });
+
+    const nodeUsages = new Map();
+    items.forEach(it => {
+        ['no-a', 'no-b', 'no-c', 'no-d'].forEach(cls => {
+            const el = it.querySelector('.' + cls);
+            if (!el) return;
+            const n = parseInt(el.value, 10);
+            if (!Number.isFinite(n)) return;
+            if (!nodeUsages.has(n)) nodeUsages.set(n, []);
+            nodeUsages.get(n).push(it);
+        });
+    });
+    nodeUsages.forEach((usages, node) => {
+        if (node === 0) return;
+        if (usages.length === 1) {
+            const it = usages[0];
+            const nome = (it.querySelector('.nome-comp')?.value || '?').trim();
+            avisos.push(`Nó <code>${node}</code> só aparece em <code>${escapeXml(nome)}</code> (sem fechamento de malha).`);
+            it.classList.add('has-warning');
+        }
+    });
+
+    if (!erros.length && !avisos.length) {
+        painel.hidden = true;
+        painel.innerHTML = '';
+        delete painel.dataset.severity;
+        return;
+    }
+
+    painel.dataset.severity = erros.length ? 'error' : 'warning';
+    let html = '';
+    if (erros.length) {
+        html += `<h4>&#9940; ${erros.length} erro(s) detectado(s)</h4><ul>`
+            + erros.map(e => `<li>${e}</li>`).join('') + '</ul>';
+    }
+    if (avisos.length) {
+        const sep = erros.length ? 'style="margin-top:8px"' : '';
+        html += `<h4 ${sep}>&#9888;&#65039; ${avisos.length} aviso(s)</h4><ul>`
+            + avisos.map(a => `<li>${a}</li>`).join('') + '</ul>';
+    }
+    painel.innerHTML = html;
+    painel.hidden = false;
+}
+
+/**
+ * Instala atalhos globais de teclado:
+ *  - Ctrl+Enter (ou Cmd+Enter no macOS): aciona "Analisar Completo".
+ */
+function setupAtalhosTeclado() {
+    document.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            const btn = document.getElementById('btnAnalisarCompleto');
+            if (btn) {
+                e.preventDefault();
+                btn.click();
+            }
+        }
+    });
+}
+
 /**
  * Alterna entre modo claro e escuro
  */
@@ -1855,4 +2020,15 @@ document.addEventListener('DOMContentLoaded', function() {
     setupOutputTabs();
     setupEsquematicoLive();
     setupDialogoRelacionar();
+    setupAtalhosTeclado();
+    aplicarTooltipsGlobais();
 });
+
+function aplicarTooltipsGlobais() {
+    const freq = document.getElementById('inputFrequenciaAc');
+    if (freq && !freq.title) freq.title = 'Frequência em Hz. Use 60 para rede brasileira, 50 para europeia.';
+    const toggleAc = document.getElementById('toggleModoAc');
+    if (toggleAc && !toggleAc.title) toggleAc.title = 'Alterna entre DC (corrente contínua) e AC (corrente alternada).';
+    const btnAnalisar = document.getElementById('btnAnalisarCompleto');
+    if (btnAnalisar) btnAnalisar.title = 'Analisa o circuito (atalho: Ctrl+Enter)';
+}
