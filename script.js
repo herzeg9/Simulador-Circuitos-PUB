@@ -1677,33 +1677,89 @@ function executarAdicaoRelacionada(modo, tipo, lado) {
 }
 
 /**
- * Remove o componente do DOM. Se foi inserido em série via diálogo, tenta
- * restaurar o nó original do componente de referência — mas apenas se a
- * referência ainda usa o nó intermediário (i.e., o usuário não editou
- * manualmente a referência depois da inserção).
+ * Remove um componente do DOM com auto-cicatrização da cadeia em série:
+ *
+ * - Se o componente tem EXATAMENTE 1 filho direto (outro componente
+ *   inserido em série com este, e ainda atrelado pelo nó intermediário),
+ *   faz "splice": o filho assume a posição estrutural deste no encadeamento.
+ *   Concretamente, o terminal "interno" do filho (o que enxergava o
+ *   intermediário) é redirecionado para o terminal "externo" deste
+ *   componente; e os metadados de inserção em série deste componente são
+ *   herdados pelo filho. Resultado: a cadeia continua funcionando como
+ *   se este componente nunca tivesse existido (do ponto de vista da
+ *   referência original / "avô" na cadeia).
+ *
+ * - Se o componente NÃO tem filhos (folha da cadeia), faz o restore
+ *   simples: restaura o terminal original da referência, desde que ela
+ *   ainda use o nó intermediário criado por esta inserção.
+ *
+ * - Se o componente tem >1 filho adjacente (caso topológico ramificado
+ *   raro), faz fallback para restore simples para não introduzir gaps.
  *
  * @param {HTMLLIElement} li - O elemento .comp-item a remover.
  */
 function removerComponente(li) {
     if (!li) return;
-    const refUid = li.dataset.seriesRefUid;
-    const side = li.dataset.seriesSide;
-    const newNode = parseInt(li.dataset.seriesNewNode, 10);
-    const oldValue = parseInt(li.dataset.seriesOldValue, 10);
+    const myUid = li.dataset.uid;
 
-    if (refUid && (side === 'A' || side === 'B') && Number.isFinite(newNode) && Number.isFinite(oldValue)) {
-        const refEl = document.querySelector('.comp-item[data-uid="' + refUid + '"]');
-        if (refEl) {
-            const sideEl = refEl.querySelector(side === 'A' ? '.no-a' : '.no-b');
-            if (sideEl) {
-                const curValue = parseInt(sideEl.value, 10);
-                if (curValue === newNode) {
-                    sideEl.value = String(oldValue);
-                    sideEl.dispatchEvent(new Event('input', { bubbles: true }));
+    const childrenAll = myUid
+        ? Array.from(document.querySelectorAll('.comp-item'))
+            .filter(el => el !== li && el.dataset.seriesRefUid === myUid)
+        : [];
+
+    const parentNA = parseInt(li.querySelector('.no-a')?.value, 10);
+    const parentNB = parseInt(li.querySelector('.no-b')?.value, 10);
+
+    const adjacentChildren = childrenAll.filter(child => {
+        const cSide = child.dataset.seriesSide;
+        const cNewNode = parseInt(child.dataset.seriesNewNode, 10);
+        if ((cSide !== 'A' && cSide !== 'B') || !Number.isFinite(cNewNode)) return false;
+        const parentVal = cSide === 'A' ? parentNA : parentNB;
+        return parentVal === cNewNode;
+    });
+
+    if (adjacentChildren.length === 1) {
+        const child = adjacentChildren[0];
+        const cSide = child.dataset.seriesSide;
+        const childInnerSelector = cSide === 'A' ? '.no-b' : '.no-a';
+        const parentOuterValue = cSide === 'A' ? parentNB : parentNA;
+        const childInnerEl = child.querySelector(childInnerSelector);
+        if (childInnerEl && Number.isFinite(parentOuterValue)) {
+            childInnerEl.value = String(parentOuterValue);
+            childInnerEl.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        const parentSeriesRefUid = li.dataset.seriesRefUid;
+        if (parentSeriesRefUid) {
+            child.dataset.seriesRefUid = parentSeriesRefUid;
+            child.dataset.seriesSide = li.dataset.seriesSide;
+            child.dataset.seriesOldValue = li.dataset.seriesOldValue;
+            child.dataset.seriesNewNode = li.dataset.seriesNewNode;
+        } else {
+            delete child.dataset.seriesRefUid;
+            delete child.dataset.seriesSide;
+            delete child.dataset.seriesOldValue;
+            delete child.dataset.seriesNewNode;
+        }
+    } else {
+        const refUid = li.dataset.seriesRefUid;
+        const side = li.dataset.seriesSide;
+        const newNode = parseInt(li.dataset.seriesNewNode, 10);
+        const oldValue = parseInt(li.dataset.seriesOldValue, 10);
+        if (refUid && (side === 'A' || side === 'B') && Number.isFinite(newNode) && Number.isFinite(oldValue)) {
+            const refEl = document.querySelector('.comp-item[data-uid="' + refUid + '"]');
+            if (refEl) {
+                const sideEl = refEl.querySelector(side === 'A' ? '.no-a' : '.no-b');
+                if (sideEl) {
+                    const curValue = parseInt(sideEl.value, 10);
+                    if (curValue === newNode) {
+                        sideEl.value = String(oldValue);
+                        sideEl.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
                 }
             }
         }
     }
+
     li.remove();
 }
 
