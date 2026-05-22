@@ -1,0 +1,1006 @@
+(* Content-type: application/vnd.wolfram.mathematica *)
+
+(*** Wolfram Notebook File ***)
+(* http://www.wolfram.com/nb *)
+
+(* CreatedBy='Wolfram 14.3' *)
+
+(*CacheID: 234*)
+(* Internal cache information:
+NotebookFileLineBreakTest
+NotebookFileLineBreakTest
+NotebookDataPosition[       154,          7]
+NotebookDataLength[     44622,        998]
+NotebookOptionsPosition[     44115,        980]
+NotebookOutlinePosition[     44533,        997]
+CellTagsIndexPosition[     44490,        994]
+WindowFrame->Normal*)
+
+(* Beginning of Notebook Content *)
+Notebook[{
+
+Cell[CellGroupData[{
+Cell[BoxData[
+ RowBox[{
+  RowBox[{"(*", " ", 
+   RowBox[{
+   "===", "===", "===", "===", "===", "===", "===", "===", "===", "===", "===",
+     "===", "===", "==="}], "*)"}], 
+  RowBox[{"(*", 
+   RowBox[{
+    RowBox[{"API", " ", "WOLFRAM"}], "-", 
+    RowBox[{"V25", " ", 
+     RowBox[{"(", 
+      RowBox[{
+      "CORRE\[CapitalCCedilla]\[CapitalATilde]O", " ", "DA", " ", 
+       "SE\[CapitalCCedilla]\[CapitalATilde]O", " ", "2"}], ")"}]}]}], "*)"}], 
+  RowBox[{"(*", 
+   RowBox[{"Fasores", "+", "MNA", "+", 
+    RowBox[{"Superposi\[CCedilla]\[ATilde]o", " ", "Restaurada"}]}], "*)"}], 
+  RowBox[{"(*", " ", 
+   RowBox[{
+   "===", "===", "===", "===", "===", "===", "===", "===", "===", "===", "===",
+     "===", "===", "==="}], "*)"}], 
+  RowBox[{
+   RowBox[{
+    RowBox[{
+     RowBox[{"parseValue", "[", "val_String", "]"}], ":=", 
+     RowBox[{"ToExpression", "[", "val", "]"}]}], ";"}], "\n", 
+   RowBox[{
+    RowBox[{
+     RowBox[{"parseValue", "[", "val_", "]"}], ":=", "val"}], ";"}], 
+   "\[IndentingNewLine]", "\n", 
+   RowBox[{
+    RowBox[{
+     RowBox[{"cleanTeX", "[", "expr_", "]"}], ":=", 
+     RowBox[{"StringReplace", "[", 
+      RowBox[{
+       RowBox[{"ToString", "[", 
+        RowBox[{"expr", ",", "TeXForm"}], "]"}], ",", 
+       RowBox[{"{", 
+        RowBox[{
+         RowBox[{"\"\<$\\\\_$\>\"", "->", "\"\<_\>\""}], ",", 
+         RowBox[{"\"\<\\\\text{i}\>\"", "->", "\"\<i\>\""}], ",", 
+         RowBox[{"\"\<\\\\text{v}\>\"", "->", "\"\<v\>\""}], ",", 
+         RowBox[{"\"\<\\\\text{\>\"", "->", "\"\<\>\""}], ",", 
+         RowBox[{"\"\<}\>\"", "->", "\"\<\>\""}]}], "}"}]}], "]"}]}], ";"}], 
+   "\[IndentingNewLine]", "\n", 
+   RowBox[{
+    RowBox[{
+     RowBox[{"formatResult", "[", 
+      RowBox[{"val_", ",", "modo_"}], "]"}], ":=", 
+     RowBox[{"Module", "[", 
+      RowBox[{
+       RowBox[{"{", 
+        RowBox[{
+         RowBox[{"num", "=", 
+          RowBox[{"N", "[", "val", "]"}]}], ",", "mag", ",", "ang"}], "}"}], ",", 
+       RowBox[{"If", "[", 
+        RowBox[{
+         RowBox[{"modo", "==", "\"\<AC\>\""}], ",", 
+         RowBox[{"If", "[", 
+          RowBox[{
+           RowBox[{
+            RowBox[{"Abs", "[", "num", "]"}], "<", 
+            RowBox[{"10", "^", 
+             RowBox[{"-", "8"}]}]}], ",", "\"\<0\>\"", ",", 
+           RowBox[{
+            RowBox[{"mag", "=", 
+             RowBox[{"Round", "[", 
+              RowBox[{
+               RowBox[{"Abs", "[", "num", "]"}], ",", "0.0001"}], "]"}]}], ";",
+             "\[IndentingNewLine]", 
+            RowBox[{"ang", "=", 
+             RowBox[{"Round", "[", 
+              RowBox[{
+               RowBox[{
+                RowBox[{"Arg", "[", "num", "]"}], "/", "Degree"}], ",", 
+               "0.01"}], "]"}]}], ";", "\[IndentingNewLine]", 
+            RowBox[{
+             RowBox[{"ToString", "[", "mag", "]"}], "<>", "\"\< \[Angle] \>\"",
+              "<>", 
+             RowBox[{"ToString", "[", "ang", "]"}], 
+             "<>", "\"\<\[Degree]\>\""}]}]}], "]"}], ",", 
+         RowBox[{"ToString", "[", 
+          RowBox[{"Round", "[", 
+           RowBox[{
+            RowBox[{"Chop", "[", "num", "]"}], ",", "0.0001"}], "]"}], 
+          "]"}]}], "]"}]}], "]"}]}], ";"}], "\[IndentingNewLine]", "\n", 
+   RowBox[{
+    RowBox[{
+     RowBox[{"processCircuit", "[", "payloadStr_String", "]"}], ":=", 
+     RowBox[{"Module", "[", 
+      RowBox[{
+       RowBox[{"{", 
+        RowBox[{
+        "result", ",", "payload", ",", "config", ",", "components", ",", 
+         "modo", ",", "freq", ",", "omega", ",", "nodes", ",", "eqs", ",", 
+         "vars", ",", "solSym", ",", "currentVars", ",", "response", ",", 
+         "compVal", ",", "srcVal", ",", "n1", ",", "n2", ",", "ctrl1", ",", 
+         "ctrl2", ",", "indepSources", ",", "stepEqs", ",", "stepSol", ",", 
+         "superposicao", ",", "hasDependentOrReactive"}], "}"}], ",", 
+       RowBox[{
+        RowBox[{"Clear", "[", 
+         RowBox[{"v", ",", "i"}], "]"}], ";", "\[IndentingNewLine]", 
+        RowBox[{"result", "=", 
+         RowBox[{"Catch", "[", 
+          RowBox[{
+           RowBox[{"payload", "=", 
+            RowBox[{"Check", "[", 
+             RowBox[{
+              RowBox[{"ImportString", "[", 
+               RowBox[{"payloadStr", ",", "\"\<RawJSON\>\""}], "]"}], ",", 
+              RowBox[{"Throw", "[", 
+               RowBox[{"<|", 
+                RowBox[{"\"\<Erro\>\"", "->", "\"\<Falha ao ler JSON.\>\""}], 
+                "|>"}], "]"}]}], "]"}]}], ";", "\[IndentingNewLine]", 
+           RowBox[{"If", "[", 
+            RowBox[{
+             RowBox[{
+              RowBox[{"!", 
+               RowBox[{"KeyExistsQ", "[", 
+                RowBox[{"payload", ",", "\"\<Config\>\""}], "]"}]}], "||", 
+              RowBox[{"!", 
+               RowBox[{"KeyExistsQ", "[", 
+                RowBox[{"payload", ",", "\"\<Netlist\>\""}], "]"}]}]}], ",", 
+             RowBox[{"Throw", "[", 
+              RowBox[{"<|", 
+               
+               RowBox[{"\"\<Erro\>\"", 
+                "->", "\"\<Formato de payload inv\[AAcute]lido (Falta Config \
+ou Netlist).\>\""}], "|>"}], "]"}]}], "]"}], ";", "\[IndentingNewLine]", 
+           RowBox[{"config", "=", 
+            RowBox[{"payload", "[", "\"\<Config\>\"", "]"}]}], ";", 
+           "\[IndentingNewLine]", 
+           RowBox[{"components", "=", 
+            RowBox[{"payload", "[", "\"\<Netlist\>\"", "]"}]}], ";", 
+           "\[IndentingNewLine]", 
+           RowBox[{"modo", "=", 
+            RowBox[{"config", "[", "\"\<Modo\>\"", "]"}]}], ";", 
+           "\[IndentingNewLine]", 
+           RowBox[{"If", "[", 
+            RowBox[{
+             RowBox[{
+              RowBox[{"!", 
+               RowBox[{"ListQ", "[", "components", "]"}]}], "||", 
+              RowBox[{
+               RowBox[{"Length", "[", "components", "]"}], "==", "0"}]}], ",", 
+             RowBox[{"Throw", "[", 
+              RowBox[{"<|", 
+               
+               RowBox[{"\"\<Erro\>\"", 
+                "->", "\"\<O circuito est\[AAcute] vazio.\>\""}], "|>"}], 
+              "]"}]}], "]"}], ";", "\[IndentingNewLine]", 
+           RowBox[{"freq", "=", 
+            RowBox[{"If", "[", 
+             RowBox[{
+              RowBox[{"KeyExistsQ", "[", 
+               RowBox[{"config", ",", "\"\<Frequencia\>\""}], "]"}], ",", 
+              RowBox[{"parseValue", "[", 
+               RowBox[{"ToString", "[", 
+                RowBox[{"config", "[", "\"\<Frequencia\>\"", "]"}], "]"}], 
+               "]"}], ",", "60"}], "]"}]}], ";", "\[IndentingNewLine]", 
+           RowBox[{"omega", "=", 
+            RowBox[{"2", "*", "Pi", "*", "freq"}]}], ";", 
+           "\[IndentingNewLine]", 
+           RowBox[{"nodes", "=", 
+            RowBox[{"Check", "[", 
+             RowBox[{
+              RowBox[{"DeleteDuplicates", "[", 
+               RowBox[{"Flatten", "[", 
+                RowBox[{"Map", "[", 
+                 RowBox[{
+                  RowBox[{
+                   RowBox[{"#", "[", "\"\<Nos\>\"", "]"}], "&"}], ",", 
+                  "components"}], "]"}], "]"}], "]"}], ",", 
+              RowBox[{"Throw", "[", 
+               RowBox[{"<|", 
+                
+                RowBox[{"\"\<Erro\>\"", 
+                 "->", "\"\<Falha na extra\[CCedilla]\[ATilde]o dos \
+n\[OAcute]s.\>\""}], "|>"}], "]"}]}], "]"}]}], ";", "\[IndentingNewLine]", 
+           RowBox[{"nodes", "=", 
+            RowBox[{"Select", "[", 
+             RowBox[{"nodes", ",", 
+              RowBox[{
+               RowBox[{"#", "!=", "0"}], "&"}]}], "]"}]}], ";", 
+           "\[IndentingNewLine]", 
+           RowBox[{"eqs", "=", 
+            RowBox[{"{", "}"}]}], ";", 
+           RowBox[{"currentVars", "=", 
+            RowBox[{"{", "}"}]}], ";", 
+           RowBox[{
+            RowBox[{"v", "[", "0", "]"}], "=", "0"}], ";", 
+           "\[IndentingNewLine]", 
+           RowBox[{"Check", "[", 
+            RowBox[{
+             RowBox[{"Do", "[", 
+              RowBox[{
+               RowBox[{"AppendTo", "[", 
+                RowBox[{"eqs", ",", 
+                 RowBox[{
+                  RowBox[{"Sum", "[", 
+                   RowBox[{
+                    RowBox[{"Which", "[", 
+                    RowBox[{
+                    RowBox[{
+                    RowBox[{
+                    RowBox[{"comp", "[", "\"\<Tipo\>\"", "]"}], 
+                    "==", "\"\<Transformer\>\""}], "&&", 
+                    RowBox[{
+                    RowBox[{
+                    RowBox[{"comp", "[", "\"\<Nos\>\"", "]"}], "[", 
+                    RowBox[{"[", "1", "]"}], "]"}], "==", "n"}]}], ",", 
+                    RowBox[{"i", "[", 
+                    RowBox[{
+                    RowBox[{"comp", "[", "\"\<Componente\>\"", "]"}], 
+                    "<>", "\"\<_p\>\""}], "]"}], ",", 
+                    RowBox[{
+                    RowBox[{
+                    RowBox[{"comp", "[", "\"\<Tipo\>\"", "]"}], 
+                    "==", "\"\<Transformer\>\""}], "&&", 
+                    RowBox[{
+                    RowBox[{
+                    RowBox[{"comp", "[", "\"\<Nos\>\"", "]"}], "[", 
+                    RowBox[{"[", "2", "]"}], "]"}], "==", "n"}]}], ",", 
+                    RowBox[{"-", 
+                    RowBox[{"i", "[", 
+                    RowBox[{
+                    RowBox[{"comp", "[", "\"\<Componente\>\"", "]"}], 
+                    "<>", "\"\<_p\>\""}], "]"}]}], ",", 
+                    RowBox[{
+                    RowBox[{
+                    RowBox[{"comp", "[", "\"\<Tipo\>\"", "]"}], 
+                    "==", "\"\<Transformer\>\""}], "&&", 
+                    RowBox[{
+                    RowBox[{
+                    RowBox[{"comp", "[", "\"\<Nos\>\"", "]"}], "[", 
+                    RowBox[{"[", "3", "]"}], "]"}], "==", "n"}]}], ",", 
+                    RowBox[{"i", "[", 
+                    RowBox[{
+                    RowBox[{"comp", "[", "\"\<Componente\>\"", "]"}], 
+                    "<>", "\"\<_s\>\""}], "]"}], ",", 
+                    RowBox[{
+                    RowBox[{
+                    RowBox[{"comp", "[", "\"\<Tipo\>\"", "]"}], 
+                    "==", "\"\<Transformer\>\""}], "&&", 
+                    RowBox[{
+                    RowBox[{
+                    RowBox[{"comp", "[", "\"\<Nos\>\"", "]"}], "[", 
+                    RowBox[{"[", "4", "]"}], "]"}], "==", "n"}]}], ",", 
+                    RowBox[{"-", 
+                    RowBox[{"i", "[", 
+                    RowBox[{
+                    RowBox[{"comp", "[", "\"\<Componente\>\"", "]"}], 
+                    "<>", "\"\<_s\>\""}], "]"}]}], ",", 
+                    RowBox[{
+                    RowBox[{
+                    RowBox[{"comp", "[", "\"\<Nos\>\"", "]"}], "[", 
+                    RowBox[{"[", "1", "]"}], "]"}], "==", "n"}], ",", 
+                    RowBox[{"i", "[", 
+                    RowBox[{"comp", "[", "\"\<Componente\>\"", "]"}], "]"}], ",", 
+                    RowBox[{
+                    RowBox[{
+                    RowBox[{"comp", "[", "\"\<Nos\>\"", "]"}], "[", 
+                    RowBox[{"[", "2", "]"}], "]"}], "==", "n"}], ",", 
+                    RowBox[{"-", 
+                    RowBox[{"i", "[", 
+                    RowBox[{"comp", "[", "\"\<Componente\>\"", "]"}], "]"}]}],
+                     ",", "True", ",", "0"}], "]"}], ",", 
+                    RowBox[{"{", 
+                    RowBox[{"comp", ",", "components"}], "}"}]}], "]"}], "==",
+                   "0"}]}], "]"}], ",", 
+               RowBox[{"{", 
+                RowBox[{"n", ",", "nodes"}], "}"}]}], "]"}], ",", 
+             RowBox[{"Throw", "[", 
+              RowBox[{"<|", 
+               
+               RowBox[{"\"\<Erro\>\"", 
+                "->", "\"\<Falha na montagem da LCK.\>\""}], "|>"}], "]"}]}], 
+            "]"}], ";", "\[IndentingNewLine]", 
+           RowBox[{"Check", "[", 
+            RowBox[{
+             RowBox[{"Do", "[", 
+              RowBox[{
+               RowBox[{
+                RowBox[{"n1", "=", 
+                 RowBox[{
+                  RowBox[{"comp", "[", "\"\<Nos\>\"", "]"}], "[", 
+                  RowBox[{"[", "1", "]"}], "]"}]}], ";", 
+                RowBox[{"n2", "=", 
+                 RowBox[{
+                  RowBox[{"comp", "[", "\"\<Nos\>\"", "]"}], "[", 
+                  RowBox[{"[", "2", "]"}], "]"}]}], ";", 
+                "\[IndentingNewLine]", 
+                RowBox[{"Switch", "[", 
+                 RowBox[{
+                  RowBox[{"comp", "[", "\"\<Tipo\>\"", "]"}], 
+                  ",", "\"\<Resistor\>\"", ",", 
+                  RowBox[{
+                   RowBox[{"compVal", "=", 
+                    RowBox[{"parseValue", "[", 
+                    RowBox[{"ToString", "[", 
+                    RowBox[{"comp", "[", "\"\<Valor\>\"", "]"}], "]"}], 
+                    "]"}]}], ";", 
+                   RowBox[{"AppendTo", "[", 
+                    RowBox[{"eqs", ",", 
+                    RowBox[{
+                    RowBox[{
+                    RowBox[{"v", "[", "n1", "]"}], "-", 
+                    RowBox[{"v", "[", "n2", "]"}]}], "==", 
+                    RowBox[{"compVal", "*", 
+                    RowBox[{"i", "[", 
+                    RowBox[{"comp", "[", "\"\<Componente\>\"", "]"}], 
+                    "]"}]}]}]}], "]"}], ";", 
+                   RowBox[{"AppendTo", "[", 
+                    RowBox[{"currentVars", ",", 
+                    RowBox[{"i", "[", 
+                    RowBox[{"comp", "[", "\"\<Componente\>\"", "]"}], "]"}]}],
+                     "]"}]}], ",", "\"\<VoltageSource\>\"", ",", 
+                  RowBox[{
+                   RowBox[{"srcVal", "=", 
+                    RowBox[{"If", "[", 
+                    RowBox[{
+                    RowBox[{"modo", "==", "\"\<AC\>\""}], ",", 
+                    RowBox[{
+                    RowBox[{"parseValue", "[", 
+                    RowBox[{"ToString", "[", 
+                    RowBox[{"comp", "[", "\"\<Modulo\>\"", "]"}], "]"}], 
+                    "]"}], "*", 
+                    RowBox[{"Exp", "[", 
+                    RowBox[{"I", "*", 
+                    RowBox[{"parseValue", "[", 
+                    RowBox[{"ToString", "[", 
+                    RowBox[{"comp", "[", "\"\<Fase\>\"", "]"}], "]"}], "]"}], 
+                    "*", "Degree"}], "]"}]}], ",", 
+                    RowBox[{"parseValue", "[", 
+                    RowBox[{"ToString", "[", 
+                    RowBox[{"comp", "[", "\"\<Valor\>\"", "]"}], "]"}], 
+                    "]"}]}], "]"}]}], ";", 
+                   RowBox[{"AppendTo", "[", 
+                    RowBox[{"eqs", ",", 
+                    RowBox[{
+                    RowBox[{
+                    RowBox[{"v", "[", "n1", "]"}], "-", 
+                    RowBox[{"v", "[", "n2", "]"}]}], "==", "srcVal"}]}], 
+                    "]"}], ";", 
+                   RowBox[{"AppendTo", "[", 
+                    RowBox[{"currentVars", ",", 
+                    RowBox[{"i", "[", 
+                    RowBox[{"comp", "[", "\"\<Componente\>\"", "]"}], "]"}]}],
+                     "]"}]}], ",", "\"\<CurrentSource\>\"", ",", 
+                  RowBox[{
+                   RowBox[{"srcVal", "=", 
+                    RowBox[{"If", "[", 
+                    RowBox[{
+                    RowBox[{"modo", "==", "\"\<AC\>\""}], ",", 
+                    RowBox[{
+                    RowBox[{"parseValue", "[", 
+                    RowBox[{"ToString", "[", 
+                    RowBox[{"comp", "[", "\"\<Modulo\>\"", "]"}], "]"}], 
+                    "]"}], "*", 
+                    RowBox[{"Exp", "[", 
+                    RowBox[{"I", "*", 
+                    RowBox[{"parseValue", "[", 
+                    RowBox[{"ToString", "[", 
+                    RowBox[{"comp", "[", "\"\<Fase\>\"", "]"}], "]"}], "]"}], 
+                    "*", "Degree"}], "]"}]}], ",", 
+                    RowBox[{"parseValue", "[", 
+                    RowBox[{"ToString", "[", 
+                    RowBox[{"comp", "[", "\"\<Valor\>\"", "]"}], "]"}], 
+                    "]"}]}], "]"}]}], ";", 
+                   RowBox[{"AppendTo", "[", 
+                    RowBox[{"eqs", ",", 
+                    RowBox[{
+                    RowBox[{"i", "[", 
+                    RowBox[{"comp", "[", "\"\<Componente\>\"", "]"}], "]"}], "==",
+                     "srcVal"}]}], "]"}], ";", 
+                   RowBox[{"AppendTo", "[", 
+                    RowBox[{"currentVars", ",", 
+                    RowBox[{"i", "[", 
+                    RowBox[{"comp", "[", "\"\<Componente\>\"", "]"}], "]"}]}],
+                     "]"}]}], ",", "\"\<Capacitor\>\"", ",", 
+                  RowBox[{
+                   RowBox[{"compVal", "=", 
+                    RowBox[{"parseValue", "[", 
+                    RowBox[{"ToString", "[", 
+                    RowBox[{"comp", "[", "\"\<Valor\>\"", "]"}], "]"}], 
+                    "]"}]}], ";", 
+                   RowBox[{"If", "[", 
+                    RowBox[{
+                    RowBox[{"modo", "==", "\"\<AC\>\""}], ",", 
+                    RowBox[{"AppendTo", "[", 
+                    RowBox[{"eqs", ",", 
+                    RowBox[{
+                    RowBox[{
+                    RowBox[{"v", "[", "n1", "]"}], "-", 
+                    RowBox[{"v", "[", "n2", "]"}]}], "==", 
+                    RowBox[{
+                    RowBox[{"(", 
+                    RowBox[{"1", "/", 
+                    RowBox[{"(", 
+                    RowBox[{"I", "*", "omega", "*", "compVal"}], ")"}]}], 
+                    ")"}], "*", 
+                    RowBox[{"i", "[", 
+                    RowBox[{"comp", "[", "\"\<Componente\>\"", "]"}], 
+                    "]"}]}]}]}], "]"}], ",", 
+                    RowBox[{"AppendTo", "[", 
+                    RowBox[{"eqs", ",", 
+                    RowBox[{
+                    RowBox[{"i", "[", 
+                    RowBox[{"comp", "[", "\"\<Componente\>\"", "]"}], "]"}], "==",
+                     "0"}]}], "]"}]}], "]"}], ";", 
+                   RowBox[{"AppendTo", "[", 
+                    RowBox[{"currentVars", ",", 
+                    RowBox[{"i", "[", 
+                    RowBox[{"comp", "[", "\"\<Componente\>\"", "]"}], "]"}]}],
+                     "]"}]}], ",", "\"\<Inductor\>\"", ",", 
+                  RowBox[{
+                   RowBox[{"compVal", "=", 
+                    RowBox[{"parseValue", "[", 
+                    RowBox[{"ToString", "[", 
+                    RowBox[{"comp", "[", "\"\<Valor\>\"", "]"}], "]"}], 
+                    "]"}]}], ";", 
+                   RowBox[{"If", "[", 
+                    RowBox[{
+                    RowBox[{"modo", "==", "\"\<AC\>\""}], ",", 
+                    RowBox[{"AppendTo", "[", 
+                    RowBox[{"eqs", ",", 
+                    RowBox[{
+                    RowBox[{
+                    RowBox[{"v", "[", "n1", "]"}], "-", 
+                    RowBox[{"v", "[", "n2", "]"}]}], "==", 
+                    RowBox[{
+                    RowBox[{"(", 
+                    RowBox[{"I", "*", "omega", "*", "compVal"}], ")"}], "*", 
+                    RowBox[{"i", "[", 
+                    RowBox[{"comp", "[", "\"\<Componente\>\"", "]"}], 
+                    "]"}]}]}]}], "]"}], ",", 
+                    RowBox[{"AppendTo", "[", 
+                    RowBox[{"eqs", ",", 
+                    RowBox[{
+                    RowBox[{
+                    RowBox[{"v", "[", "n1", "]"}], "-", 
+                    RowBox[{"v", "[", "n2", "]"}]}], "==", "0"}]}], "]"}]}], 
+                    "]"}], ";", 
+                   RowBox[{"AppendTo", "[", 
+                    RowBox[{"currentVars", ",", 
+                    RowBox[{"i", "[", 
+                    RowBox[{"comp", "[", "\"\<Componente\>\"", "]"}], "]"}]}],
+                     "]"}]}], ",", "\"\<VCVS\>\"", ",", 
+                  RowBox[{
+                   RowBox[{"compVal", "=", 
+                    RowBox[{"parseValue", "[", 
+                    RowBox[{"ToString", "[", 
+                    RowBox[{"comp", "[", "\"\<Valor\>\"", "]"}], "]"}], 
+                    "]"}]}], ";", 
+                   RowBox[{"ctrl1", "=", 
+                    RowBox[{
+                    RowBox[{"comp", "[", "\"\<Nos\>\"", "]"}], "[", 
+                    RowBox[{"[", "3", "]"}], "]"}]}], ";", 
+                   RowBox[{"ctrl2", "=", 
+                    RowBox[{
+                    RowBox[{"comp", "[", "\"\<Nos\>\"", "]"}], "[", 
+                    RowBox[{"[", "4", "]"}], "]"}]}], ";", 
+                   RowBox[{"AppendTo", "[", 
+                    RowBox[{"eqs", ",", 
+                    RowBox[{
+                    RowBox[{
+                    RowBox[{"v", "[", "n1", "]"}], "-", 
+                    RowBox[{"v", "[", "n2", "]"}]}], "==", 
+                    RowBox[{"compVal", "*", 
+                    RowBox[{"(", 
+                    RowBox[{
+                    RowBox[{"v", "[", "ctrl1", "]"}], "-", 
+                    RowBox[{"v", "[", "ctrl2", "]"}]}], ")"}]}]}]}], "]"}], ";", 
+                   RowBox[{"AppendTo", "[", 
+                    RowBox[{"currentVars", ",", 
+                    RowBox[{"i", "[", 
+                    RowBox[{"comp", "[", "\"\<Componente\>\"", "]"}], "]"}]}],
+                     "]"}]}], ",", "\"\<VCCS\>\"", ",", 
+                  RowBox[{
+                   RowBox[{"compVal", "=", 
+                    RowBox[{"parseValue", "[", 
+                    RowBox[{"ToString", "[", 
+                    RowBox[{"comp", "[", "\"\<Valor\>\"", "]"}], "]"}], 
+                    "]"}]}], ";", 
+                   RowBox[{"ctrl1", "=", 
+                    RowBox[{
+                    RowBox[{"comp", "[", "\"\<Nos\>\"", "]"}], "[", 
+                    RowBox[{"[", "3", "]"}], "]"}]}], ";", 
+                   RowBox[{"ctrl2", "=", 
+                    RowBox[{
+                    RowBox[{"comp", "[", "\"\<Nos\>\"", "]"}], "[", 
+                    RowBox[{"[", "4", "]"}], "]"}]}], ";", 
+                   RowBox[{"AppendTo", "[", 
+                    RowBox[{"eqs", ",", 
+                    RowBox[{
+                    RowBox[{"i", "[", 
+                    RowBox[{"comp", "[", "\"\<Componente\>\"", "]"}], "]"}], "==", 
+                    RowBox[{"compVal", "*", 
+                    RowBox[{"(", 
+                    RowBox[{
+                    RowBox[{"v", "[", "ctrl1", "]"}], "-", 
+                    RowBox[{"v", "[", "ctrl2", "]"}]}], ")"}]}]}]}], "]"}], ";", 
+                   RowBox[{"AppendTo", "[", 
+                    RowBox[{"currentVars", ",", 
+                    RowBox[{"i", "[", 
+                    RowBox[{"comp", "[", "\"\<Componente\>\"", "]"}], "]"}]}],
+                     "]"}]}], ",", "\"\<CCVS\>\"", ",", 
+                  RowBox[{
+                   RowBox[{"compVal", "=", 
+                    RowBox[{"parseValue", "[", 
+                    RowBox[{"ToString", "[", 
+                    RowBox[{"comp", "[", "\"\<Valor\>\"", "]"}], "]"}], 
+                    "]"}]}], ";", 
+                   RowBox[{"AppendTo", "[", 
+                    RowBox[{"eqs", ",", 
+                    RowBox[{
+                    RowBox[{
+                    RowBox[{"v", "[", "n1", "]"}], "-", 
+                    RowBox[{"v", "[", "n2", "]"}]}], "==", 
+                    RowBox[{"compVal", "*", 
+                    RowBox[{"i", "[", 
+                    RowBox[{"comp", "[", "\"\<Alvo\>\"", "]"}], "]"}]}]}]}], 
+                    "]"}], ";", 
+                   RowBox[{"AppendTo", "[", 
+                    RowBox[{"currentVars", ",", 
+                    RowBox[{"i", "[", 
+                    RowBox[{"comp", "[", "\"\<Componente\>\"", "]"}], "]"}]}],
+                     "]"}]}], ",", "\"\<CCCS\>\"", ",", 
+                  RowBox[{
+                   RowBox[{"compVal", "=", 
+                    RowBox[{"parseValue", "[", 
+                    RowBox[{"ToString", "[", 
+                    RowBox[{"comp", "[", "\"\<Valor\>\"", "]"}], "]"}], 
+                    "]"}]}], ";", 
+                   RowBox[{"AppendTo", "[", 
+                    RowBox[{"eqs", ",", 
+                    RowBox[{
+                    RowBox[{"i", "[", 
+                    RowBox[{"comp", "[", "\"\<Componente\>\"", "]"}], "]"}], "==", 
+                    RowBox[{"compVal", "*", 
+                    RowBox[{"i", "[", 
+                    RowBox[{"comp", "[", "\"\<Alvo\>\"", "]"}], "]"}]}]}]}], 
+                    "]"}], ";", 
+                   RowBox[{"AppendTo", "[", 
+                    RowBox[{"currentVars", ",", 
+                    RowBox[{"i", "[", 
+                    RowBox[{"comp", "[", "\"\<Componente\>\"", "]"}], "]"}]}],
+                     "]"}]}], ",", "\"\<Transformer\>\"", ",", 
+                  RowBox[{
+                   RowBox[{"compVal", "=", 
+                    RowBox[{"parseValue", "[", 
+                    RowBox[{"ToString", "[", 
+                    RowBox[{"comp", "[", "\"\<Razao\>\"", "]"}], "]"}], 
+                    "]"}]}], ";", 
+                   RowBox[{"AppendTo", "[", 
+                    RowBox[{"eqs", ",", 
+                    RowBox[{
+                    RowBox[{
+                    RowBox[{"v", "[", "n1", "]"}], "-", 
+                    RowBox[{"v", "[", "n2", "]"}]}], "==", 
+                    RowBox[{"compVal", "*", 
+                    RowBox[{"(", 
+                    RowBox[{
+                    RowBox[{"v", "[", 
+                    RowBox[{
+                    RowBox[{"comp", "[", "\"\<Nos\>\"", "]"}], "[", 
+                    RowBox[{"[", "3", "]"}], "]"}], "]"}], "-", 
+                    RowBox[{"v", "[", 
+                    RowBox[{
+                    RowBox[{"comp", "[", "\"\<Nos\>\"", "]"}], "[", 
+                    RowBox[{"[", "4", "]"}], "]"}], "]"}]}], ")"}]}]}]}], 
+                    "]"}], ";", 
+                   RowBox[{"AppendTo", "[", 
+                    RowBox[{"eqs", ",", 
+                    RowBox[{
+                    RowBox[{"i", "[", 
+                    RowBox[{
+                    RowBox[{"comp", "[", "\"\<Componente\>\"", "]"}], 
+                    "<>", "\"\<_s\>\""}], "]"}], "==", 
+                    RowBox[{
+                    RowBox[{"-", "compVal"}], "*", 
+                    RowBox[{"i", "[", 
+                    RowBox[{
+                    RowBox[{"comp", "[", "\"\<Componente\>\"", "]"}], 
+                    "<>", "\"\<_p\>\""}], "]"}]}]}]}], "]"}], ";", 
+                   RowBox[{"AppendTo", "[", 
+                    RowBox[{"currentVars", ",", 
+                    RowBox[{"i", "[", 
+                    RowBox[{
+                    RowBox[{"comp", "[", "\"\<Componente\>\"", "]"}], 
+                    "<>", "\"\<_p\>\""}], "]"}]}], "]"}], ";", 
+                   RowBox[{"AppendTo", "[", 
+                    RowBox[{"currentVars", ",", 
+                    RowBox[{"i", "[", 
+                    RowBox[{
+                    RowBox[{"comp", "[", "\"\<Componente\>\"", "]"}], 
+                    "<>", "\"\<_s\>\""}], "]"}]}], "]"}]}]}], "]"}]}], ",", 
+               RowBox[{"{", 
+                RowBox[{"comp", ",", "components"}], "}"}]}], "]"}], ",", 
+             RowBox[{"Throw", "[", 
+              RowBox[{"<|", 
+               
+               RowBox[{"\"\<Erro\>\"", 
+                "->", "\"\<Falha nas equa\[CCedilla]\[OTilde]es dos \
+componentes.\>\""}], "|>"}], "]"}]}], "]"}], ";", "\[IndentingNewLine]", 
+           RowBox[{"vars", "=", 
+            RowBox[{"Join", "[", 
+             RowBox[{
+              RowBox[{"Table", "[", 
+               RowBox[{
+                RowBox[{"v", "[", "n", "]"}], ",", 
+                RowBox[{"{", 
+                 RowBox[{"n", ",", "nodes"}], "}"}]}], "]"}], ",", 
+              "currentVars"}], "]"}]}], ";", "\[IndentingNewLine]", 
+           RowBox[{"solSym", "=", 
+            RowBox[{"Check", "[", 
+             RowBox[{
+              RowBox[{"Solve", "[", 
+               RowBox[{"eqs", ",", "vars"}], "]"}], ",", 
+              RowBox[{"Throw", "[", 
+               RowBox[{"<|", 
+                
+                RowBox[{"\"\<Erro\>\"", 
+                 "->", "\"\<Falha na resolu\[CCedilla]\[ATilde]o da matriz.\>\
+\""}], "|>"}], "]"}]}], "]"}]}], ";", "\[IndentingNewLine]", 
+           RowBox[{"If", "[", 
+            RowBox[{
+             RowBox[{
+              RowBox[{"Length", "[", "solSym", "]"}], ">", "0"}], ",", 
+             RowBox[{"(*", 
+              RowBox[{
+               RowBox[{
+                RowBox[{"--", 
+                 RowBox[{"-", "M\[CapitalOAcute]DULO"}]}], " ", "DE", " ", 
+                RowBox[{
+                "SUPERPOSI\[CapitalCCedilla]\[CapitalATilde]O", "--"}]}], 
+               "-"}], "*)"}], 
+             RowBox[{
+              RowBox[{"indepSources", "=", 
+               RowBox[{"Select", "[", 
+                RowBox[{"components", ",", 
+                 RowBox[{
+                  RowBox[{
+                   RowBox[{
+                    RowBox[{"#", "[", "\"\<Tipo\>\"", "]"}], 
+                    "==", "\"\<VoltageSource\>\""}], "||", 
+                   RowBox[{
+                    RowBox[{"#", "[", "\"\<Tipo\>\"", "]"}], 
+                    "==", "\"\<CurrentSource\>\""}]}], "&"}]}], "]"}]}], ";", 
+              "\[IndentingNewLine]", 
+              RowBox[{"hasDependentOrReactive", "=", 
+               RowBox[{
+                RowBox[{"Length", "[", 
+                 RowBox[{"Select", "[", 
+                  RowBox[{"components", ",", 
+                   RowBox[{
+                    RowBox[{"MemberQ", "[", 
+                    RowBox[{
+                    RowBox[{"{", 
+                    
+                    RowBox[{"\"\<VCVS\>\"", ",", "\"\<VCCS\>\"", 
+                    ",", "\"\<CCVS\>\"", ",", "\"\<CCCS\>\"", 
+                    ",", "\"\<Capacitor\>\"", ",", "\"\<Inductor\>\"", 
+                    ",", "\"\<Transformer\>\""}], "}"}], ",", 
+                    RowBox[{"#", "[", "\"\<Tipo\>\"", "]"}]}], "]"}], "&"}]}],
+                   "]"}], "]"}], ">", "0"}]}], ";", "\[IndentingNewLine]", 
+              RowBox[{"superposicao", "=", 
+               RowBox[{"{", "}"}]}], ";", "\[IndentingNewLine]", 
+              RowBox[{"If", "[", 
+               RowBox[{
+                RowBox[{
+                 RowBox[{"!", "hasDependentOrReactive"}], "&&", 
+                 RowBox[{
+                  RowBox[{"Length", "[", "indepSources", "]"}], ">", "1"}]}], 
+                ",", 
+                RowBox[{"Do", "[", 
+                 RowBox[{
+                  RowBox[{
+                   RowBox[{"stepEqs", "=", 
+                    RowBox[{"{", "}"}]}], ";", "\[IndentingNewLine]", 
+                   RowBox[{"Do", "[", 
+                    RowBox[{
+                    RowBox[{"AppendTo", "[", 
+                    RowBox[{"stepEqs", ",", 
+                    RowBox[{
+                    RowBox[{"Sum", "[", 
+                    RowBox[{
+                    RowBox[{"Which", "[", 
+                    RowBox[{
+                    RowBox[{
+                    RowBox[{
+                    RowBox[{"comp", "[", "\"\<Nos\>\"", "]"}], "[", 
+                    RowBox[{"[", "1", "]"}], "]"}], "==", "n"}], ",", 
+                    RowBox[{"i", "[", 
+                    RowBox[{"comp", "[", "\"\<Componente\>\"", "]"}], "]"}], ",", 
+                    RowBox[{
+                    RowBox[{
+                    RowBox[{"comp", "[", "\"\<Nos\>\"", "]"}], "[", 
+                    RowBox[{"[", "2", "]"}], "]"}], "==", "n"}], ",", 
+                    RowBox[{"-", 
+                    RowBox[{"i", "[", 
+                    RowBox[{"comp", "[", "\"\<Componente\>\"", "]"}], "]"}]}],
+                     ",", "True", ",", "0"}], "]"}], ",", 
+                    RowBox[{"{", 
+                    RowBox[{"comp", ",", "components"}], "}"}]}], "]"}], "==",
+                     "0"}]}], "]"}], ",", 
+                    RowBox[{"{", 
+                    RowBox[{"n", ",", "nodes"}], "}"}]}], "]"}], ";", 
+                   "\[IndentingNewLine]", 
+                   RowBox[{"Do", "[", 
+                    RowBox[{
+                    RowBox[{"Switch", "[", 
+                    RowBox[{
+                    RowBox[{"comp", "[", "\"\<Tipo\>\"", "]"}], 
+                    ",", "\"\<Resistor\>\"", ",", 
+                    RowBox[{
+                    RowBox[{"compVal", "=", 
+                    RowBox[{"parseValue", "[", 
+                    RowBox[{"ToString", "[", 
+                    RowBox[{"comp", "[", "\"\<Valor\>\"", "]"}], "]"}], 
+                    "]"}]}], ";", 
+                    RowBox[{"AppendTo", "[", 
+                    RowBox[{"stepEqs", ",", 
+                    RowBox[{
+                    RowBox[{
+                    RowBox[{"v", "[", 
+                    RowBox[{
+                    RowBox[{"comp", "[", "\"\<Nos\>\"", "]"}], "[", 
+                    RowBox[{"[", "1", "]"}], "]"}], "]"}], "-", 
+                    RowBox[{"v", "[", 
+                    RowBox[{
+                    RowBox[{"comp", "[", "\"\<Nos\>\"", "]"}], "[", 
+                    RowBox[{"[", "2", "]"}], "]"}], "]"}]}], "==", 
+                    RowBox[{"compVal", "*", 
+                    RowBox[{"i", "[", 
+                    RowBox[{"comp", "[", "\"\<Componente\>\"", "]"}], 
+                    "]"}]}]}]}], "]"}]}], ",", "\"\<VoltageSource\>\"", ",", 
+                    RowBox[{
+                    RowBox[{"srcVal", "=", 
+                    RowBox[{"If", "[", 
+                    RowBox[{
+                    RowBox[{"modo", "==", "\"\<AC\>\""}], ",", 
+                    RowBox[{
+                    RowBox[{"parseValue", "[", 
+                    RowBox[{"ToString", "[", 
+                    RowBox[{"comp", "[", "\"\<Modulo\>\"", "]"}], "]"}], 
+                    "]"}], "*", 
+                    RowBox[{"Exp", "[", 
+                    RowBox[{"I", "*", 
+                    RowBox[{"parseValue", "[", 
+                    RowBox[{"ToString", "[", 
+                    RowBox[{"comp", "[", "\"\<Fase\>\"", "]"}], "]"}], "]"}], 
+                    "*", "Degree"}], "]"}]}], ",", 
+                    RowBox[{"parseValue", "[", 
+                    RowBox[{"ToString", "[", 
+                    RowBox[{"comp", "[", "\"\<Valor\>\"", "]"}], "]"}], 
+                    "]"}]}], "]"}]}], ";", 
+                    RowBox[{"If", "[", 
+                    RowBox[{
+                    RowBox[{
+                    RowBox[{"comp", "[", "\"\<Componente\>\"", "]"}], "==", 
+                    RowBox[{"src", "[", "\"\<Componente\>\"", "]"}]}], ",", 
+                    RowBox[{"AppendTo", "[", 
+                    RowBox[{"stepEqs", ",", 
+                    RowBox[{
+                    RowBox[{
+                    RowBox[{"v", "[", 
+                    RowBox[{
+                    RowBox[{"comp", "[", "\"\<Nos\>\"", "]"}], "[", 
+                    RowBox[{"[", "1", "]"}], "]"}], "]"}], "-", 
+                    RowBox[{"v", "[", 
+                    RowBox[{
+                    RowBox[{"comp", "[", "\"\<Nos\>\"", "]"}], "[", 
+                    RowBox[{"[", "2", "]"}], "]"}], "]"}]}], "==", 
+                    "srcVal"}]}], "]"}], ",", 
+                    RowBox[{"AppendTo", "[", 
+                    RowBox[{"stepEqs", ",", 
+                    RowBox[{
+                    RowBox[{
+                    RowBox[{"v", "[", 
+                    RowBox[{
+                    RowBox[{"comp", "[", "\"\<Nos\>\"", "]"}], "[", 
+                    RowBox[{"[", "1", "]"}], "]"}], "]"}], "-", 
+                    RowBox[{"v", "[", 
+                    RowBox[{
+                    RowBox[{"comp", "[", "\"\<Nos\>\"", "]"}], "[", 
+                    RowBox[{"[", "2", "]"}], "]"}], "]"}]}], "==", "0"}]}], 
+                    "]"}]}], "]"}]}], ",", "\"\<CurrentSource\>\"", ",", 
+                    RowBox[{
+                    RowBox[{"srcVal", "=", 
+                    RowBox[{"If", "[", 
+                    RowBox[{
+                    RowBox[{"modo", "==", "\"\<AC\>\""}], ",", 
+                    RowBox[{
+                    RowBox[{"parseValue", "[", 
+                    RowBox[{"ToString", "[", 
+                    RowBox[{"comp", "[", "\"\<Modulo\>\"", "]"}], "]"}], 
+                    "]"}], "*", 
+                    RowBox[{"Exp", "[", 
+                    RowBox[{"I", "*", 
+                    RowBox[{"parseValue", "[", 
+                    RowBox[{"ToString", "[", 
+                    RowBox[{"comp", "[", "\"\<Fase\>\"", "]"}], "]"}], "]"}], 
+                    "*", "Degree"}], "]"}]}], ",", 
+                    RowBox[{"parseValue", "[", 
+                    RowBox[{"ToString", "[", 
+                    RowBox[{"comp", "[", "\"\<Valor\>\"", "]"}], "]"}], 
+                    "]"}]}], "]"}]}], ";", 
+                    RowBox[{"If", "[", 
+                    RowBox[{
+                    RowBox[{
+                    RowBox[{"comp", "[", "\"\<Componente\>\"", "]"}], "==", 
+                    RowBox[{"src", "[", "\"\<Componente\>\"", "]"}]}], ",", 
+                    RowBox[{"AppendTo", "[", 
+                    RowBox[{"stepEqs", ",", 
+                    RowBox[{
+                    RowBox[{"i", "[", 
+                    RowBox[{"comp", "[", "\"\<Componente\>\"", "]"}], "]"}], "==",
+                     "srcVal"}]}], "]"}], ",", 
+                    RowBox[{"AppendTo", "[", 
+                    RowBox[{"stepEqs", ",", 
+                    RowBox[{
+                    RowBox[{"i", "[", 
+                    RowBox[{"comp", "[", "\"\<Componente\>\"", "]"}], "]"}], "==",
+                     "0"}]}], "]"}]}], "]"}]}]}], "]"}], ",", 
+                    RowBox[{"{", 
+                    RowBox[{"comp", ",", "components"}], "}"}]}], "]"}], ";", 
+                   "\[IndentingNewLine]", 
+                   RowBox[{"stepSol", "=", 
+                    RowBox[{"Solve", "[", 
+                    RowBox[{"stepEqs", ",", "vars"}], "]"}]}], ";", 
+                   "\[IndentingNewLine]", 
+                   RowBox[{"If", "[", 
+                    RowBox[{
+                    RowBox[{
+                    RowBox[{"Length", "[", "stepSol", "]"}], ">", "0"}], ",", 
+                    RowBox[{"AppendTo", "[", 
+                    RowBox[{"superposicao", ",", 
+                    RowBox[{"<|", 
+                    RowBox[{
+                    RowBox[{"\"\<FonteAtiva\>\"", "->", 
+                    RowBox[{"src", "[", "\"\<Componente\>\"", "]"}]}], ",", 
+                    RowBox[{"\"\<ResultadosParciais\>\"", "->", 
+                    RowBox[{"Table", "[", 
+                    RowBox[{
+                    RowBox[{"formatResult", "[", 
+                    RowBox[{
+                    RowBox[{
+                    RowBox[{"v", "[", "n", "]"}], "/.", " ", 
+                    RowBox[{"stepSol", "[", 
+                    RowBox[{"[", "1", "]"}], "]"}]}], ",", "modo"}], "]"}], ",", 
+                    RowBox[{"{", 
+                    RowBox[{"n", ",", "nodes"}], "}"}]}], "]"}]}]}], "|>"}]}],
+                     "]"}]}], "]"}]}], ",", 
+                  RowBox[{"{", 
+                   RowBox[{"src", ",", "indepSources"}], "}"}]}], "]"}]}], 
+               "]"}], ";", "\[IndentingNewLine]", 
+              RowBox[{"response", "=", 
+               RowBox[{"<|", 
+                RowBox[{
+                 RowBox[{"\"\<Equacoes\>\"", "->", 
+                  RowBox[{"Table", "[", 
+                   RowBox[{
+                    RowBox[{"cleanTeX", "[", "eq", "]"}], ",", 
+                    RowBox[{"{", 
+                    RowBox[{"eq", ",", "eqs"}], "}"}]}], "]"}]}], ",", 
+                 RowBox[{"\"\<Superposicao\>\"", "->", "superposicao"}], ",", 
+                 RowBox[{"(*", 
+                  RowBox[{"CORRE\[CapitalCCedilla]\[CapitalATilde]O", ":", 
+                   RowBox[{
+                   "AGORA", " ", "O", " ", "PACOTE", " ", "\[CapitalEAcute]", 
+                    " ", 
+                    RowBox[{"ENVIADO", "!"}]}]}], "*)"}], 
+                 RowBox[{"\"\<Resultados\>\"", "->", 
+                  RowBox[{"Flatten", "[", 
+                   RowBox[{"{", 
+                    RowBox[{
+                    RowBox[{"Table", "[", 
+                    RowBox[{
+                    RowBox[{"<|", 
+                    RowBox[{
+                    RowBox[{"\"\<Local\>\"", "->", 
+                    RowBox[{"\"\<N\[OAcute] \>\"", "<>", 
+                    RowBox[{"ToString", "[", "n", "]"}]}]}], ",", 
+                    RowBox[{"\"\<ValorNumerico\>\"", "->", 
+                    RowBox[{"formatResult", "[", 
+                    RowBox[{
+                    RowBox[{
+                    RowBox[{"v", "[", "n", "]"}], "/.", " ", 
+                    RowBox[{"solSym", "[", 
+                    RowBox[{"[", "1", "]"}], "]"}]}], ",", "modo"}], "]"}]}], 
+                    ",", 
+                    RowBox[{"\"\<Unidade\>\"", "->", "\"\<V\>\""}]}], "|>"}], 
+                    ",", 
+                    RowBox[{"{", 
+                    RowBox[{"n", ",", "nodes"}], "}"}]}], "]"}], ",", 
+                    RowBox[{"Table", "[", 
+                    RowBox[{
+                    RowBox[{"<|", 
+                    RowBox[{
+                    RowBox[{"\"\<Local\>\"", "->", 
+                    RowBox[{"\"\<Corrente \>\"", "<>", 
+                    RowBox[{"ToString", "[", 
+                    RowBox[{"cv", "[", 
+                    RowBox[{"[", "1", "]"}], "]"}], "]"}]}]}], ",", 
+                    RowBox[{"\"\<ValorNumerico\>\"", "->", 
+                    RowBox[{"formatResult", "[", 
+                    RowBox[{
+                    RowBox[{"cv", "/.", " ", 
+                    RowBox[{"solSym", "[", 
+                    RowBox[{"[", "1", "]"}], "]"}]}], ",", "modo"}], "]"}]}], 
+                    ",", 
+                    RowBox[{"\"\<Unidade\>\"", "->", "\"\<A\>\""}]}], "|>"}], 
+                    ",", 
+                    RowBox[{"{", 
+                    RowBox[{"cv", ",", "currentVars"}], "}"}]}], "]"}]}], 
+                    "}"}], "]"}]}], ",", 
+                 RowBox[{"\"\<NosLista\>\"", "->", "nodes"}]}], "|>"}]}], ";",
+               "\[IndentingNewLine]", "response"}], ",", 
+             RowBox[{"Throw", "[", 
+              RowBox[{"<|", 
+               
+               RowBox[{"\"\<Erro\>\"", 
+                "->", "\"\<Sistema singular. Frequ\[EHat]ncia de \
+resson\[AHat]ncia perigosa ou curto.\>\""}], "|>"}], "]"}]}], "]"}]}], 
+          "]"}]}], ";", "\[IndentingNewLine]", 
+        RowBox[{"ExportString", "[", 
+         RowBox[{"result", ",", "\"\<JSON\>\""}], "]"}]}]}], "]"}]}], ";"}], 
+   "\[IndentingNewLine]", "\n", 
+   RowBox[{
+    RowBox[{"apiEndpoint", "=", 
+     RowBox[{"APIFunction", "[", 
+      RowBox[{
+       RowBox[{"{", 
+        RowBox[{"\"\<netlist\>\"", "->", "\"\<String\>\""}], "}"}], ",", 
+       RowBox[{
+        RowBox[{"processCircuit", "[", "#netlist", "]"}], "&"}], 
+       ",", "\"\<String\>\""}], "]"}]}], ";"}], "\n", 
+   RowBox[{"CloudDeploy", "[", 
+    RowBox[{"apiEndpoint", ",", 
+     RowBox[{"Permissions", "->", "\"\<Public\>\""}]}], "]"}]}]}]], "Input",
+ CellChangeTimes->{{3.9882149216530056`*^9, 3.9882149216530056`*^9}},
+ CellLabel->"In[1]:=",ExpressionUUID->"f2ac070a-5817-5d46-baf8-38fed2f5bd30"],
+
+Cell[BoxData[
+ InterpretationBox[
+  RowBox[{"CloudObject", "[", 
+   TemplateBox[{
+    "\"https://www.wolframcloud.com/obj/6393a82b-44ae-4bd7-85d5-6845ccf7289f\"\
+", "https://www.wolframcloud.com/obj/6393a82b-44ae-4bd7-85d5-6845ccf7289f"},
+    "HyperlinkURL"], "]"}],
+  CloudObject[
+  "https://www.wolframcloud.com/obj/6393a82b-44ae-4bd7-85d5-6845ccf7289f"],
+  SelectWithContents->True]], "Output",
+ CellChangeTimes->{3.9882149278457623`*^9, 3.9884612147469063`*^9},
+ CellLabel->"Out[7]=",ExpressionUUID->"2c89fa36-d90b-f945-aa2c-0b684441ea2b"]
+}, Open  ]]
+},
+WindowSize->{1428, 765.75},
+WindowMargins->{{0, Automatic}, {Automatic, 0}},
+LightDark->"Dark",
+FrontEndVersion->"14.3 for Microsoft Windows (64-bit) (July 8, 2025)",
+StyleDefinitions->"Default.nb",
+ExpressionUUID->"463cf03e-27b9-f341-817b-c824346143ce"
+]
+(* End of Notebook Content *)
+
+(* Internal cache information *)
+(*CellTagsOutline
+CellTagsIndex->{}
+*)
+(*CellTagsIndex
+CellTagsIndex->{}
+*)
+(*NotebookFileOutline
+Notebook[{
+Cell[CellGroupData[{
+Cell[576, 22, 42977, 942, 2677, "Input",ExpressionUUID->"f2ac070a-5817-5d46-baf8-38fed2f5bd30"],
+Cell[43556, 966, 543, 11, 33, "Output",ExpressionUUID->"2c89fa36-d90b-f945-aa2c-0b684441ea2b"]
+}, Open  ]]
+}
+]
+*)
+
