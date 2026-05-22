@@ -946,13 +946,27 @@ function limparEquacaoAC(eq) {
         '$1 /_ ($2°)'
     );
 
-    // Sanitização de complexos retangulares vindos do Wolfram:
-    // o TeXForm de "12.+8.*I" pode chegar como "12., +8. i" (ponto solto
-    // ao fim de inteiros + vírgula espúria entre parte real e imaginária).
-    // Trocamos por uma forma limpa "12 + 8 i" sem alterar números decimais
-    // legítimos (3.14 fica intacto graças ao lookahead).
+    // Sanitização de complexos retangulares vindos do Wolfram.
+    //
+    // O TeXForm de algo como "5. + 3.*I" pode chegar de duas formas:
+    //   (a) "v(1) = 5. , +3. i"          (vírgula espúria entre partes)
+    //   (b) "v(1) = 5.\\, +3.\\, i"      (TeX thin space "\\,")
+    // ... e, para complexos com parte real zero:
+    //   (c) "v(2) = (0. , -26.5258i) i(C1)"
+    //
+    // 1) Trocamos qualquer espaço fino TeX (\\, \\; \\:) por espaço normal e
+    //    removemos o negative-thin-space (\\!).
+    // 2) Removemos o ponto solto ao fim de um inteiro — só remove ponto não
+    //    seguido de dígito (3.14 fica intacto).
+    // 3) Removemos a vírgula espúria entre número/) e sinal.
+    // 4) Quando o parêntese (ou "=") abre com "0 +X" ou "0 -X", omitimos o
+    //    zero real redundante para que a saída fique "(-26.5258i)" em vez de
+    //    "(0 -26.5258i)" — mais limpa didaticamente.
+    s = s.replace(/\\[,;:]/g, ' ');
+    s = s.replace(/\\!/g, '');
     s = s.replace(/(\d+)\.(?!\d)/g, '$1');
     s = s.replace(/(\d|\))\s*,\s*([+\-])/g, '$1 $2');
+    s = s.replace(/(\(|=)\s*0\s+([+\-])/g, '$1 $2');
 
     return s;
 }
