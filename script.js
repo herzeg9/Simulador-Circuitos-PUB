@@ -1,4 +1,4 @@
-const API_URL = "https://www.wolframcloud.com/obj/f4e13c39-ac72-4d0c-a5ce-43474d36f88f"; 
+const API_URL = "https://www.wolframcloud.com/obj/herzeghenrique/simulador-circuitos-api"; 
 
 let idCounter = 1;
 

@@ -10,10 +10,10 @@
 NotebookFileLineBreakTest
 NotebookFileLineBreakTest
 NotebookDataPosition[       154,          7]
-NotebookDataLength[     44622,        998]
-NotebookOptionsPosition[     44115,        980]
-NotebookOutlinePosition[     44533,        997]
-CellTagsIndexPosition[     44490,        994]
+NotebookDataLength[     44643,        998]
+NotebookOptionsPosition[     44136,        980]
+NotebookOutlinePosition[     44554,        997]
+CellTagsIndexPosition[     44511,        994]
 WindowFrame->Normal*)
 
 (* Beginning of Notebook Content *)
@@ -48,8 +48,7 @@ Cell[BoxData[
      RowBox[{"ToExpression", "[", "val", "]"}]}], ";"}], "\n", 
    RowBox[{
     RowBox[{
-     RowBox[{"parseValue", "[", "val_", "]"}], ":=", "val"}], ";"}], 
-   "\[IndentingNewLine]", "\n", 
+     RowBox[{"parseValue", "[", "val_", "]"}], ":=", "val"}], ";"}], "\n", "\[IndentingNewLine]", 
    RowBox[{
     RowBox[{
      RowBox[{"cleanTeX", "[", "expr_", "]"}], ":=", 
@@ -64,7 +63,7 @@ Cell[BoxData[
          RowBox[{"\"\<\\\\text{v}\>\"", "->", "\"\<v\>\""}], ",", 
          RowBox[{"\"\<\\\\text{\>\"", "->", "\"\<\>\""}], ",", 
          RowBox[{"\"\<}\>\"", "->", "\"\<\>\""}]}], "}"}]}], "]"}]}], ";"}], 
-   "\[IndentingNewLine]", "\n", 
+   "\n", "\[IndentingNewLine]", 
    RowBox[{
     RowBox[{
      RowBox[{"formatResult", "[", 
@@ -105,7 +104,7 @@ Cell[BoxData[
           RowBox[{"Round", "[", 
            RowBox[{
             RowBox[{"Chop", "[", "num", "]"}], ",", "0.0001"}], "]"}], 
-          "]"}]}], "]"}]}], "]"}]}], ";"}], "\[IndentingNewLine]", "\n", 
+          "]"}]}], "]"}]}], "]"}]}], ";"}], "\n", "\[IndentingNewLine]", 
    RowBox[{
     RowBox[{
      RowBox[{"processCircuit", "[", "payloadStr_String", "]"}], ":=", 
@@ -948,7 +947,7 @@ resson\[AHat]ncia perigosa ou curto.\>\""}], "|>"}], "]"}]}], "]"}]}],
           "]"}]}], ";", "\[IndentingNewLine]", 
         RowBox[{"ExportString", "[", 
          RowBox[{"result", ",", "\"\<JSON\>\""}], "]"}]}]}], "]"}]}], ";"}], 
-   "\[IndentingNewLine]", "\n", 
+   "\n", "\[IndentingNewLine]", 
    RowBox[{
     RowBox[{"apiEndpoint", "=", 
      RowBox[{"APIFunction", "[", 
@@ -959,7 +958,7 @@ resson\[AHat]ncia perigosa ou curto.\>\""}], "|>"}], "]"}]}], "]"}]}],
         RowBox[{"processCircuit", "[", "#netlist", "]"}], "&"}], 
        ",", "\"\<String\>\""}], "]"}]}], ";"}], "\n", 
    RowBox[{"CloudDeploy", "[", 
-    RowBox[{"apiEndpoint", ",", 
+    RowBox[{"apiEndpoint", ",", "\"\<simulador-circuitos-api\>\"", ",", 
      RowBox[{"Permissions", "->", "\"\<Public\>\""}]}], "]"}]}]}]], "Input",
  CellChangeTimes->{{3.9882149216530056`*^9, 3.9882149216530056`*^9}},
  CellLabel->"In[1]:=",ExpressionUUID->"f2ac070a-5817-5d46-baf8-38fed2f5bd30"],
@@ -968,14 +967,15 @@ Cell[BoxData[
  InterpretationBox[
   RowBox[{"CloudObject", "[", 
    TemplateBox[{
-    "\"https://www.wolframcloud.com/obj/6393a82b-44ae-4bd7-85d5-6845ccf7289f\"\
-", "https://www.wolframcloud.com/obj/6393a82b-44ae-4bd7-85d5-6845ccf7289f"},
+    "\"https://www.wolframcloud.com/obj/c09a47c0-edcb-4587-a30c-8655de54b92d\"\
+", "https://www.wolframcloud.com/obj/c09a47c0-edcb-4587-a30c-8655de54b92d"},
     "HyperlinkURL"], "]"}],
   CloudObject[
-  "https://www.wolframcloud.com/obj/6393a82b-44ae-4bd7-85d5-6845ccf7289f"],
+  "https://www.wolframcloud.com/obj/c09a47c0-edcb-4587-a30c-8655de54b92d"],
   SelectWithContents->True]], "Output",
- CellChangeTimes->{3.9882149278457623`*^9, 3.9884612147469063`*^9},
- CellLabel->"Out[7]=",ExpressionUUID->"2c89fa36-d90b-f945-aa2c-0b684441ea2b"]
+ CellChangeTimes->{3.9882149278457623`*^9, 3.9884612147469063`*^9, 
+  3.988463003047655*^9},
+ CellLabel->"Out[7]=",ExpressionUUID->"c2d73a38-96e6-eb49-a636-f06c371f5c44"]
 }, Open  ]]
 },
 WindowSize->{1428, 765.75},
@@ -997,8 +997,8 @@ CellTagsIndex->{}
 (*NotebookFileOutline
 Notebook[{
 Cell[CellGroupData[{
-Cell[576, 22, 42977, 942, 2677, "Input",ExpressionUUID->"f2ac070a-5817-5d46-baf8-38fed2f5bd30"],
-Cell[43556, 966, 543, 11, 33, "Output",ExpressionUUID->"2c89fa36-d90b-f945-aa2c-0b684441ea2b"]
+Cell[576, 22, 42973, 941, 2677, "Input",ExpressionUUID->"f2ac070a-5817-5d46-baf8-38fed2f5bd30"],
+Cell[43552, 965, 568, 12, 33, "Output",ExpressionUUID->"c2d73a38-96e6-eb49-a636-f06c371f5c44"]
 }, Open  ]]
 }
 ]
