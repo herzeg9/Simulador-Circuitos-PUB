@@ -1246,6 +1246,35 @@ function limparEquacaoAC(eq) {
     s = s.replace(/(\d|\))\s*,\s*([+\-])/g, '$1 $2');
     s = s.replace(/(\(|=)\s*0\s+([+\-])/g, '$1 $2');
 
+    // FASE 5.2 — Sanitização de \frac vindo do backend.
+    //
+    // Quando a Razão do trafo é uma fração racional (ex.: "1/2"), o Wolfram
+    // representa o coeficiente como Rational[1,2] e o TeXForm gera \frac{N}{D},
+    // que é LaTeX e o AsciiMath não consegue parsear. Pior: a formatarEquacao
+    // do backend faz uma substituição ingênua de chaves e às vezes corrompe
+    // a string para \frac{N{D} ou \frac{N{D (sem a chave de fechamento),
+    // resultando em renderização como "v(2){2".
+    //
+    // Aqui aceitamos as três formas e convertemos para a sintaxe nativa do
+    // AsciiMath "(N)/(D)" — robusta, balanceada e tipográfica:
+    //   \frac{v(2)}{2}   -> (v(2))/(2)
+    //   \frac{v(2){2}    -> (v(2))/(2)
+    //   \frac{v(2){2     -> (v(2))/(2)
+    //
+    // A regex aceita N contendo parênteses simples (v(2), i(T1_p) etc.)
+    // e termina o denominador em delimitador natural (espaço, sinal, =, fim).
+    s = s.replace(
+        /\\frac\{([^{}]*(?:\([^)]*\)[^{}]*)*)\}?\s*\{?([^{}\s+\-=*/]+)\}?/g,
+        '($1)/($2)'
+    );
+
+    // FASE 5.2 — Nomes de componente com "_" seguido de 2+ letras (ex.: R_Carga).
+    // O AsciiMath interpreta "_" como subscrito de UM token: "R_Carga" vira
+    // R com subscrito "C" e "arga" solto. Para nomes longos, envolvemos a
+    // parte após o "_" em aspas, que o AsciiMath renderiza como texto
+    // subscrito completo. Não afeta T1_p / T1_s (subscrito de 1 letra).
+    s = s.replace(/([A-Za-z0-9])_([A-Za-z][A-Za-z0-9]+)\b/g, '$1_"$2"');
+
     return s;
 }
 
