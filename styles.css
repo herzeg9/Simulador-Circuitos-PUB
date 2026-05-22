@@ -197,6 +197,87 @@ body.dark-mode .sim-config-ac__title {
     box-shadow: 0 0 0 3px rgba(22, 160, 133, 0.25);
 }
 
+/* FASE 5.1 — seletor de convenção temporal cos/sen */
+.sim-config-ac__conv {
+    border: 1px dashed rgba(72, 201, 176, 0.55);
+    border-radius: 8px;
+    margin-top: 12px;
+    padding: 8px 12px 10px;
+    background: rgba(22, 160, 133, 0.04);
+}
+.sim-config-ac__conv legend {
+    padding: 0 6px;
+    font-size: 0.78em;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+.sim-config-ac__radio {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 4px;
+    font-size: 0.86em;
+    color: var(--text-primary);
+    cursor: pointer;
+    user-select: none;
+}
+.sim-config-ac__radio input[type="radio"] {
+    accent-color: #16a085;
+    cursor: pointer;
+}
+body.dark-mode .sim-config-ac__conv {
+    background: rgba(22, 160, 133, 0.08);
+    border-color: rgba(118, 215, 196, 0.45);
+}
+
+/* FASE 5.1 — card de Ondas no tempo V(t)/I(t) */
+.card-ondas {
+    border-left: 5px solid #2980b9;
+}
+.card-ondas .section-title { color: #1f618d; }
+body.dark-mode .card-ondas .section-title { color: #85c1e9; }
+.onda-subtitulo {
+    font-size: 0.86em;
+    color: var(--text-secondary);
+    margin: 0 0 10px;
+    font-family: 'Courier New', monospace;
+}
+.onda-svg-wrap {
+    width: 100%;
+    overflow-x: auto;
+    background: var(--bg-card);
+    border-radius: 8px;
+    padding: 6px 4px;
+}
+.onda-legenda-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 14px;
+    margin-top: 12px;
+}
+.onda-legenda-titulo {
+    font-weight: 700;
+    font-size: 0.92em;
+    margin-bottom: 4px;
+}
+.onda-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 6px;
+    font-size: 0.84em;
+    color: var(--text-primary);
+    font-family: 'Courier New', monospace;
+    border-radius: 4px;
+}
+.onda-legend-item:hover { background: rgba(41, 128, 185, 0.08); }
+.onda-nota {
+    font-size: 0.78em;
+    color: var(--text-secondary);
+    margin-top: 10px;
+    font-style: italic;
+}
+
 /* Fontes independentes: blocos DC vs AC no card */
 body:not(.modo-ac) .src-val-ac {
     display: none !important;
@@ -705,6 +786,21 @@ body.dark-mode {
 .card-fasorial { border-left: 5px solid #16a085; }
 .card-fasorial .section-title { color: #117864; }
 body.dark-mode .card-fasorial .section-title { color: #76d7c4; }
+.fasor-conv-aviso {
+    background: rgba(22, 160, 133, 0.10);
+    padding: 6px 12px;
+    border-radius: 6px;
+    border-left: 3px solid #16a085;
+    margin: 0 0 10px;
+    font-size: 0.86em;
+    color: var(--text-primary);
+}
+.fasor-conv-aviso code {
+    background: transparent;
+    font-weight: 700;
+    color: #117864;
+}
+body.dark-mode .fasor-conv-aviso code { color: #76d7c4; }
 
 .fasor-note {
     margin: 0 0 14px;
@@ -1477,6 +1573,21 @@ body.dark-mode kbd {
 body.dark-mode .ajuda-nota {
     background: rgba(241, 196, 15, 0.06);
     color: #f8d96b;
+}
+.ajuda-formula {
+    text-align: center;
+    margin: 10px 0;
+    padding: 8px;
+    background: rgba(22, 160, 133, 0.06);
+    border-radius: 6px;
+    font-size: 1em;
+}
+.ajuda-formula code {
+    font-size: 1em;
+    background: transparent;
+}
+body.dark-mode .ajuda-formula {
+    background: rgba(22, 160, 133, 0.12);
 }
 
 /* ------- Painel de avisos topológicos ------- */

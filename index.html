@@ -8,7 +8,7 @@
     <script>MathJax = {loader: {load: ['input/asciimath', 'output/chtml']}, asciimath: {delimiters: [['`','`']]}};</script>
     <script type="text/javascript" id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/startup.js"></script>
 
-    <link rel="stylesheet" href="styles.css?v=20260522-complex2">
+    <link rel="stylesheet" href="styles.css?v=20260522-seno">
 </head>
 <body>
 
@@ -87,6 +87,29 @@
 
         <details class="ajuda-section">
             <summary class="ajuda-summary">
+                <span class="ajuda-icon" aria-hidden="true">&#8767;</span>
+                <span>Fontes senoidais &mdash; conven&ccedil;&atilde;o temporal (cos vs sen)</span>
+            </summary>
+            <div class="ajuda-content">
+                <p>Em modo AC, toda fonte declarada por <em>m&oacute;dulo</em> e <em>fase</em> representa uma <strong>senoide pura</strong> oscilando na frequ&ecirc;ncia global do circuito:</p>
+                <p class="ajuda-formula"><code>V(t) = A &middot; cos(&omega;t + &phi;)</code> &nbsp;ou&nbsp; <code>V(t) = A &middot; sen(&omega;t + &phi;)</code></p>
+                <p>onde <code>&omega; = 2&pi;f</code>. Use o seletor <strong>Conven&ccedil;&atilde;o temporal</strong> nas Configura&ccedil;&otilde;es AC para escolher qual base voc&ecirc; prefere. As duas s&atilde;o equivalentes &mdash; diferem apenas por um deslocamento de 90&deg;:</p>
+                <p class="ajuda-formula"><code>A &middot; sen(&omega;t + &phi;) = A &middot; cos(&omega;t + &phi; &minus; 90&deg;)</code></p>
+                <table class="ajuda-tabela">
+                    <thead>
+                        <tr><th>Conven&ccedil;&atilde;o</th><th>Quando preferir</th><th>O que o backend recebe</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><code>cos</code> (padr&atilde;o)</td><td>Eng. el&eacute;trica, an&aacute;lise fasorial cl&aacute;ssica.</td><td>Fase <em>como digitada</em>.</td></tr>
+                        <tr><td><code>sen</code></td><td>F&iacute;sica geral, livros que partem de <code>sen(&omega;t)</code>.</td><td>Fase &minus; 90&deg; (corre&ccedil;&atilde;o autom&aacute;tica). Os resultados s&atilde;o exibidos j&aacute; convertidos de volta.</td></tr>
+                    </tbody>
+                </table>
+                <p class="ajuda-nota">O card <strong>6. Ondas no tempo</strong> na aba Resultados desenha cada tens&atilde;o/corrente como uma senoide real, j&aacute; na conven&ccedil;&atilde;o escolhida. O diagrama fasorial e a tabela de resultados tamb&eacute;m s&atilde;o ajustados.</p>
+            </div>
+        </details>
+
+        <details class="ajuda-section">
+            <summary class="ajuda-summary">
                 <span class="ajuda-icon" aria-hidden="true">&#128257;</span>
                 <span>Fontes dependentes (controladas)</span>
             </summary>
@@ -145,6 +168,17 @@
                 <div class="sim-config-ac__title">Configurações de Simulação</div>
                 <label class="sim-config-ac__label" for="inputFrequenciaAc">Frequência (Hz)</label>
                 <input type="number" class="sim-config-ac__input" id="inputFrequenciaAc" min="0" step="any" value="60" placeholder="60">
+                <fieldset class="sim-config-ac__conv">
+                    <legend class="sim-config-ac__label">Convenção temporal</legend>
+                    <label class="sim-config-ac__radio">
+                        <input type="radio" name="convencaoSeno" value="cos" checked>
+                        <span>V(t) = A&middot;cos(&omega;t + &phi;)</span>
+                    </label>
+                    <label class="sim-config-ac__radio">
+                        <input type="radio" name="convencaoSeno" value="sen">
+                        <span>V(t) = A&middot;sen(&omega;t + &phi;)</span>
+                    </label>
+                </fieldset>
             </div>
             
             <label style="font-weight:bold; color:#3498db;">📚 Biblioteca:</label>
@@ -284,6 +318,6 @@
         </form>
     </dialog>
 
-    <script src="script.js?v=20260522-complex2"></script>
+    <script src="script.js?v=20260522-seno"></script>
 </body>
 </html>

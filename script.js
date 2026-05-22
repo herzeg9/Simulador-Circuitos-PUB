@@ -443,6 +443,9 @@ function gerarJSON() {
             } else {
                 modRaw = nomeComp(item);
             }
+            // FASE 5.1: se a convenção temporal escolhida é sen, traduzimos
+            // para cos equivalente (sen x = cos(x - 90°)) antes de enviar.
+            faseStr = faseParaEnvio(faseStr);
             compObj["Modulo"] = modRaw;
             compObj["Fase"] = faseStr;
         } else {
@@ -582,18 +585,217 @@ function formatFaseLimpa(fase) {
  * @param {string} unidade
  * @returns {{valor:string, unidade:string}}
  */
-function formatarResultadoEng(valorStr, unidade) {
+function formatarResultadoEng(valorStr, unidade, deslocFaseGraus = 0) {
     const polar = parsePolar(valorStr);
     if (!polar) return { valor: valorStr, unidade: unidade || '' };
     const isPolar = /[\u2220<]/.test(String(valorStr || ''));
     if (isPolar) {
         const { mantissa, prefix } = formatMagnitudeEng(polar.mod);
-        const fase = formatFaseLimpa(polar.fase);
+        const fase = formatFaseLimpa(polar.fase + deslocFaseGraus);
         return { valor: `${mantissa} ∠ ${fase}°`, unidade: prefix + (unidade || '') };
     }
     const signed = polar.fase === 180 ? -polar.mod : polar.mod;
     const { mantissa, prefix } = formatMagnitudeEng(signed);
     return { valor: mantissa, unidade: prefix + (unidade || '') };
+}
+
+/* ============================================================
+ * FASE 5.1 — Fontes senoidais (frontend-only)
+ *
+ * O backend já trabalha com fasores cos(ωt+φ). Esta fase adiciona o
+ * seletor de convenção temporal: o aluno pode escolher cos (padrão de
+ * engenharia elétrica) ou sen. Internamente, se convencao = "sen",
+ * subtraímos 90° da fase antes de enviar (sen x = cos(x - 90°)) e
+ * somamos 90° na fase ao exibir os resultados. O backend continua
+ * achando que tudo é cos — contrato JSON intacto.
+ * ============================================================ */
+
+/**
+ * Lê o radio do painel #painelConfigAc. Default: 'cos'.
+ * @returns {'cos'|'sen'}
+ */
+function getConvencaoTemporal() {
+    const el = document.querySelector('input[name="convencaoSeno"]:checked');
+    return el && el.value === 'sen' ? 'sen' : 'cos';
+}
+
+/**
+ * Aplica a convenção temporal sobre uma fase de entrada (digitada pelo
+ * usuário). Em 'sen', subtrai 90° para a forma cos equivalente que o
+ * backend espera. Aceita string ou número; devolve string.
+ *
+ * @param {string|number} faseDigitada - Fase em graus.
+ * @returns {string}
+ */
+function faseParaEnvio(faseDigitada) {
+    const num = parseFloat(faseDigitada);
+    if (!Number.isFinite(num)) return String(faseDigitada);
+    if (getConvencaoTemporal() === 'sen') return String(num - 90);
+    return String(num);
+}
+
+/**
+ * Deslocamento (em graus) a ser somado às fases que vêm do backend,
+ * antes de exibir, para reverter à convenção do usuário.
+ * @returns {number}
+ */
+function deslocFaseConvencao() {
+    return getConvencaoTemporal() === 'sen' ? 90 : 0;
+}
+
+/**
+ * Sincroniza estado dos radios cos/sen com localStorage. Como a fase
+ * exibida em "Resultados Finais", o "Diagrama Fasorial" e "Ondas no
+ * tempo" depende da convenção corrente, limpamos os resultados ao
+ * trocar para evitar leitura ambígua — o usuário re-clica em Analisar.
+ */
+function sincronizarConvencaoTemporal() {
+    const conv = getConvencaoTemporal();
+    try { localStorage.setItem('simConvencaoSeno', conv); } catch (e) { /* ignore */ }
+    const divRes = document.getElementById('resultado');
+    if (divRes && divRes.innerHTML.trim() !== '') {
+        divRes.innerHTML = '<div class="card" style="border-left:5px solid #f39c12;"><p style="margin:0; color:var(--text-primary);">Convenção temporal alterada — clique em <strong>Analisar Completo</strong> (ou Ctrl+Enter) para recalcular com a nova convenção.</p></div>';
+    }
+}
+
+/**
+ * Calcula amostras V(t) = |V|·cos(ωt+φ) (ou ·sen) para plot temporal.
+ * Devolve um array de pontos {t, v} cobrindo dois períodos.
+ *
+ * @param {number} mod - Amplitude.
+ * @param {number} faseDeg - Fase em graus (na convenção do usuário).
+ * @param {number} f - Frequência em Hz.
+ * @param {'cos'|'sen'} conv - Convenção temporal.
+ * @param {number} nPts - Quantidade de amostras (default 200).
+ * @returns {Array<{t:number, v:number}>}
+ */
+function _ondaTemporalSamples(mod, faseDeg, f, conv, nPts = 200) {
+    const T = f > 0 ? 1 / f : 1;
+    const tMax = 2 * T;
+    const omega = 2 * Math.PI * f;
+    const fnTrig = conv === 'sen' ? Math.sin : Math.cos;
+    const faseRad = faseDeg * Math.PI / 180;
+    const pts = [];
+    for (let i = 0; i <= nPts; i++) {
+        const t = (i / nPts) * tMax;
+        pts.push({ t, v: mod * fnTrig(omega * t + faseRad) });
+    }
+    return pts;
+}
+
+/**
+ * Renderiza o card "Ondas no tempo V(t), I(t)" na aba Resultados.
+ * Recebe os resultados (já com a fase NA convenção do usuário) e
+ * desenha um SVG com cada onda sobreposta, cores separando V e I.
+ *
+ * Só faz sentido em AC; em DC retorna sem efeito.
+ *
+ * @param {Array<{Local:string, ValorNumerico:string, Unidade:string}>} resultados
+ * @param {HTMLElement} container
+ * @returns {void}
+ */
+function renderOndasTemporais(resultados, container) {
+    if (getModoSimulacao() !== 'AC') return;
+    if (!Array.isArray(resultados) || !resultados.length) return;
+    const freqEl = document.getElementById('inputFrequenciaAc');
+    const f = freqEl ? parseFloat(freqEl.value) : NaN;
+    if (!Number.isFinite(f) || f <= 0) return;
+    const conv = getConvencaoTemporal();
+    const desloc = deslocFaseConvencao();
+
+    const fasores = [];
+    resultados.forEach(r => {
+        const p = parsePolar(r.ValorNumerico);
+        if (!p || !(p.mod > 0)) return;
+        fasores.push({
+            mod: p.mod,
+            faseUsr: p.fase + desloc,
+            local: String(r.Local || ''),
+            unidade: r.Unidade || '',
+            tipo: classificarFasor(r)
+        });
+    });
+    if (!fasores.length) return;
+
+    const W = 720, H = 220;
+    const padL = 50, padR = 14, padT = 22, padB = 36;
+    const innerW = W - padL - padR;
+    const innerH = H - padT - padB;
+    const T = 1 / f;
+    const tMax = 2 * T;
+
+    const vMax = Math.max(...fasores.map(o => o.mod));
+    const xScale = (t) => padL + (t / tMax) * innerW;
+    const yScale = (v) => padT + innerH / 2 - (v / vMax) * (innerH / 2 - 4);
+
+    const eixos = `
+        <line x1="${padL}" y1="${padT + innerH / 2}" x2="${padL + innerW}" y2="${padT + innerH / 2}" stroke="var(--z-axis, #bdc3c7)" stroke-width="1"/>
+        <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT + innerH}" stroke="var(--z-axis, #bdc3c7)" stroke-width="1"/>`;
+
+    const gridT = [0, 0.5, 1, 1.5, 2].map(k => {
+        const t = k * T;
+        const x = xScale(t);
+        const lbl = k === 0 ? '0' : (k === 1 ? 'T' : (k === 2 ? '2T' : (k === 0.5 ? 'T/2' : '3T/2')));
+        return `
+            <line x1="${x}" y1="${padT}" x2="${x}" y2="${padT + innerH}" stroke="var(--z-axis, #bdc3c7)" stroke-width="0.5" stroke-dasharray="2 4"/>
+            <text x="${x}" y="${padT + innerH + 14}" text-anchor="middle" font-size="10" fill="var(--text-secondary, #7f8c8d)">${lbl}</text>`;
+    }).join('');
+
+    const corV = '#e74c3c';
+    const corI = '#27ae60';
+    const colorsByTipo = (tipo, idx) => tipo === 'V' ? corV : corI;
+    const dashByIdx = (idx) => idx === 0 ? '' : (idx % 3 === 1 ? '6 4' : (idx % 3 === 2 ? '2 3' : '8 2 2 2'));
+
+    const idxByTipo = { V: 0, I: 0 };
+    const paths = fasores.map(o => {
+        const i = idxByTipo[o.tipo]++;
+        const pts = _ondaTemporalSamples(o.mod, o.faseUsr, f, conv, 240);
+        const d = pts.map((p, k) => (k === 0 ? 'M ' : 'L ') + xScale(p.t).toFixed(2) + ',' + yScale(p.v).toFixed(2)).join(' ');
+        const color = colorsByTipo(o.tipo, i);
+        const dash = dashByIdx(i);
+        return `<path d="${d}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" ${dash ? `stroke-dasharray="${dash}"` : ''} opacity="0.92"/>`;
+    }).join('');
+
+    const yLabels = [vMax, vMax / 2, 0, -vMax / 2, -vMax].map(v => {
+        const y = yScale(v);
+        const { mantissa, prefix } = formatMagnitudeEng(Math.abs(v));
+        const txt = v === 0 ? '0' : `${v < 0 ? '−' : ''}${mantissa}${prefix ? ' ' + prefix : ''}`;
+        return `<text x="${padL - 6}" y="${y + 3}" text-anchor="end" font-size="9" fill="var(--text-secondary, #7f8c8d)">${txt}</text>`;
+    }).join('');
+
+    const titulo = conv === 'sen' ? `V(t) = A·sen(ωt + φ)` : `V(t) = A·cos(ωt + φ)`;
+    const subtitulo = `ω = 2π·${f} ≈ ${(2 * Math.PI * f).toPrecision(4)} rad/s &nbsp;·&nbsp; T = 1/f ≈ ${(1000 * T).toPrecision(3)} ms`;
+
+    const itemLeg = (o, color) => {
+        const { mantissa, prefix } = formatMagnitudeEng(o.mod);
+        const fase = formatFaseLimpa(o.faseUsr);
+        const trig = conv === 'sen' ? 'sen' : 'cos';
+        return `<div class="onda-legend-item">
+            <span class="fasor-legend-dot" style="background:${color}"></span>
+            <span class="fasor-legend-name">${escapeXml(o.local)}</span>
+            <span class="fasor-legend-val">${mantissa}${prefix ? ' ' + prefix : ''} ${trig}(ωt + ${fase}°) ${o.unidade}</span>
+        </div>`;
+    };
+    const legV = fasores.filter(o => o.tipo === 'V').map(o => itemLeg(o, corV)).join('');
+    const legI = fasores.filter(o => o.tipo === 'I').map(o => itemLeg(o, corI)).join('');
+
+    const card = document.createElement('div');
+    card.className = 'card card-ondas';
+    card.innerHTML = `
+        <h3 class="section-title">6. Ondas no tempo</h3>
+        <p class="onda-subtitulo">${titulo} &nbsp;·&nbsp; ${subtitulo}</p>
+        <div class="onda-svg-wrap">
+            <svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" preserveAspectRatio="xMidYMid meet">
+                ${eixos}${gridT}${yLabels}${paths}
+            </svg>
+        </div>
+        <div class="onda-legenda-grid">
+            ${legV ? `<div class="onda-legenda-col"><div class="onda-legenda-titulo" style="color:${corV}">Tensões</div>${legV}</div>` : ''}
+            ${legI ? `<div class="onda-legenda-col"><div class="onda-legenda-titulo" style="color:${corI}">Correntes</div>${legI}</div>` : ''}
+        </div>
+        <p class="onda-nota">As ondas mostradas cobrem dois períodos completos (0 a 2T). A escala vertical é normalizada pela maior amplitude (V e I compartilham o mesmo eixo apenas para visualização — em geral as escalas absolutas são diferentes).</p>
+    `;
+    container.appendChild(card);
 }
 
 /* ============================================================
@@ -1097,6 +1299,8 @@ function drawPhasorPlot(fasores, cor, titulo) {
 function renderFasorial(resultados, container) {
     if (!Array.isArray(resultados) || !resultados.length) return;
 
+    const desloc = deslocFaseConvencao();
+
     /** @type {Array<{mod:number, fase:number, local:string, unidade:string, tipo:'V'|'I'}>} */
     const fasores = [];
     resultados.forEach(r => {
@@ -1104,7 +1308,7 @@ function renderFasorial(resultados, container) {
         if (!p || !(p.mod > 0)) return;
         fasores.push({
             mod: p.mod,
-            fase: p.fase,
+            fase: p.fase + desloc,
             local: String(r.Local || ''),
             unidade: r.Unidade || '',
             tipo: classificarFasor(r)
@@ -1135,10 +1339,15 @@ function renderFasorial(resultados, container) {
         ? `<p class="fasor-note">As escalas de tensão e corrente são normalizadas independentemente para preservar a leitura angular. Os módulos absolutos aparecem na legenda.</p>`
         : `<p class="fasor-note">Os vetores estão normalizados pelo maior módulo do grupo. Confira os valores absolutos na legenda.</p>`;
 
+    const convNota = getConvencaoTemporal() === 'sen'
+        ? `<p class="fasor-conv-aviso">Fases exibidas na convenção <code>sen(ωt + φ)</code> (escolhida nas Configurações AC).</p>`
+        : '';
+
     const card = document.createElement('div');
     card.className = 'card card-fasorial';
     card.innerHTML = `
         <h3 class="section-title">5. Diagrama Fasorial</h3>
+        ${convNota}
         ${escalaNote}
         <div class="fasorial-grid${(fV.length && fI.length) ? ' fasorial-grid--dual' : ''}">
             ${fV.length ? `<div class="fasorial-cell"><div class="fasorial-svg-wrap">${plotV}</div><div class="fasorial-legend fasorial-legend--v">${legendV}</div></div>` : ''}
@@ -1254,9 +1463,10 @@ async function calcular() {
         }
 
         if (dados.Resultados) {
+            const desloc = deslocFaseConvencao();
             let html = `<div class="card"><h3 class="section-title">4. Resultados Finais</h3>`;
             dados.Resultados.forEach(r => {
-                const f = formatarResultadoEng(r.ValorNumerico, r.Unidade);
+                const f = formatarResultadoEng(r.ValorNumerico, r.Unidade, desloc);
                 html += `<div style="border-bottom:1px solid #eee; margin-bottom:10px;"><strong>${r.Local}:</strong><div class="numeric-result">= ${f.valor} ${f.unidade}</div></div>`;
             });
             divRes.innerHTML += html + `</div>`;
@@ -1264,10 +1474,11 @@ async function calcular() {
 
         if (getModoSimulacao() === 'AC' && Array.isArray(dados.Resultados)) {
             renderFasorial(dados.Resultados, divRes);
+            renderOndasTemporais(dados.Resultados, divRes);
         }
 
         if (dados.Malhas) {
-            let html = `<div class="card" style="border-left: 5px solid #8e44ad;"><h3 class="section-title" style="color: #8e44ad;">6. Análise de Malhas</h3>`;
+            let html = `<div class="card" style="border-left: 5px solid #8e44ad;"><h3 class="section-title" style="color: #8e44ad;">7. Análise de Malhas</h3>`;
             if (dados.Malhas.length === 0) {
                  html += `<p style="color:#999;">Topologia simples ou linear (sem laços fundamentais detectados).</p>`;
             } else {
@@ -2248,6 +2459,7 @@ function coletarEstadoCompleto() {
         timestamp: Date.now(),
         modo: getModoSimulacao(),
         frequencia: document.getElementById('inputFrequenciaAc')?.value || '60',
+        convencaoSeno: getConvencaoTemporal(),
         componentes
     };
 }
@@ -2306,6 +2518,15 @@ function restaurarEstadoSalvo(state) {
     }
     const freqEl = document.getElementById('inputFrequenciaAc');
     if (freqEl && state.frequencia != null) freqEl.value = state.frequencia;
+
+    // FASE 5.1: restaura convenção temporal cos/sen, se presente
+    if (state.convencaoSeno === 'sen' || state.convencaoSeno === 'cos') {
+        const radio = document.querySelector(`input[name="convencaoSeno"][value="${state.convencaoSeno}"]`);
+        if (radio) {
+            radio.checked = true;
+            sincronizarConvencaoTemporal();
+        }
+    }
 
     state.componentes.forEach(comp => {
         const nos = [parseInt(comp.nos.a, 10), parseInt(comp.nos.b, 10)];
@@ -2696,6 +2917,19 @@ document.addEventListener('DOMContentLoaded', function() {
         sincronizarModoSimulacao();
     }
 
+    // FASE 5.1: restaura convenção temporal cos/sen do localStorage e
+    // registra listeners para persistência + re-render do esquemático.
+    try {
+        const convSalva = localStorage.getItem('simConvencaoSeno');
+        if (convSalva === 'sen' || convSalva === 'cos') {
+            const radio = document.querySelector(`input[name="convencaoSeno"][value="${convSalva}"]`);
+            if (radio) radio.checked = true;
+        }
+    } catch (e) { /* ignore */ }
+    document.querySelectorAll('input[name="convencaoSeno"]').forEach(r => {
+        r.addEventListener('change', sincronizarConvencaoTemporal);
+    });
+
     setupOutputTabs();
     setupEsquematicoLive();
     setupDialogoRelacionar();
@@ -2713,4 +2947,8 @@ function aplicarTooltipsGlobais() {
     if (toggleAc && !toggleAc.title) toggleAc.title = 'Alterna entre DC (corrente contínua) e AC (corrente alternada).';
     const btnAnalisar = document.getElementById('btnAnalisarCompleto');
     if (btnAnalisar) btnAnalisar.title = 'Analisa o circuito (atalho: Ctrl+Enter)';
+    const radioCos = document.querySelector('input[name="convencaoSeno"][value="cos"]');
+    if (radioCos && !radioCos.title) radioCos.title = 'V(t) = A·cos(ωt + φ). Convenção padrão de engenharia elétrica e análise fasorial.';
+    const radioSen = document.querySelector('input[name="convencaoSeno"][value="sen"]');
+    if (radioSen && !radioSen.title) radioSen.title = 'V(t) = A·sen(ωt + φ). Convenção comum em física geral. Os resultados são convertidos automaticamente.';
 }
