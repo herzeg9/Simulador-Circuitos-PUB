@@ -891,7 +891,7 @@ function renderPainelImpedancias(container) {
 
     const html = `
         <div class="card card-impedancias">
-            <h3 class="section-title">⚡ 1.5. Impedâncias do circuito</h3>
+            <h3 class="section-title">2. Impedâncias do circuito</h3>
             <p class="impedancias-freq">${freqLine}</p>
             <div class="impedancias-tabela-wrap">
                 <table class="impedancias-table">
@@ -1108,7 +1108,7 @@ function renderFasorial(resultados, container) {
     const card = document.createElement('div');
     card.className = 'card card-fasorial';
     card.innerHTML = `
-        <h3 class="section-title">📐 5. Diagrama Fasorial</h3>
+        <h3 class="section-title">5. Diagrama Fasorial</h3>
         ${escalaNote}
         <div class="fasorial-grid${(fV.length && fI.length) ? ' fasorial-grid--dual' : ''}">
             ${fV.length ? `<div class="fasorial-cell"><div class="fasorial-svg-wrap">${plotV}</div><div class="fasorial-legend fasorial-legend--v">${legendV}</div></div>` : ''}
@@ -1179,7 +1179,7 @@ async function calcular() {
             const notaReatancias = (modoAc && topPassivos)
                 ? `<p class="mna-reatancias-nota">Reatâncias substituídas automaticamente: <code>Z_L = jωL</code> para indutores, <code>Z_C = 1/(jωC)</code> para capacitores. O detalhamento numérico está no painel <em>Impedâncias do circuito</em> abaixo.</p>`
                 : '';
-            let html = `<div class="card"><h3 class="section-title">📝 1. Equações do Sistema (MNA)</h3>${notaReatancias}`;
+            let html = `<div class="card"><h3 class="section-title">1. Equações do Sistema (MNA)</h3>${notaReatancias}`;
             dados.Equacoes.forEach(eq => {
                 const limpa = limparEquacaoAC(eq).replace("==", "=");
                 html += `<div class="formula">\` ${limpa} \`</div>`;
@@ -1193,7 +1193,7 @@ async function calcular() {
 
         // Superposição: a API pode omitir a chave, enviar null ou [] — ainda assim mostramos o bloco 2 com passos ou avisos locais.
         if (Array.isArray(dados.Superposicao) && dados.Superposicao.length > 0) {
-            let html = `<div class="card"><h3 class="section-title">🧩 2. Superposição</h3><div class="super-container">`;
+            let html = `<div class="card"><h3 class="section-title">3. Superposição</h3><div class="super-container">`;
             dados.Superposicao.forEach(passo => {
                 html += `<div class="super-card"><div class="didactic-text">Fonte Ativa: <strong>${passo.FonteAtiva}</strong></div>`;
                 passo.ResultadosParciais.forEach((res, idx) => {
@@ -1209,7 +1209,7 @@ async function calcular() {
                 c.Tipo === 'VCVS' || c.Tipo === 'VCCS' || c.Tipo === 'CCVS' || c.Tipo === 'CCCS'
             );
 
-            const avisoSuper = (msg) => `<div class="card"><h3 class="section-title">🧩 2. Superposição</h3><div style="background:#fffcf5; border-left:5px solid #f1c40f; padding:12px; border-radius:6px;"><p style="margin:0;">⚠️ <em>${msg}</em></p></div></div>`;
+            const avisoSuper = (msg) => `<div class="card"><h3 class="section-title">3. Superposição</h3><div style="background:#fffcf5; border-left:5px solid #f1c40f; padding:12px; border-radius:6px;"><p style="margin:0;">⚠️ <em>${msg}</em></p></div></div>`;
 
             if (qtdFontes <= 1 && !temComponentesReativos) {
                 divRes.innerHTML += avisoSuper('A Superposição não é aplicável pois o circuito possui apenas uma fonte independente.');
@@ -1224,7 +1224,7 @@ async function calcular() {
         }
 
         if (dados.Resultados) {
-            let html = `<div class="card"><h3 class="section-title">🎯 3. Resultados Finais</h3>`;
+            let html = `<div class="card"><h3 class="section-title">4. Resultados Finais</h3>`;
             dados.Resultados.forEach(r => {
                 const f = formatarResultadoEng(r.ValorNumerico, r.Unidade);
                 html += `<div style="border-bottom:1px solid #eee; margin-bottom:10px;"><strong>${r.Local}:</strong><div class="numeric-result">= ${f.valor} ${f.unidade}</div></div>`;
@@ -1237,7 +1237,7 @@ async function calcular() {
         }
 
         if (dados.Malhas) {
-            let html = `<div class="card" style="border-left: 5px solid #8e44ad;"><h3 class="section-title" style="color: #8e44ad;">🔄 4. Análise de Malhas</h3>`;
+            let html = `<div class="card" style="border-left: 5px solid #8e44ad;"><h3 class="section-title" style="color: #8e44ad;">6. Análise de Malhas</h3>`;
             if (dados.Malhas.length === 0) {
                  html += `<p style="color:#999;">Topologia simples ou linear (sem laços fundamentais detectados).</p>`;
             } else {
