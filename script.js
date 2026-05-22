@@ -427,12 +427,22 @@ function gerarJSON() {
             const modIn = item.querySelector('.val-input-mod');
             const faseIn = item.querySelector('.val-input-fase');
             let modRaw = (modIn && modIn.value.trim()) ? modIn.value.trim() : '';
-            if (!modRaw) {
-                modRaw = nomeComp(item);
-            } else {
+            let faseStr = (faseIn && faseIn.value.trim()) ? faseIn.value.trim() : '0';
+
+            // FASE 4 (C): se o usuário escreveu o módulo em forma retangular
+            // "a+bj" (ou "a+bi"), convertemos para polar antes de enviar.
+            // O backend só conhece (Modulo, Fase em graus); a conveniência é
+            // 100% frontend, sem mudar o contrato.
+            const rect = _parseRetangular(modRaw);
+            if (rect) {
+                const { mod, phaseDeg } = _polarFromRect(rect.re, rect.im);
+                modRaw = String(mod);
+                faseStr = String(phaseDeg);
+            } else if (modRaw) {
                 modRaw = aplicarSufixosValor(modRaw);
+            } else {
+                modRaw = nomeComp(item);
             }
-            const faseStr = (faseIn && faseIn.value.trim()) ? faseIn.value.trim() : '0';
             compObj["Modulo"] = modRaw;
             compObj["Fase"] = faseStr;
         } else {
@@ -584,6 +594,321 @@ function formatarResultadoEng(valorStr, unidade) {
     const signed = polar.fase === 180 ? -polar.mod : polar.mod;
     const { mantissa, prefix } = formatMagnitudeEng(signed);
     return { valor: mantissa, unidade: prefix + (unidade || '') };
+}
+
+/* ============================================================
+ * FASE 4 — Modelagem matemática de complexos (frontend-only)
+ *
+ * O backend (IC_1905.nb) já modela Z_C = 1/(jωC) e Z_L = jωL ao montar
+ * as equações MNA. Este bloco apenas torna essa matemática VISÍVEL para
+ * o aluno (painel de impedâncias, tooltips no esquemático, aceitação de
+ * entrada retangular "a+bj" em fontes AC). Não toca no contrato JSON
+ * com o servidor.
+ * ============================================================ */
+
+/**
+ * Frequência angular ω = 2πf da simulação atual. Retorna 0 em DC ou se
+ * o campo de frequência estiver vazio/invalido.
+ * @returns {number}
+ */
+function _omegaAtual() {
+    if (getModoSimulacao() !== 'AC') return 0;
+    const f = parseFloat(document.getElementById('inputFrequenciaAc')?.value);
+    return Number.isFinite(f) ? 2 * Math.PI * f : 0;
+}
+
+/**
+ * Converte uma string numérica com sufixo SI (k, M, m, u/µ, n, p, G) em
+ * Number. Devolve NaN se a string não for um número simples.
+ * Não aceita expressões — para isso use _parseRetangular.
+ *
+ * @param {string} s
+ * @returns {number}
+ */
+function _parseNumeroSI(s) {
+    if (s == null) return NaN;
+    const t = String(s).trim();
+    if (!t) return NaN;
+    const m = t.match(/^([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)\s*([kMmuµnpG])?\s*$/);
+    if (!m) return NaN;
+    const num = parseFloat(m[1]);
+    const sufix = m[2] || '';
+    const mult = { k: 1e3, M: 1e6, G: 1e9, m: 1e-3, u: 1e-6, 'µ': 1e-6, n: 1e-9, p: 1e-12 }[sufix];
+    return num * (mult ?? 1);
+}
+
+/**
+ * Tenta interpretar a string como um complexo retangular a+bj (ou a+bi).
+ * Aceita: "5j", "-5j", "+j", "3+4j", "3-4j", "1.5e3+2j", "-3+4i".
+ * Cada coeficiente pode ter sufixo SI (ex.: "3k+4kj" ⇒ {re:3000, im:4000}).
+ * Devolve null se a string não tiver a forma esperada (caller decide tratar
+ * como número simples ou erro).
+ *
+ * @param {string} s
+ * @returns {?{re:number, im:number}}
+ */
+function _parseRetangular(s) {
+    if (s == null) return null;
+    const t = String(s).trim().replace(/\s+/g, '').replace(/i$/i, 'j');
+    if (!t || !/j$/i.test(t)) return null;
+    const NUM = '(?:[+-]?(?:\\d+\\.?\\d*|\\.\\d+)(?:[eE][+-]?\\d+)?[kMmuµnpG]?)';
+    const onlyImag = t.match(new RegExp(`^(${NUM})?j$`));
+    if (onlyImag) {
+        const raw = onlyImag[1];
+        let im;
+        if (raw === undefined || raw === '') im = 1;
+        else if (raw === '+' || raw === '-') im = (raw === '-' ? -1 : 1);
+        else im = _parseNumeroSI(raw);
+        return Number.isFinite(im) ? { re: 0, im } : null;
+    }
+    const both = t.match(new RegExp(`^(${NUM})([+-](?:\\d+\\.?\\d*|\\.\\d+)(?:[eE][+-]?\\d+)?[kMmuµnpG]?)j$`));
+    if (both) {
+        const re = _parseNumeroSI(both[1]);
+        const im = _parseNumeroSI(both[2]);
+        if (Number.isFinite(re) && Number.isFinite(im)) return { re, im };
+    }
+    return null;
+}
+
+/**
+ * Conversão polar ↔ retangular.
+ */
+function _polarFromRect(re, im) {
+    return { mod: Math.hypot(re, im), phaseDeg: Math.atan2(im, re) * 180 / Math.PI };
+}
+
+/**
+ * Calcula a impedância de um componente passivo (R, C, L) no modo/freq
+ * atuais. Retorna estrutura rica com forma simbólica, retangular e polar.
+ *
+ *  - DC + R    →  Z = R                       (real)
+ *  - DC + C    →  Z = ∞ (aberto)              (tratado como simbólico)
+ *  - DC + L    →  Z = 0 (curto)
+ *  - AC + R    →  Z = R + 0j                  (ângulo 0°)
+ *  - AC + C    →  Z = 1/(jωC) = 0 − j·1/(ωC)  (ângulo −90°)
+ *  - AC + L    →  Z = jωL = 0 + j·ωL          (ângulo +90°)
+ *
+ * @param {{tipo:string, nome:string, valor:string}} comp
+ * @param {number} omega
+ * @returns {?{tipo:string, simbolo:string, formula:string, re:number, im:number, mod:number, phaseDeg:number, especial:?string}}
+ */
+function _impedanciaCompPassivo(comp, omega) {
+    const modoAc = getModoSimulacao() === 'AC';
+    if (comp.tipo === 'Resistor') {
+        const r = _parseNumeroSI(comp.valor);
+        if (!Number.isFinite(r)) return null;
+        return { tipo: 'R', simbolo: 'R', formula: 'Z_R = R', re: r, im: 0, mod: r, phaseDeg: 0, especial: null };
+    }
+    if (comp.tipo === 'Capacitor') {
+        const c = _parseNumeroSI(comp.valor);
+        if (!Number.isFinite(c)) return null;
+        if (!modoAc) {
+            return { tipo: 'C', simbolo: 'C', formula: 'Z_C → ∞ (DC: aberto)', re: Infinity, im: 0, mod: Infinity, phaseDeg: 0, especial: 'aberto' };
+        }
+        if (omega === 0 || c === 0) return null;
+        const im = -1 / (omega * c);
+        return { tipo: 'C', simbolo: 'C', formula: 'Z_C = 1 / (jωC)', re: 0, im, mod: Math.abs(im), phaseDeg: -90, especial: null };
+    }
+    if (comp.tipo === 'Inductor') {
+        const l = _parseNumeroSI(comp.valor);
+        if (!Number.isFinite(l)) return null;
+        if (!modoAc) {
+            return { tipo: 'L', simbolo: 'L', formula: 'Z_L = 0 (DC: curto)', re: 0, im: 0, mod: 0, phaseDeg: 0, especial: 'curto' };
+        }
+        const im = omega * l;
+        return { tipo: 'L', simbolo: 'L', formula: 'Z_L = jωL', re: 0, im, mod: Math.abs(im), phaseDeg: 90, especial: null };
+    }
+    return null;
+}
+
+/**
+ * Formata um par (re, im) como string retangular em notação de engenharia
+ * com sufixo SI, ex.: "3.00 k − 4.00 kj", "265 j" (im puro), "1.50 k" (real puro).
+ *
+ * @param {number} re
+ * @param {number} im
+ * @returns {string}
+ */
+function _fmtComplexRet(re, im) {
+    if (!Number.isFinite(re)) return '∞';
+    if (Math.abs(re) < 1e-15 && Math.abs(im) < 1e-15) return '0';
+    const fmt = (v) => {
+        const { mantissa, prefix } = formatMagnitudeEng(Math.abs(v));
+        return prefix ? `${mantissa} ${prefix}` : mantissa;
+    };
+    if (Math.abs(re) < 1e-15) return `${im < 0 ? '−' : ''}${fmt(im)}j`;
+    if (Math.abs(im) < 1e-15) return `${re < 0 ? '−' : ''}${fmt(re)}`;
+    const sgnI = im < 0 ? '−' : '+';
+    return `${re < 0 ? '−' : ''}${fmt(re)} ${sgnI} ${fmt(im)}j`;
+}
+
+/**
+ * Formata um par (mod, fase°) em notação polar de engenharia,
+ * ex.: "265 ∠ −90°", "1.50 k ∠ 0°".
+ *
+ * @param {number} mod
+ * @param {number} phaseDeg
+ * @returns {string}
+ */
+function _fmtPolarEng(mod, phaseDeg) {
+    if (!Number.isFinite(mod)) return '∞';
+    const { mantissa, prefix } = formatMagnitudeEng(mod);
+    return `${prefix ? mantissa + ' ' + prefix : mantissa} ∠ ${formatFaseLimpa(phaseDeg)}°`;
+}
+
+/**
+ * Gera um mini-SVG (110x110) com o diagrama de impedância no plano complexo
+ * para um componente passivo. Eixos Re horizontal e Im vertical (com Im
+ * crescendo para cima, ao contrário da coord. SVG).
+ *
+ *  - R puro     → vetor horizontal para +Re (0°)
+ *  - L em AC    → vetor vertical para +Im (+90°)
+ *  - C em AC    → vetor vertical para −Im (−90°)
+ *  - L em DC    → ponto na origem com rótulo "Z = 0"
+ *  - C em DC    → símbolo "∞" no infinito (texto)
+ *
+ * O vetor sempre tem comprimento gráfico fixo (40 px) — o diagrama é
+ * esquemático, didático, não escalar entre componentes. O valor numérico
+ * fica registrado fora do SVG (na tabela).
+ *
+ * @param {{re:number, im:number, mod:number, phaseDeg:number, simbolo:string, especial:?string}} z
+ * @returns {string} SVG inline
+ */
+function _diagramaImpedanciaSvg(z) {
+    const W = 110, H = 110;
+    const cx = W / 2, cy = H / 2;
+    const axisColor = 'var(--z-axis, #bdc3c7)';
+    const vecColor = 'var(--z-vec, #c0392b)';
+    const labelColor = 'var(--text-secondary, #7f8c8d)';
+
+    if (z.especial === 'aberto') {
+        return `<svg class="z-diagrama" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-label="Z = infinito">
+            <line x1="6" y1="${cy}" x2="${W - 6}" y2="${cy}" stroke="${axisColor}" stroke-width="1"/>
+            <line x1="${cx}" y1="6" x2="${cx}" y2="${H - 6}" stroke="${axisColor}" stroke-width="1"/>
+            <text x="${cx}" y="${cy - 2}" text-anchor="middle" font-size="28" font-weight="700" fill="${vecColor}">∞</text>
+            <text x="${cx}" y="${H - 10}" text-anchor="middle" font-size="9" fill="${labelColor}">DC: aberto</text>
+        </svg>`;
+    }
+    if (z.especial === 'curto') {
+        return `<svg class="z-diagrama" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-label="Z = 0">
+            <line x1="6" y1="${cy}" x2="${W - 6}" y2="${cy}" stroke="${axisColor}" stroke-width="1"/>
+            <line x1="${cx}" y1="6" x2="${cx}" y2="${H - 6}" stroke="${axisColor}" stroke-width="1"/>
+            <circle cx="${cx}" cy="${cy}" r="5" fill="${vecColor}"/>
+            <text x="${cx + 9}" y="${cy + 4}" font-size="11" font-weight="600" fill="${vecColor}">Z = 0</text>
+            <text x="${cx}" y="${H - 10}" text-anchor="middle" font-size="9" fill="${labelColor}">DC: curto</text>
+        </svg>`;
+    }
+
+    const L = 40;
+    let xEnd = cx, yEnd = cy;
+    if (z.re === 0 && z.im > 0) yEnd = cy - L;
+    else if (z.re === 0 && z.im < 0) yEnd = cy + L;
+    else if (z.im === 0 && z.re > 0) xEnd = cx + L;
+    else if (z.im === 0 && z.re < 0) xEnd = cx - L;
+    else {
+        const ang = Math.atan2(z.im, z.re);
+        xEnd = cx + L * Math.cos(ang);
+        yEnd = cy - L * Math.sin(ang);
+    }
+
+    const hasRe = Math.abs(z.re) > 1e-15;
+    const hasIm = Math.abs(z.im) > 1e-15;
+    const isMixed = hasRe && hasIm;
+
+    let projections = '';
+    if (isMixed) {
+        projections = `
+            <line x1="${cx}" y1="${cy}" x2="${xEnd}" y2="${cy}" stroke="${axisColor}" stroke-width="1" stroke-dasharray="3 3"/>
+            <line x1="${xEnd}" y1="${cy}" x2="${xEnd}" y2="${yEnd}" stroke="${axisColor}" stroke-width="1" stroke-dasharray="3 3"/>`;
+    }
+
+    let rotuloPonta = '';
+    if (z.simbolo === 'R') rotuloPonta = `<text x="${xEnd + 4}" y="${cy - 4}" font-size="11" font-weight="700" fill="${vecColor}">R</text>`;
+    else if (z.simbolo === 'L') rotuloPonta = `<text x="${cx + 6}" y="${yEnd + 6}" font-size="11" font-weight="700" fill="${vecColor}">+jX<tspan font-size="8" baseline-shift="sub">L</tspan></text>`;
+    else if (z.simbolo === 'C') rotuloPonta = `<text x="${cx + 6}" y="${yEnd - 2}" font-size="11" font-weight="700" fill="${vecColor}">−jX<tspan font-size="8" baseline-shift="sub">C</tspan></text>`;
+
+    return `<svg class="z-diagrama" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-label="Diagrama de impedância">
+        <defs>
+            <marker id="z-arrow-${z.simbolo}" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 0 L 8 4 L 0 8 z" fill="${vecColor}"/>
+            </marker>
+        </defs>
+        <line x1="6" y1="${cy}" x2="${W - 6}" y2="${cy}" stroke="${axisColor}" stroke-width="1"/>
+        <line x1="${cx}" y1="6" x2="${cx}" y2="${H - 6}" stroke="${axisColor}" stroke-width="1"/>
+        <text x="${W - 4}" y="${cy - 3}" text-anchor="end" font-size="8" fill="${labelColor}">Re</text>
+        <text x="${cx + 3}" y="9" font-size="8" fill="${labelColor}">Im</text>
+        ${projections}
+        <line x1="${cx}" y1="${cy}" x2="${xEnd}" y2="${yEnd}" stroke="${vecColor}" stroke-width="2.2" marker-end="url(#z-arrow-${z.simbolo})"/>
+        ${rotuloPonta}
+    </svg>`;
+}
+
+/**
+ * Renderiza o painel "Impedâncias do circuito" (Fase 4 — meta A) com uma
+ * tabela de Z em forma polar e retangular para cada R/L/C, mais um mini
+ * diagrama no plano complexo (meta E). Em DC, ainda mostra R (resistivo)
+ * e indica L→curto / C→aberto.
+ *
+ * Não emite painel se não houver componentes passivos.
+ *
+ * @param {HTMLElement} container - Geralmente #resultado
+ */
+function renderPainelImpedancias(container) {
+    const modo = getModoSimulacao();
+    const omega = _omegaAtual();
+    const top = getTopologiaAtual();
+    const passivos = top.filter(c => c.tipo === 'Resistor' || c.tipo === 'Capacitor' || c.tipo === 'Inductor');
+    if (passivos.length === 0) return;
+
+    const freqEl = document.getElementById('inputFrequenciaAc');
+    const f = freqEl ? parseFloat(freqEl.value) : NaN;
+    const freqLine = modo === 'AC' && Number.isFinite(f)
+        ? `f = ${f} Hz &nbsp;·&nbsp; ω = 2πf ≈ ${omega.toPrecision(4)} rad/s`
+        : 'Modo DC (ω = 0)';
+
+    let rows = '';
+    passivos.forEach(c => {
+        const z = _impedanciaCompPassivo(c, omega);
+        if (!z) {
+            rows += `<tr><td><strong>${escapeXml(c.nome)}</strong></td><td>${c.tipo}</td><td colspan="4" class="z-invalido">valor inválido</td></tr>`;
+            return;
+        }
+        let polarStr, rectStr;
+        if (z.especial === 'aberto') { polarStr = '∞'; rectStr = '∞'; }
+        else if (z.especial === 'curto') { polarStr = '0'; rectStr = '0'; }
+        else { polarStr = _fmtPolarEng(z.mod, z.phaseDeg) + ' Ω'; rectStr = _fmtComplexRet(z.re, z.im) + ' Ω'; }
+        const diagrama = _diagramaImpedanciaSvg(z);
+        rows += `
+            <tr>
+                <td><strong>${escapeXml(c.nome)}</strong></td>
+                <td>${z.simbolo} = ${escapeXml(c.valor || '?')}</td>
+                <td><code class="z-formula">${z.formula}</code></td>
+                <td><span class="z-polar">${polarStr}</span></td>
+                <td><span class="z-rect">${rectStr}</span></td>
+                <td class="z-diagrama-cell">${diagrama}</td>
+            </tr>`;
+    });
+
+    const html = `
+        <div class="card card-impedancias">
+            <h3 class="section-title">⚡ 1.5. Impedâncias do circuito</h3>
+            <p class="impedancias-freq">${freqLine}</p>
+            <div class="impedancias-tabela-wrap">
+                <table class="impedancias-table">
+                    <thead><tr><th>Comp.</th><th>Valor</th><th>Fórmula</th><th>Polar (|Z| ∠ θ)</th><th>Retangular (R + jX)</th><th>Diagrama</th></tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>
+            <p class="impedancias-nota">
+                Reatância capacitiva <code>X_C = 1/(ωC)</code>, impedância <code>Z_C = −jX_C</code>.
+                Reatância indutiva <code>X_L = ωL</code>, impedância <code>Z_L = +jX_L</code>.
+                Esses valores são substituídos automaticamente nas equações MNA acima.
+                O <em>diagrama</em> à direita situa cada Z no plano complexo
+                (eixo horizontal = parte resistiva, eixo vertical = reatância);
+                R fica em <code>+Re</code>, indutor em <code>+Im</code>, capacitor em <code>−Im</code>.
+            </p>
+        </div>`;
+    container.insertAdjacentHTML('beforeend', html);
 }
 
 /**
@@ -849,13 +1174,22 @@ async function calcular() {
         }
 
         if (dados.Equacoes) {
-            let html = `<div class="card"><h3 class="section-title">📝 1. Equações do Sistema (MNA)</h3>`;
+            const modoAc = getModoSimulacao() === 'AC';
+            const topPassivos = getTopologiaAtual().some(c => c.tipo === 'Capacitor' || c.tipo === 'Inductor');
+            const notaReatancias = (modoAc && topPassivos)
+                ? `<p class="mna-reatancias-nota">Reatâncias substituídas automaticamente: <code>Z_L = jωL</code> para indutores, <code>Z_C = 1/(jωC)</code> para capacitores. O detalhamento numérico está no painel <em>Impedâncias do circuito</em> abaixo.</p>`
+                : '';
+            let html = `<div class="card"><h3 class="section-title">📝 1. Equações do Sistema (MNA)</h3>${notaReatancias}`;
             dados.Equacoes.forEach(eq => {
                 const limpa = limparEquacaoAC(eq).replace("==", "=");
                 html += `<div class="formula">\` ${limpa} \`</div>`;
             });
             divRes.innerHTML += html + `</div>`;
         }
+
+        // FASE 4 (A): Painel de impedâncias entre MNA e Superposição.
+        // Só emite algo se houver componentes passivos no circuito.
+        renderPainelImpedancias(divRes);
 
         // Superposição: a API pode omitir a chave, enviar null ou [] — ainda assim mostramos o bloco 2 com passos ou avisos locais.
         if (Array.isArray(dados.Superposicao) && dados.Superposicao.length > 0) {
@@ -1382,18 +1716,31 @@ function symDependentSource(tipo, cx, cy, orient, label, valor, alvoCtrl) {
 
 function drawSimbolo(comp, cx, cy, orient) {
     const t = comp.tipo;
-    if (t === 'Resistor') return symResistor(cx, cy, orient, comp.nome, comp.valor);
-    if (t === 'Capacitor') return symCapacitor(cx, cy, orient, comp.nome, comp.valor);
-    if (t === 'Inductor') return symInductor(cx, cy, orient, comp.nome, comp.valor);
-    if (t === 'VoltageSource') return symVoltageSource(cx, cy, orient, comp.nome, comp.valor, comp._positiveOnA);
-    if (t === 'CurrentSource') return symCurrentSource(cx, cy, orient, comp.nome, comp.valor, comp._fromAtoB);
-    if (t === 'VCVS' || t === 'VCCS' || t === 'CCVS' || t === 'CCCS') {
+    let svg = '';
+    if (t === 'Resistor') svg = symResistor(cx, cy, orient, comp.nome, comp.valor);
+    else if (t === 'Capacitor') svg = symCapacitor(cx, cy, orient, comp.nome, comp.valor);
+    else if (t === 'Inductor') svg = symInductor(cx, cy, orient, comp.nome, comp.valor);
+    else if (t === 'VoltageSource') svg = symVoltageSource(cx, cy, orient, comp.nome, comp.valor, comp._positiveOnA);
+    else if (t === 'CurrentSource') svg = symCurrentSource(cx, cy, orient, comp.nome, comp.valor, comp._fromAtoB);
+    else if (t === 'VCVS' || t === 'VCCS' || t === 'CCVS' || t === 'CCCS') {
         const ctrl = (t === 'VCVS' || t === 'VCCS')
             ? (comp.nC != null && comp.nD != null ? `v(${comp.nC},${comp.nD})` : null)
             : (comp.alvo || null);
-        return symDependentSource(t, cx, cy, orient, comp.nome, comp.valor, ctrl);
+        svg = symDependentSource(t, cx, cy, orient, comp.nome, comp.valor, ctrl);
     }
-    return '';
+
+    // FASE 4 (B): tooltip nativo SVG via <title> com a impedância dos passivos.
+    if (svg && (t === 'Resistor' || t === 'Capacitor' || t === 'Inductor')) {
+        const z = _impedanciaCompPassivo(comp, _omegaAtual());
+        if (z) {
+            let titleTxt;
+            if (z.especial === 'aberto') titleTxt = `${comp.nome} (${z.simbolo} = ${comp.valor})\n${z.formula}`;
+            else if (z.especial === 'curto') titleTxt = `${comp.nome} (${z.simbolo} = ${comp.valor})\n${z.formula}`;
+            else titleTxt = `${comp.nome} (${z.simbolo} = ${comp.valor})\n${z.formula}\nZ = ${_fmtComplexRet(z.re, z.im)} Ω\nZ = ${_fmtPolarEng(z.mod, z.phaseDeg)} Ω`;
+            svg = svg.replace('<g class="esq-sym">', `<g class="esq-sym"><title>${escapeXml(titleTxt)}</title>`);
+        }
+    }
+    return svg;
 }
 
 /**
@@ -2134,8 +2481,8 @@ const _TOOLTIPS = {
     'no-d': 'Nó negativo do controle (entrada da fonte dependente).',
     'val-input': 'Valor numérico. Aceita sufixos: k (10³), M (10⁶ — maiúsculo), m (10⁻³ — minúsculo), u (10⁻⁶), n (10⁻⁹), p (10⁻¹²).',
     'val-input-dc': 'Valor DC. Aceita sufixos k/M/m/u/n/p.',
-    'val-input-mod': 'Módulo (amplitude) da fonte AC. Aceita sufixos k/M/m/u/n/p.',
-    'val-input-fase': 'Fase em graus. Pode ser negativa (ex: -30).',
+    'val-input-mod': 'Módulo (amplitude) da fonte AC. Aceita sufixos k/M/m/u/n/p. Aceita também forma retangular: digite "3+4j" e o campo Fase é calculado automaticamente.',
+    'val-input-fase': 'Fase em graus. Pode ser negativa (ex: -30). Ignorada se o Módulo for digitado em forma retangular "a+bj".',
     'nome-comp': 'Nome do componente. Deve ser único.',
     'alvo-comp': 'Nome do componente cuja corrente serve de referência. Deve existir na lista.'
 };

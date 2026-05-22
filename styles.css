@@ -887,6 +887,139 @@ body.dark-mode {
 .card-esquematico .section-title { color: #2980b9; }
 body.dark-mode .card-esquematico .section-title { color: #85c1e9; }
 
+/* ============================================================
+   FASE 4 — Painel "Impedâncias do circuito" + nota MNA
+   ============================================================ */
+.mna-reatancias-nota {
+    margin: 0 0 12px;
+    padding: 9px 12px;
+    background: rgba(230, 126, 34, 0.08);
+    border-left: 3px solid #e67e22;
+    border-radius: 6px;
+    font-size: 0.85em;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+.mna-reatancias-nota code {
+    background: rgba(0, 0, 0, 0.06);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', 'Consolas', monospace;
+    font-size: 0.95em;
+    color: var(--text-primary);
+}
+body.dark-mode .mna-reatancias-nota code { background: rgba(255, 255, 255, 0.08); }
+
+.card-impedancias { border-left: 5px solid #e67e22; }
+.card-impedancias .section-title { color: #d35400; }
+body.dark-mode .card-impedancias .section-title { color: #f5b041; }
+
+.impedancias-freq {
+    margin: 0 0 12px;
+    font-size: 0.86em;
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+.impedancias-tabela-wrap {
+    overflow-x: auto;
+}
+.impedancias-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9em;
+    margin: 4px 0 6px;
+}
+.impedancias-table th,
+.impedancias-table td {
+    padding: 8px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+    vertical-align: middle;
+}
+.impedancias-table thead th {
+    background: rgba(230, 126, 34, 0.1);
+    font-weight: 700;
+    font-size: 0.78em;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+}
+.impedancias-table tbody tr:hover {
+    background: rgba(230, 126, 34, 0.04);
+}
+body.dark-mode .impedancias-table tbody tr:hover {
+    background: rgba(245, 176, 65, 0.06);
+}
+.impedancias-table code.z-formula {
+    background: rgba(0, 0, 0, 0.05);
+    padding: 2px 7px;
+    border-radius: 5px;
+    font-family: 'JetBrains Mono', 'Consolas', monospace;
+    font-size: 0.92em;
+    color: var(--text-primary);
+}
+body.dark-mode .impedancias-table code.z-formula { background: rgba(255, 255, 255, 0.07); }
+.impedancias-table .z-polar,
+.impedancias-table .z-rect {
+    font-family: 'JetBrains Mono', 'Consolas', monospace;
+    font-size: 0.94em;
+    font-weight: 600;
+}
+.impedancias-table .z-polar { color: #c0392b; }
+.impedancias-table .z-rect  { color: #2980b9; }
+body.dark-mode .impedancias-table .z-polar { color: #f1948a; }
+body.dark-mode .impedancias-table .z-rect  { color: #85c1e9; }
+.impedancias-table .z-invalido {
+    color: #999;
+    font-style: italic;
+}
+
+/* Diagrama de impedância (Fase 4 — E) */
+:root {
+    --z-axis: #bdc3c7;
+    --z-vec: #c0392b;
+}
+body.dark-mode {
+    --z-axis: #5d6d7e;
+    --z-vec: #f1948a;
+}
+.impedancias-table td.z-diagrama-cell {
+    width: 120px;
+    padding: 6px 8px;
+    text-align: center;
+}
+svg.z-diagrama {
+    display: inline-block;
+    vertical-align: middle;
+    background: var(--bg-card, transparent);
+    border-radius: 6px;
+}
+
+.impedancias-nota {
+    margin: 10px 0 0;
+    padding: 8px 12px;
+    background: rgba(52, 152, 219, 0.06);
+    border-left: 3px solid #3498db;
+    border-radius: 6px;
+    font-size: 0.82em;
+    line-height: 1.6;
+    color: var(--text-secondary);
+}
+.impedancias-nota code {
+    background: rgba(0, 0, 0, 0.06);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', 'Consolas', monospace;
+    font-size: 0.95em;
+    color: var(--text-primary);
+}
+body.dark-mode .impedancias-nota code { background: rgba(255, 255, 255, 0.08); }
+
+/* Tooltip <title> em <g> SVG é nativo do browser; aqui só damos a dica
+   visual de que os símbolos passivos são "informativos". */
+.esq-sym:hover { cursor: help; }
+
 .esq-note {
     margin: 0 0 14px;
     padding: 10px 14px;
