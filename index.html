@@ -8,7 +8,7 @@
     <script>MathJax = {loader: {load: ['input/asciimath', 'output/chtml']}, asciimath: {delimiters: [['`','`']]}};</script>
     <script type="text/javascript" id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/startup.js"></script>
 
-    <link rel="stylesheet" href="styles.css?v=20260522-seno">
+    <link rel="stylesheet" href="styles.css?v=20260522-trafo">
 </head>
 <body>
 
@@ -127,6 +127,25 @@
 
         <details class="ajuda-section">
             <summary class="ajuda-summary">
+                <span class="ajuda-icon" aria-hidden="true">&#9883;</span>
+                <span>Transformador ideal</span>
+            </summary>
+            <div class="ajuda-content">
+                <p>O bot&atilde;o <strong>+ Trafo</strong> insere um transformador ideal de 4 terminais. Voc&ecirc; informa:</p>
+                <ul>
+                    <li><strong>Pri (+/&minus;)</strong> &mdash; os dois n&oacute;s do enrolamento prim&aacute;rio (N<sub>1</sub> espiras).</li>
+                    <li><strong>Sec (+/&minus;)</strong> &mdash; os dois n&oacute;s do enrolamento secund&aacute;rio (N<sub>2</sub> espiras).</li>
+                    <li><strong>Raz&atilde;o N1/N2</strong> &mdash; pode digitar como <code>1:2</code>, <code>1/2</code>, <code>0.5</code> ou <code>2</code>.</li>
+                </ul>
+                <p>Equa&ccedil;&otilde;es internas (acopladas via fluxo magn&eacute;tico ideal):</p>
+                <p class="ajuda-formula">V<sub>pri</sub> = n &middot; V<sub>sec</sub> &nbsp;&nbsp;&middot;&nbsp;&nbsp; I<sub>sec</sub> = &minus;n &middot; I<sub>pri</sub> &nbsp;&nbsp;com&nbsp;&nbsp; n = N<sub>1</sub>/N<sub>2</sub></p>
+                <p class="ajuda-nota">Os pontos pretos no esquem&aacute;tico indicam a <strong>polaridade convencional</strong> &mdash; tens&atilde;o no terminal "+" do prim&aacute;rio est&aacute; em fase com a tens&atilde;o no terminal "+" do secund&aacute;rio. Trafos ideais s&atilde;o renderizados em um painel pr&oacute;prio abaixo do esquem&aacute;tico principal.</p>
+                <p class="ajuda-nota"><strong>Observa&ccedil;&atilde;o:</strong> circuitos com trafo n&atilde;o entram no caminho de <em>superposi&ccedil;&atilde;o simplificada</em> &mdash; o c&aacute;lculo &eacute; sempre feito pela an&aacute;lise nodal completa.</p>
+            </div>
+        </details>
+
+        <details class="ajuda-section">
+            <summary class="ajuda-summary">
                 <span class="ajuda-icon" aria-hidden="true">&#9000;&#65039;</span>
                 <span>Atalhos de teclado</span>
             </summary>
@@ -193,6 +212,7 @@
                 <option value="vccs_amp">7. Transcondutância (VCCS)</option>
                 <option value="ccvs_teste">8. Transresistência (CCVS)</option>
                 <option value="cccs_bjt">9. Modelo Transistor (CCCS)</option>
+                <option value="trafo_step_up">10. Trafo step-up 1:2 + carga</option>
             </select>
 
             <div class="control-group">
@@ -210,6 +230,7 @@
                 </div>
                 <button class="btn-add" style="background:#ff6b35" onclick="add('Capacitor')">+ C</button>
                 <button class="btn-add" style="background:#4a5568" onclick="add('Inductor')">+ L</button>
+                <button class="btn-add" style="background:#8e44ad" onclick="add('Transformer')" title="Transformador ideal (4 terminais, raz&atilde;o N1/N2)">+ Trafo</button>
             </div>
 
             <ul id="listaComponentes"></ul>
@@ -318,6 +339,6 @@
         </form>
     </dialog>
 
-    <script src="script.js?v=20260522-seno"></script>
+    <script src="script.js?v=20260522-trafo"></script>
 </body>
 </html>

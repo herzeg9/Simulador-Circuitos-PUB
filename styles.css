@@ -1155,6 +1155,66 @@ body.dark-mode .impedancias-nota code { background: rgba(255, 255, 255, 0.08); }
     min-width: 600px;
 }
 
+/* FASE 5.2 - Painel de transformadores ideais (renderizados a parte) */
+.trafo-panel {
+    margin-top: 18px;
+    padding: 14px 16px;
+    border-top: 1px dashed var(--tab-border);
+}
+.trafo-panel-title {
+    margin: 0 0 4px 0;
+    font-size: 1em;
+    color: #8e44ad;
+    font-weight: 600;
+}
+.trafo-panel-note {
+    margin: 0 0 12px 0;
+    font-size: 0.85em;
+    color: var(--text-secondary);
+    font-style: italic;
+}
+.trafo-panel-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+}
+.trafo-card {
+    flex: 0 1 auto;
+    background: var(--esq-bg);
+    border: 1px solid var(--tab-border);
+    border-radius: 8px;
+    padding: 8px 12px 6px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+.trafo-svg {
+    width: 220px;
+    height: 130px;
+    display: block;
+}
+.trafo-info {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: 4px;
+    font-size: 0.85em;
+}
+.trafo-info strong { color: #8e44ad; font-size: 1.05em; }
+.trafo-razao {
+    font-family: 'Consolas', 'Monaco', monospace;
+    color: var(--text-primary);
+    margin-top: 2px;
+}
+.trafo-nos {
+    color: var(--text-secondary);
+    font-size: 0.9em;
+    margin-top: 2px;
+}
+body.dark-mode .trafo-panel-title { color: #c39bd3; }
+body.dark-mode .trafo-info strong { color: #c39bd3; }
+
 .esq-label--name {
     font-family: 'Segoe UI', Roboto, sans-serif;
     font-weight: 700;

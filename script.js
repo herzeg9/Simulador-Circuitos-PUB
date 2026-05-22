@@ -55,6 +55,11 @@ const exemplos = {
         {"Componente": "R_Base", "Tipo": "Resistor", "Valor": "1k", "Nos": [1, 0]},
         {"Componente": "F_BJT", "Tipo": "CCCS", "Valor": "100", "Nos": [2, 0], "Alvo": "R_Base"},
         {"Componente": "R_Col", "Tipo": "Resistor", "Valor": "10", "Nos": [2, 0]}
+    ],
+    "trafo_step_up": [
+        {"Componente": "V1", "Tipo": "VoltageSource", "Valor": "10", "Nos": [1, 0]},
+        {"Componente": "T1", "Tipo": "Transformer", "Valor": "1:2", "Nos": [1, 0, 2, 0]},
+        {"Componente": "R_Carga", "Tipo": "Resistor", "Valor": "100", "Nos": [2, 0]}
     ]
 };
 
@@ -193,7 +198,40 @@ function defaultValPorTipo(tipo, val) {
     if (tipo === 'VCVS' || tipo === 'VCCS' || tipo === 'CCVS' || tipo === 'CCCS') return '2';
     if (tipo === 'Capacitor') return '100u';
     if (tipo === 'Inductor') return '1m';
+    if (tipo === 'Transformer') return '1:2';
     return '1k';
+}
+
+/**
+ * FASE 5.2: normaliza a razão de um trafo digitada pelo usuário.
+ * Aceita "a:b" (1:2), "a/b" (1/2), decimal ("0.5") ou inteiro ("2").
+ * Devolve a string já no formato que o backend entende via parseValue/ToExpression.
+ * Returns null se a razão for inválida ou não positiva.
+ *
+ * @param {string} raw
+ * @returns {string|null}
+ */
+function normalizarRazaoTrafo(raw) {
+    if (raw == null) return null;
+    let s = String(raw).trim();
+    if (!s) return null;
+    if (s.includes(':')) {
+        const partes = s.split(':').map(p => p.trim());
+        if (partes.length !== 2 || !partes[0] || !partes[1]) return null;
+        s = `${partes[0]}/${partes[1]}`;
+    }
+    const partes = s.split('/');
+    let num;
+    if (partes.length === 2) {
+        const a = parseFloat(partes[0]);
+        const b = parseFloat(partes[1]);
+        if (!Number.isFinite(a) || !Number.isFinite(b) || b === 0) return null;
+        num = a / b;
+    } else {
+        num = parseFloat(s);
+    }
+    if (!Number.isFinite(num) || num <= 0) return null;
+    return s;
 }
 
 /**
@@ -328,6 +366,21 @@ function add(tipo, nomeFixo=null, nosInput=null, val=null, alvo=null) {
         <input type="number" class="no-b" value="${nB}" style="width:30px">
         <input type="text" class="alvo-comp" placeholder="Comp. Alvo (ex: R1)">`;
     }
+    if (tipo === 'Transformer') {
+        // FASE 5.2: trafo ideal com 4 terminais (primário e secundário).
+        // Razão n = N1/N2 = V_pri / V_sec; backend recebe via campo "Razao".
+        label = 'T';
+        nome = `T${id}`;
+        valLabel = 'Razão N1/N2';
+        if (nC === 1 && nD === 0) { nC = 2; nD = 0; }
+        inputsNos = `
+        <span style="font-size:0.7em; color:#16a085;">Pri:</span>
+        <input type="number" class="no-a" value="${nA}" min="0" style="width:30px" placeholder="+">
+        <input type="number" class="no-b" value="${nB}" min="0" style="width:30px" placeholder="-">
+        <span style="font-size:0.7em; color:#16a085;">Sec:</span>
+        <input type="number" class="no-c" value="${nC}" min="0" style="width:30px" placeholder="+">
+        <input type="number" class="no-d" value="${nD}" min="0" style="width:30px" placeholder="-">`;
+    }
 
     const defVal = defaultValPorTipo(tipo, val);
     let valorSecaoHtml = `
@@ -340,16 +393,29 @@ function add(tipo, nomeFixo=null, nosInput=null, val=null, alvo=null) {
     }
 
     // Estrutura HTML personalizada do componente na interface
+    const btnRelacionarStyle = (tipo === 'Transformer') ? 'display:none;' : '';
     li.innerHTML = `
         <span class="comp-badge">${label}</span>
         <input type="text" class="nome-comp" value="${nomeFixo || nome}" style="width:50px; font-weight:bold;">
         <div class="nodes-group">${inputsNos}</div>
         ${valorSecaoHtml}
-        <button type="button" class="btn-relacionar" onclick="abrirDialogoRelacionar(this.parentElement)" title="Adicionar componente relacionado (s\u00e9rie / paralelo)" aria-label="Adicionar componente em s\u00e9rie ou paralelo">+</button>
+        <button type="button" class="btn-relacionar" onclick="abrirDialogoRelacionar(this.parentElement)" title="Adicionar componente relacionado (s\u00e9rie / paralelo)" aria-label="Adicionar componente em s\u00e9rie ou paralelo" style="${btnRelacionarStyle}">+</button>
         <button class="btn-del" onclick="removerComponente(this.parentElement)">×</button>
     `;
     lista.appendChild(li);
     aplicarTooltipsComponente(li);
+    if (tipo === 'Transformer') {
+        const noA = li.querySelector('.no-a');
+        const noB = li.querySelector('.no-b');
+        const noC = li.querySelector('.no-c');
+        const noD = li.querySelector('.no-d');
+        if (noA) noA.title = 'Terminal positivo do primário. Use 0 para terra (GND).';
+        if (noB) noB.title = 'Terminal negativo do primário. Use 0 para terra (GND).';
+        if (noC) noC.title = 'Terminal positivo do secundário. Use 0 para terra (GND).';
+        if (noD) noD.title = 'Terminal negativo do secundário. Use 0 para terra (GND).';
+        const valInput = li.querySelector('.val-input');
+        if (valInput) valInput.title = 'Razão de transformação n = N1/N2 = V_pri/V_sec. Aceita: "2" (decimal), "1/2" (fração) ou "1:2" (notação clássica).';
+    }
 
     const alvoInput = li.querySelector('.alvo-comp');
     if (alvoInput && alvo != null && alvo !== '') {
@@ -398,7 +464,7 @@ function gerarJSON() {
         const fonteIndep = tipo === 'VoltageSource' || tipo === 'CurrentSource';
 
         let nos = [];
-        if (tipo === 'VCVS' || tipo === 'VCCS') {
+        if (tipo === 'VCVS' || tipo === 'VCCS' || tipo === 'Transformer') {
             nos = [
                 parseInt(item.querySelector('.no-a').value, 10),
                 parseInt(item.querySelector('.no-b').value, 10),
@@ -422,6 +488,16 @@ function gerarJSON() {
             "Tipo": tipo,
             "Nos": nos
         };
+
+        if (tipo === 'Transformer') {
+            // FASE 5.2: trafo ideal usa o campo "Razao" em vez de "Valor".
+            const valEl = item.querySelector('.val-input');
+            let razaoRaw = valEl ? valEl.value.trim() : '';
+            const norm = normalizarRazaoTrafo(razaoRaw);
+            compObj["Razao"] = (norm != null) ? norm : '1';
+            netlist.push(compObj);
+            return;
+        }
 
         if (modo === 'AC' && fonteIndep) {
             const modIn = item.querySelector('.val-input-mod');
@@ -1537,9 +1613,12 @@ function getTopologiaAtual() {
         const nA = parseInt((item.querySelector('.no-a')?.value ?? '').trim(), 10);
         const nB = parseInt((item.querySelector('.no-b')?.value ?? '').trim(), 10);
         if (!Number.isFinite(nA) || !Number.isFinite(nB)) return;
-        if (nA === nB) return;
+        // FASE 5.2: trafo continua aparecendo no esquemático mesmo se o
+        // primário ou o secundário estiverem temporariamente com curto;
+        // o validarTopologia já sinaliza o erro com tooltip.
+        if (tipo !== 'Transformer' && nA === nB) return;
         let nC = null, nD = null;
-        if (tipo === 'VCVS' || tipo === 'VCCS') {
+        if (tipo === 'VCVS' || tipo === 'VCCS' || tipo === 'Transformer') {
             const ncv = parseInt((item.querySelector('.no-c')?.value ?? '').trim(), 10);
             const ndv = parseInt((item.querySelector('.no-d')?.value ?? '').trim(), 10);
             if (Number.isFinite(ncv) && Number.isFinite(ndv)) { nC = ncv; nD = ndv; }
@@ -1572,8 +1651,14 @@ function getTopologiaAtual() {
  * @param {Array} topologia
  */
 function analyzeTopology(topologia) {
+    // FASE 5.2: trafos têm 4 nós e não cabem na lógica shunt/series do
+    // renderizador atual. Separamos antes para que sejam desenhados em um
+    // painel próprio abaixo do esquemático principal.
+    const trafos = topologia.filter(c => c.tipo === 'Transformer');
+    const semTrafos = topologia.filter(c => c.tipo !== 'Transformer');
+
     const nodesSet = new Set();
-    topologia.forEach(c => {
+    semTrafos.forEach(c => {
         nodesSet.add(c.nA); nodesSet.add(c.nB);
         if (c.nC != null) nodesSet.add(c.nC);
         if (c.nD != null) nodesSet.add(c.nD);
@@ -1583,7 +1668,7 @@ function analyzeTopology(topologia) {
     const shunts = [];
     const series = [];
 
-    topologia.forEach(c => {
+    semTrafos.forEach(c => {
         const aIsGnd = c.nA === 0;
         const bIsGnd = c.nB === 0;
         if (aIsGnd && bIsGnd) return;
@@ -1603,7 +1688,7 @@ function analyzeTopology(topologia) {
         }
     });
 
-    return { nonGroundNodes, shunts, series };
+    return { nonGroundNodes, shunts, series, trafos };
 }
 
 function assignSeriesRows(series) {
@@ -1997,10 +2082,15 @@ function renderEsquematico() {
         return;
     }
 
-    const { nonGroundNodes, shunts, series } = analyzeTopology(topologia);
+    const { nonGroundNodes, shunts, series, trafos } = analyzeTopology(topologia);
 
-    if (!nonGroundNodes.length) {
+    if (!nonGroundNodes.length && (!trafos || !trafos.length)) {
         wrap.innerHTML = '<div class="esq-empty">Topologia degenerada: todos os terminais estão no terra. Conecte ao menos um nó não-zero.</div>';
+        return;
+    }
+    if (!nonGroundNodes.length && trafos && trafos.length) {
+        // Caso raro: só há trafos no circuito. Renderiza apenas o painel de trafos.
+        wrap.innerHTML = renderPainelTrafos(trafos);
         return;
     }
 
@@ -2084,7 +2174,77 @@ function renderEsquematico() {
     });
 
     parts.push(`</svg>`);
-    wrap.innerHTML = parts.join('');
+
+    // FASE 5.2: trafos são desenhados em um painel próprio abaixo do SVG.
+    const painelTrafos = (trafos && trafos.length) ? renderPainelTrafos(trafos) : '';
+
+    wrap.innerHTML = parts.join('') + painelTrafos;
+}
+
+/**
+ * FASE 5.2: gera o HTML/SVG do painel de transformadores ideais que aparece
+ * abaixo do esquemático principal. Cada trafo é desenhado como duas bobinas
+ * em espiral (símbolo IEEE) com os 4 nós rotulados e a razão N1:N2.
+ *
+ * @param {Array} trafos - Lista de objetos {tipo:'Transformer', nome, nA, nB, nC, nD, valor}.
+ * @returns {string}
+ */
+function renderPainelTrafos(trafos) {
+    if (!trafos || !trafos.length) return '';
+    const cards = trafos.map(t => {
+        const W = 220, H = 130;
+        const xPri = 70, xSec = 150, yTop = 30, yBot = 100;
+        // 4 meias-elipses para a bobina primária (vertical) e secundária
+        const espiral = (cx) => {
+            const arcs = [];
+            for (let i = 0; i < 4; i++) {
+                const yA = yTop + 7 + i * 17;
+                const yB = yA + 14;
+                arcs.push(`<path d="M ${cx},${yA} Q ${cx + 9},${(yA + yB) / 2} ${cx},${yB}" stroke="var(--esq-stroke, #2c3e50)" stroke-width="2" fill="none"/>`);
+            }
+            return arcs.join('');
+        };
+        // Núcleo (duas barras verticais entre as bobinas)
+        const nucleo = `
+            <line x1="${(xPri + xSec) / 2 - 4}" y1="${yTop + 5}" x2="${(xPri + xSec) / 2 - 4}" y2="${yBot - 5}" stroke="var(--esq-stroke, #2c3e50)" stroke-width="1.5"/>
+            <line x1="${(xPri + xSec) / 2 + 4}" y1="${yTop + 5}" x2="${(xPri + xSec) / 2 + 4}" y2="${yBot - 5}" stroke="var(--esq-stroke, #2c3e50)" stroke-width="1.5"/>`;
+        // Pontos de polaridade (topo de cada bobina, lado interno do núcleo)
+        const dotPri = `<circle cx="${xPri + 11}" cy="${yTop + 4}" r="2.5" fill="var(--esq-stroke, #2c3e50)"/>`;
+        const dotSec = `<circle cx="${xSec - 11}" cy="${yTop + 4}" r="2.5" fill="var(--esq-stroke, #2c3e50)"/>`;
+        // Stubs e labels dos nós
+        const stubs = `
+            <line x1="20" y1="${yTop}" x2="${xPri}" y2="${yTop}" stroke="var(--esq-wire, #2c3e50)" stroke-width="2"/>
+            <line x1="20" y1="${yBot}" x2="${xPri}" y2="${yBot}" stroke="var(--esq-wire, #2c3e50)" stroke-width="2"/>
+            <line x1="${xSec}" y1="${yTop}" x2="${W - 20}" y2="${yTop}" stroke="var(--esq-wire, #2c3e50)" stroke-width="2"/>
+            <line x1="${xSec}" y1="${yBot}" x2="${W - 20}" y2="${yBot}" stroke="var(--esq-wire, #2c3e50)" stroke-width="2"/>
+            <text x="10" y="${yTop - 4}" font-size="11" text-anchor="middle" fill="var(--esq-stroke, #2c3e50)">${escapeXml(t.nA)}</text>
+            <text x="10" y="${yBot + 14}" font-size="11" text-anchor="middle" fill="var(--esq-stroke, #2c3e50)">${escapeXml(t.nB)}</text>
+            <text x="${W - 10}" y="${yTop - 4}" font-size="11" text-anchor="middle" fill="var(--esq-stroke, #2c3e50)">${escapeXml(t.nC)}</text>
+            <text x="${W - 10}" y="${yBot + 14}" font-size="11" text-anchor="middle" fill="var(--esq-stroke, #2c3e50)">${escapeXml(t.nD)}</text>`;
+        const valorTexto = (t.valor || '1').includes(':') ? t.valor : `n=${t.valor}`;
+        return `
+            <div class="trafo-card">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" class="trafo-svg" role="img" aria-label="Transformador ${escapeXml(t.nome)}">
+                    ${stubs}
+                    ${espiral(xPri)}
+                    ${espiral(xSec)}
+                    ${nucleo}
+                    ${dotPri}
+                    ${dotSec}
+                </svg>
+                <div class="trafo-info">
+                    <strong>${escapeXml(t.nome)}</strong>
+                    <span class="trafo-razao">${escapeXml(valorTexto)}</span>
+                    <span class="trafo-nos">Pri: ${escapeXml(t.nA)}/${escapeXml(t.nB)} &middot; Sec: ${escapeXml(t.nC)}/${escapeXml(t.nD)}</span>
+                </div>
+            </div>`;
+    }).join('');
+    return `
+        <div class="trafo-panel">
+            <h4 class="trafo-panel-title">Transformadores ideais</h4>
+            <p class="trafo-panel-note">Trafos ideais (4 terminais) s&atilde;o renderizados em separado &mdash; os pontos pretos indicam a polaridade convencional (mesma fase de tens&atilde;o).</p>
+            <div class="trafo-panel-grid">${cards}</div>
+        </div>`;
 }
 
 /* ---------- Live preview & tabs ---------- */
@@ -2530,7 +2690,7 @@ function restaurarEstadoSalvo(state) {
 
     state.componentes.forEach(comp => {
         const nos = [parseInt(comp.nos.a, 10), parseInt(comp.nos.b, 10)];
-        if (comp.tipo === 'VCVS' || comp.tipo === 'VCCS') {
+        if (comp.tipo === 'VCVS' || comp.tipo === 'VCCS' || comp.tipo === 'Transformer') {
             nos.push(parseInt(comp.nos.c, 10), parseInt(comp.nos.d, 10));
         }
 
@@ -2815,6 +2975,36 @@ function validarTopologia() {
         const existe = items.some(o => o !== it && (o.querySelector('.nome-comp')?.value || '').trim() === alvo);
         if (!existe) {
             erros.push(`<code>${escapeXml(nome)}</code> referencia <code>${escapeXml(alvo)}</code>, mas esse componente não existe.`);
+            it.classList.add('has-error');
+        }
+    });
+
+    // FASE 5.2: validações específicas para Transformer
+    items.forEach(it => {
+        if (it.dataset.tipo !== 'Transformer') return;
+        const nome = (it.querySelector('.nome-comp')?.value || '?').trim();
+        const a = parseInt(it.querySelector('.no-a')?.value, 10);
+        const b = parseInt(it.querySelector('.no-b')?.value, 10);
+        const c = parseInt(it.querySelector('.no-c')?.value, 10);
+        const d = parseInt(it.querySelector('.no-d')?.value, 10);
+        const nosOk = [a, b, c, d].every(Number.isFinite);
+        if (!nosOk) {
+            erros.push(`<code>${escapeXml(nome)}</code> (trafo) tem algum nó vazio ou inválido.`);
+            it.classList.add('has-error');
+            return;
+        }
+        if (a === b) {
+            erros.push(`<code>${escapeXml(nome)}</code>: terminais do primário não podem ser iguais.`);
+            it.classList.add('has-error');
+        }
+        if (c === d) {
+            erros.push(`<code>${escapeXml(nome)}</code>: terminais do secundário não podem ser iguais.`);
+            it.classList.add('has-error');
+        }
+        const valEl = it.querySelector('.val-input');
+        const raz = valEl ? valEl.value.trim() : '';
+        if (normalizarRazaoTrafo(raz) == null) {
+            erros.push(`<code>${escapeXml(nome)}</code> tem razão inválida (use formatos como <code>1:2</code>, <code>1/2</code>, <code>0.5</code> ou <code>2</code>; deve ser positiva).`);
             it.classList.add('has-error');
         }
     });
