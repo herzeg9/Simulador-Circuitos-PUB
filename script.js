@@ -639,7 +639,11 @@ function _parseNumeroSI(s) {
 
 /**
  * Tenta interpretar a string como um complexo retangular a+bj (ou a+bi).
- * Aceita: "5j", "-5j", "+j", "3+4j", "3-4j", "1.5e3+2j", "-3+4i".
+ * Aceita as duas convenções comuns em engenharia elétrica:
+ *
+ *   - Notação matemática:  "5j", "-5j", "3+4j", "3-4j", "1.5e3+2j", "-3+4i"
+ *   - Notação engenharia:  "j5", "-j5", "3+j4", "3-j4", "1.5e3+j2", "-3+i4"
+ *
  * Cada coeficiente pode ter sufixo SI (ex.: "3k+4kj" ⇒ {re:3000, im:4000}).
  * Devolve null se a string não tiver a forma esperada (caller decide tratar
  * como número simples ou erro).
@@ -649,8 +653,11 @@ function _parseNumeroSI(s) {
  */
 function _parseRetangular(s) {
     if (s == null) return null;
-    const t = String(s).trim().replace(/\s+/g, '').replace(/i$/i, 'j');
-    if (!t || !/j$/i.test(t)) return null;
+    let t = String(s).trim().replace(/\s+/g, '').replace(/i/gi, 'j');
+    if (!t || !/j/.test(t)) return null;
+    // Normaliza "j5", "+j5", "-j5" para "5j", "+5j", "-5j" (engenharia → matemática)
+    t = t.replace(/(^|[+\-])j(\d+\.?\d*(?:[eE][+-]?\d+)?[kMmuµnpG]?)/g, '$1$2j');
+    if (!/j$/i.test(t)) return null;
     const NUM = '(?:[+-]?(?:\\d+\\.?\\d*|\\.\\d+)(?:[eE][+-]?\\d+)?[kMmuµnpG]?)';
     const onlyImag = t.match(new RegExp(`^(${NUM})?j$`));
     if (onlyImag) {
@@ -938,6 +945,15 @@ function limparEquacaoAC(eq) {
         /(\d+(?:\.\d+)?)\s*e\^\{(-?\d+(?:\.\d+)?)\s*i\s*°\s*\}?/g,
         '$1 /_ ($2°)'
     );
+
+    // Sanitização de complexos retangulares vindos do Wolfram:
+    // o TeXForm de "12.+8.*I" pode chegar como "12., +8. i" (ponto solto
+    // ao fim de inteiros + vírgula espúria entre parte real e imaginária).
+    // Trocamos por uma forma limpa "12 + 8 i" sem alterar números decimais
+    // legítimos (3.14 fica intacto graças ao lookahead).
+    s = s.replace(/(\d+)\.(?!\d)/g, '$1');
+    s = s.replace(/(\d|\))\s*,\s*([+\-])/g, '$1 $2');
+
     return s;
 }
 
@@ -2481,8 +2497,8 @@ const _TOOLTIPS = {
     'no-d': 'Nó negativo do controle (entrada da fonte dependente).',
     'val-input': 'Valor numérico. Aceita sufixos: k (10³), M (10⁶ — maiúsculo), m (10⁻³ — minúsculo), u (10⁻⁶), n (10⁻⁹), p (10⁻¹²).',
     'val-input-dc': 'Valor DC. Aceita sufixos k/M/m/u/n/p.',
-    'val-input-mod': 'Módulo (amplitude) da fonte AC. Aceita sufixos k/M/m/u/n/p. Aceita também forma retangular: digite "3+4j" e o campo Fase é calculado automaticamente.',
-    'val-input-fase': 'Fase em graus. Pode ser negativa (ex: -30). Ignorada se o Módulo for digitado em forma retangular "a+bj".',
+    'val-input-mod': 'Módulo (amplitude) da fonte AC. Aceita sufixos k/M/m/u/n/p. Aceita também forma retangular: "3+4j" (matemática) ou "3+j4" (engenharia) — o campo Fase é calculado automaticamente.',
+    'val-input-fase': 'Fase em graus. Pode ser negativa (ex: -30). Ignorada se o Módulo for digitado em forma retangular "a+bj" / "a+jb".',
     'nome-comp': 'Nome do componente. Deve ser único.',
     'alvo-comp': 'Nome do componente cuja corrente serve de referência. Deve existir na lista.'
 };

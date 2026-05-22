@@ -8,7 +8,7 @@
     <script>MathJax = {loader: {load: ['input/asciimath', 'output/chtml']}, asciimath: {delimiters: [['`','`']]}};</script>
     <script type="text/javascript" id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/startup.js"></script>
 
-    <link rel="stylesheet" href="styles.css?v=20260522-titulos">
+    <link rel="stylesheet" href="styles.css?v=20260522-complex">
 </head>
 <body>
 
@@ -62,6 +62,26 @@
                         <tr><td><code>p</code></td><td>10<sup>-12</sup> (pico)</td><td><code>2.2p</code> &rarr; 2,2 pF</td></tr>
                     </tbody>
                 </table>
+            </div>
+        </details>
+
+        <details class="ajuda-section">
+            <summary class="ajuda-summary">
+                <span class="ajuda-icon" aria-hidden="true">&#119894;</span>
+                <span>Fontes AC em forma retangular (a + jb)</span>
+            </summary>
+            <div class="ajuda-content">
+                <p>No campo <strong>M&oacute;dulo</strong> de uma fonte AC voc&ecirc; pode digitar um complexo retangular &mdash; em qualquer das duas conven&ccedil;&otilde;es comuns:</p>
+                <table class="ajuda-tabela">
+                    <thead>
+                        <tr><th>Conven&ccedil;&atilde;o</th><th>Como escrever</th><th>O que acontece</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Matem&aacute;tica</td><td><code>12+8j</code>, <code>3-4j</code>, <code>1.5e3+2j</code></td><td rowspan="2">Convertido automaticamente para polar: <code>|Z|&nbsp;&ang;&nbsp;&theta;</code>. O campo <em>Fase</em> &eacute; ignorado.</td></tr>
+                        <tr><td>Engenharia</td><td><code>12+j8</code>, <code>3-j4</code>, <code>1.5e3+j2</code></td></tr>
+                    </tbody>
+                </table>
+                <p class="ajuda-nota">Tamb&eacute;m aceito: <code>i</code> no lugar de <code>j</code>, sufixos SI em qualquer coeficiente (ex.: <code>3k+j4k</code>), e espa&ccedil;os entre termos (ex.: <code>12 + j8</code>). O Campo <em>Fase</em> &eacute; recalculado &mdash; n&atilde;o &eacute; necess&aacute;rio mexer nele.</p>
             </div>
         </details>
 
@@ -264,6 +284,6 @@
         </form>
     </dialog>
 
-    <script src="script.js?v=20260522-titulos"></script>
+    <script src="script.js?v=20260522-complex"></script>
 </body>
 </html>
