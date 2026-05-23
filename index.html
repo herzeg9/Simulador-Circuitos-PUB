@@ -8,7 +8,7 @@
     <script>MathJax = {loader: {load: ['input/asciimath', 'output/chtml']}, asciimath: {delimiters: [['`','`']]}};</script>
     <script type="text/javascript" id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/startup.js"></script>
 
-    <link rel="stylesheet" href="styles.css?v=20260523-mathjax">
+    <link rel="stylesheet" href="styles.css?v=20260524-fase6-ux">
 </head>
 <body>
 
@@ -27,7 +27,6 @@
     <section class="ajuda-box" aria-label="Guia de uso do simulador">
         <details class="ajuda-section" open>
             <summary class="ajuda-summary">
-                <span class="ajuda-icon" aria-hidden="true">&#128218;</span>
                 <span>Conven&ccedil;&otilde;es b&aacute;sicas</span>
             </summary>
             <div class="ajuda-content">
@@ -44,7 +43,6 @@
 
         <details class="ajuda-section">
             <summary class="ajuda-summary">
-                <span class="ajuda-icon" aria-hidden="true">&#9881;&#65039;</span>
                 <span>Sufixos de unidades</span>
             </summary>
             <div class="ajuda-content">
@@ -67,7 +65,6 @@
 
         <details class="ajuda-section">
             <summary class="ajuda-summary">
-                <span class="ajuda-icon" aria-hidden="true">&#119894;</span>
                 <span>Fontes AC em forma retangular (a + jb)</span>
             </summary>
             <div class="ajuda-content">
@@ -87,7 +84,6 @@
 
         <details class="ajuda-section">
             <summary class="ajuda-summary">
-                <span class="ajuda-icon" aria-hidden="true">&#8767;</span>
                 <span>Fontes senoidais &mdash; conven&ccedil;&atilde;o temporal (cos vs sen)</span>
             </summary>
             <div class="ajuda-content">
@@ -110,7 +106,6 @@
 
         <details class="ajuda-section">
             <summary class="ajuda-summary">
-                <span class="ajuda-icon" aria-hidden="true">&#128257;</span>
                 <span>Fontes dependentes (controladas)</span>
             </summary>
             <div class="ajuda-content">
@@ -127,7 +122,6 @@
 
         <details class="ajuda-section">
             <summary class="ajuda-summary">
-                <span class="ajuda-icon" aria-hidden="true">&#9883;</span>
                 <span>Transformador ideal</span>
             </summary>
             <div class="ajuda-content">
@@ -146,7 +140,6 @@
 
         <details class="ajuda-section">
             <summary class="ajuda-summary">
-                <span class="ajuda-icon" aria-hidden="true">&#9000;&#65039;</span>
                 <span>Atalhos de teclado</span>
             </summary>
             <div class="ajuda-content">
@@ -162,7 +155,6 @@
     </section>
 
     <div id="bannerRestaurarCircuito" class="banner-restaurar" role="alert" hidden>
-        <span class="banner-icon" aria-hidden="true">&#128190;</span>
         <p class="banner-msg">Encontramos um circuito salvo.</p>
         <div class="banner-actions">
             <button type="button" class="banner-btn banner-btn-restaurar" onclick="onRestaurarCircuitoClick()">Restaurar</button>
@@ -200,20 +192,27 @@
                 </fieldset>
             </div>
             
-            <label style="font-weight:bold; color:#3498db;">📚 Biblioteca:</label>
-            <select class="example-select" onchange="carregarExemplo(this.value)">
-                <option value="">-- Carregar Exemplo --</option>
-                <option value="divisor">1. Divisor de Tensão</option>
-                <option value="ponte">2. Ponte de Wheatstone</option>
-                <option value="amp">3. Amplificador (VCVS)</option>
-                <option value="misto">4. Malhas Complexas</option>
-                <option value="capacitor_dc">5. Capacitor em DC (Bloqueio)</option>
-                <option value="indutor_dc">6. Indutor em DC (Curto)</option>
-                <option value="vccs_amp">7. Transcondutância (VCCS)</option>
-                <option value="ccvs_teste">8. Transresistência (CCVS)</option>
-                <option value="cccs_bjt">9. Modelo Transistor (CCCS)</option>
-                <option value="trafo_step_up">10. Trafo step-up 1:2 + carga</option>
-            </select>
+            <label style="font-weight:bold; color:#3498db;">Biblioteca:</label>
+            <div class="biblioteca-row">
+                <select class="example-select" id="exemplosSelect" onchange="carregarExemplo(this.value)">
+                    <option value="">-- Carregar Exemplo --</option>
+                    <optgroup label="Exemplos nativos">
+                        <option value="divisor">1. Divisor de Tens&atilde;o</option>
+                        <option value="ponte">2. Ponte de Wheatstone</option>
+                        <option value="amp">3. Amplificador (VCVS)</option>
+                        <option value="misto">4. Malhas Complexas</option>
+                        <option value="capacitor_dc">5. Capacitor em DC (Bloqueio)</option>
+                        <option value="indutor_dc">6. Indutor em DC (Curto)</option>
+                        <option value="vccs_amp">7. Transcondut&acirc;ncia (VCCS)</option>
+                        <option value="ccvs_teste">8. Transresist&ecirc;ncia (CCVS)</option>
+                        <option value="cccs_bjt">9. Modelo Transistor (CCCS)</option>
+                        <option value="trafo_step_up">10. Trafo step-up 1:2 + carga</option>
+                    </optgroup>
+                    <optgroup id="exemplosCustomGroup" label="Meus circuitos" hidden></optgroup>
+                </select>
+                <button type="button" class="biblioteca-btn" id="btnSalvarExemplo" onclick="salvarCircuitoComoExemplo()" title="Salva o circuito atual na biblioteca local (apenas neste navegador)">+ Salvar atual</button>
+                <button type="button" class="biblioteca-btn biblioteca-btn-danger" id="btnRemoverExemplo" onclick="removerExemploCustomSelecionado()" title="Remove o exemplo personalizado selecionado" hidden>Apagar</button>
+            </div>
 
             <div class="control-group">
                 <button class="btn-add" style="background:#f1c40f; color:#333;" onclick="add('Resistor')">+ R</button>
@@ -230,7 +229,7 @@
                 </div>
                 <button class="btn-add" style="background:#ff6b35" onclick="add('Capacitor')">+ C</button>
                 <button class="btn-add" style="background:#4a5568" onclick="add('Inductor')">+ L</button>
-                <button class="btn-add" style="background:#8e44ad" onclick="add('Transformer')" title="Transformador ideal (4 terminais, raz&atilde;o N1/N2)">+ Trafo</button>
+                <button class="btn-add btn-add-trafo" onclick="add('Transformer')" title="Transformador ideal (4 terminais, raz&atilde;o N1/N2)">+ Trafo</button>
             </div>
 
             <ul id="listaComponentes"></ul>
@@ -239,15 +238,22 @@
 
             <div class="button-group">
                 <button class="btn-calc" id="btnAnalisarCompleto" onclick="calcular()" title="Atalho: Ctrl+Enter"> Analisar Completo</button>
+                <button type="button" class="btn-utility" onclick="renumerarNos()" title="Reordena os n&oacute;s sequencialmente (1,2,3,...) sem alterar a topologia">Renumerar n&oacute;s</button>
                 <button class="btn-clear" onclick="limparTudo()"> Limpar Tudo</button>
             </div>
-            <div id="loading" class="loading">Processando na Wolfram Cloud...</div>
+            <div id="loading" class="loading" role="status" aria-live="polite">
+                <div class="loading-spinner" aria-hidden="true"></div>
+                <div class="loading-texto">
+                    <span class="loading-msg">Processando na Wolfram Cloud&hellip;</span>
+                    <span class="loading-tempo" id="loadingTempo">0,0 s</span>
+                </div>
+            </div>
         </div>
 
         <div class="output-panel">
             <div class="output-tabs" role="tablist" aria-label="Vis\u00f5es do circuito">
-                <button type="button" class="output-tab is-active" role="tab" aria-selected="true" aria-controls="resultado" id="tabBtnResultados" data-tab="resultados">📊 Resultados</button>
-                <button type="button" class="output-tab" role="tab" aria-selected="false" aria-controls="painelEsquematico" id="tabBtnEsquematico" data-tab="esquematico">🔌 Esquemático</button>
+                <button type="button" class="output-tab is-active" role="tab" aria-selected="true" aria-controls="resultado" id="tabBtnResultados" data-tab="resultados">Resultados</button>
+                <button type="button" class="output-tab" role="tab" aria-selected="false" aria-controls="painelEsquematico" id="tabBtnEsquematico" data-tab="esquematico">Esquemático</button>
             </div>
 
             <div class="output-tab-panel is-active" id="resultado" role="tabpanel" aria-labelledby="tabBtnResultados">
@@ -339,6 +345,6 @@
         </form>
     </dialog>
 
-    <script src="script.js?v=20260523-mathjax"></script>
+    <script src="script.js?v=20260524-fase6-ux"></script>
 </body>
 </html>

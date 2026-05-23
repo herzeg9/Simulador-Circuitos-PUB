@@ -278,6 +278,94 @@ body.dark-mode .card-ondas .section-title { color: #85c1e9; }
     font-style: italic;
 }
 
+/* FASE 6 — Toggles interativos do card de Ondas */
+.onda-controles {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 6px 0 10px;
+    font-size: 0.85em;
+    color: var(--text-secondary);
+}
+.onda-controles-label {
+    margin-right: 4px;
+    font-weight: 600;
+}
+.onda-controle-btn {
+    padding: 4px 10px;
+    background: var(--bg-card);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    font-size: 0.85em;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.onda-controle-btn:hover {
+    background: rgba(41, 128, 185, 0.08);
+    border-color: #2980b9;
+    color: #2980b9;
+}
+body.dark-mode .onda-controle-btn:hover {
+    background: rgba(133, 193, 233, 0.12);
+    border-color: #85c1e9;
+    color: #85c1e9;
+}
+.onda-controle-btn:active { transform: translateY(1px); }
+
+label.onda-legend-item {
+    cursor: pointer;
+    user-select: none;
+}
+label.onda-legend-item input.onda-toggle {
+    margin: 0;
+    cursor: pointer;
+    accent-color: #2980b9;
+}
+label.onda-legend-item.is-off {
+    opacity: 0.42;
+}
+label.onda-legend-item.is-off .fasor-legend-name,
+label.onda-legend-item.is-off .fasor-legend-val {
+    text-decoration: line-through;
+}
+
+path.onda-path { transition: opacity 0.18s ease; }
+path.onda-path.onda-hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* FASE 6 — Toggles do Diagrama Fasorial (Card 5) */
+label.fasor-legend-item {
+    cursor: pointer;
+    user-select: none;
+}
+label.fasor-legend-item input.fasor-toggle {
+    margin: 0;
+    cursor: pointer;
+    accent-color: #117864;
+}
+label.fasor-legend-item.is-off {
+    opacity: 0.42;
+}
+label.fasor-legend-item.is-off .fasor-legend-name,
+label.fasor-legend-item.is-off .fasor-legend-val {
+    text-decoration: line-through;
+}
+.fasor-controles { margin-top: 4px; }
+
+line.fasor-vetor,
+text.fasor-tip {
+    transition: opacity 0.18s ease;
+}
+line.fasor-vetor.fasor-hidden,
+text.fasor-tip.fasor-hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
 /* Fontes independentes: blocos DC vs AC no card */
 body:not(.modo-ac) .src-val-ac {
     display: none !important;
@@ -339,15 +427,26 @@ h1 {
 .output-panel { flex: 1; min-width: 0; }
 
 /* Biblioteca */
-.example-select { 
-    width: 100%; 
-    padding: 10px; 
-    margin-bottom: 15px; 
-    border: 2px solid #3498db; 
-    border-radius: 6px; 
-    background: #ebf5fb; 
-    color: #2980b9; 
-    font-weight: bold; 
+.biblioteca-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 15px;
+    align-items: stretch;
+}
+.biblioteca-row .example-select {
+    flex: 1 1 200px;
+    margin-bottom: 0;
+}
+.example-select {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 15px;
+    border: 2px solid #3498db;
+    border-radius: 6px;
+    background: #ebf5fb;
+    color: #2980b9;
+    font-weight: bold;
     cursor: pointer;
     transition: all 0.3s ease;
 }
@@ -357,6 +456,33 @@ body.dark-mode .example-select {
     color: #85c1e9;
     border-color: #3498db;
 }
+
+.biblioteca-btn {
+    padding: 8px 14px;
+    border: 2px solid #3498db;
+    border-radius: 6px;
+    background: #3498db;
+    color: white;
+    font-weight: 600;
+    font-size: 0.85em;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.08s ease;
+}
+.biblioteca-btn:hover { background: #2980b9; border-color: #2980b9; }
+.biblioteca-btn:active { transform: translateY(1px); }
+.biblioteca-btn-danger {
+    background: #c0392b;
+    border-color: #c0392b;
+}
+.biblioteca-btn-danger:hover {
+    background: #962d22;
+    border-color: #962d22;
+}
+body.dark-mode .biblioteca-btn { background: #2980b9; border-color: #2980b9; }
+body.dark-mode .biblioteca-btn:hover { background: #1f6391; border-color: #1f6391; }
+body.dark-mode .biblioteca-btn-danger { background: #b03020; border-color: #b03020; }
+body.dark-mode .biblioteca-btn-danger:hover { background: #8a2519; border-color: #8a2519; }
 
 /* Botões */
 .control-group { display: flex; gap: 5px; margin-bottom: 15px; flex-wrap: wrap; }
@@ -436,6 +562,26 @@ body.dark-mode .control-group-dep .dep-select:hover {
 .btn-clear { background: #d35400; color: white; border: none; padding: 12px; flex: 1; border-radius: 6px; font-size: 1.1em; font-weight: bold; cursor: pointer; box-shadow: 0 4px 0 #a04000; transition: all 0.2s ease; }
 .btn-clear:active { transform: translateY(2px); box-shadow: 0 1px 0 #a04000; }
 .btn-clear:hover { opacity: 0.95; background: #c0392b; }
+.btn-utility {
+    background: #34495e;
+    color: white;
+    border: none;
+    padding: 12px;
+    flex: 1;
+    border-radius: 6px;
+    font-size: 1em;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 0 #1f2c39;
+    transition: all 0.2s ease;
+}
+.btn-utility:active { transform: translateY(2px); box-shadow: 0 1px 0 #1f2c39; }
+.btn-utility:hover { background: #2c3e50; }
+body.dark-mode .btn-utility {
+    background: #283747;
+    box-shadow: 0 4px 0 #11181f;
+}
+body.dark-mode .btn-utility:hover { background: #1c2733; }
 
 /* Lista Componentes - ESTILOS NOVOS AQUI */
 #listaComponentes { list-style: none; padding: 0; margin: 0; }
@@ -445,7 +591,32 @@ body.dark-mode .control-group-dep .dep-select:hover {
     padding: 8px; margin-bottom: 8px; 
     border-radius: 6px; border-left: 5px solid #ccc; 
     font-size: 0.9em; flex-wrap: wrap;
-    transition: 0.2s;
+    transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    animation: comp-item-in 0.22s ease-out both;
+}
+@keyframes comp-item-in {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.comp-item.removendo {
+    animation: comp-item-out 0.22s ease-in forwards;
+    pointer-events: none;
+    overflow: hidden;
+}
+@keyframes comp-item-out {
+    to {
+        opacity: 0;
+        transform: translateX(-24px) scale(0.96);
+        max-height: 0;
+        margin-top: 0;
+        margin-bottom: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+        border-width: 0;
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    .comp-item, .comp-item.removendo { animation: none; }
 }
 
 /* Badge (O quadradinho com a letra) */
@@ -724,12 +895,57 @@ body.dark-mode .didactic-text {
     color: var(--text-secondary);
 }
 
-.loading { 
-    text-align: center; 
-    color: var(--text-secondary); 
-    font-style: italic; 
-    display: none; 
-    margin-top: 20px;
+.loading {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 18px;
+    padding: 14px 18px;
+    background: rgba(41, 128, 185, 0.06);
+    border: 1px solid rgba(41, 128, 185, 0.25);
+    border-radius: 10px;
+    color: var(--text-secondary);
+    font-size: 0.95em;
+}
+.loading.is-active { display: flex; }
+
+.loading-spinner {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 3px solid rgba(41, 128, 185, 0.2);
+    border-top-color: #2980b9;
+    animation: spinner-rot 0.85s linear infinite;
+    flex-shrink: 0;
+}
+@keyframes spinner-rot {
+    to { transform: rotate(360deg); }
+}
+body.dark-mode .loading {
+    background: rgba(133, 193, 233, 0.07);
+    border-color: rgba(133, 193, 233, 0.25);
+}
+body.dark-mode .loading-spinner {
+    border-color: rgba(133, 193, 233, 0.2);
+    border-top-color: #85c1e9;
+}
+
+.loading-texto {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.3;
+    min-width: 180px;
+}
+.loading-msg {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+.loading-tempo {
+    font-family: 'JetBrains Mono', 'Consolas', monospace;
+    font-size: 0.82em;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
 }
 
 /* Ajustes para elementos com estilos inline no HTML */
@@ -1807,3 +2023,89 @@ body.dark-mode .esq-export-btn:hover {
     outline-offset: 2px;
 }
 .esq-export-icon { font-size: 0.9em; }
+
+/* ============================================================
+   FASE 6 — UX & Polimento: cores dos cards 1, 3, 4 e 7
+   + cards de erro/aviso, sem dependência de emojis
+   ============================================================ */
+
+/* Card 1 — Equações MNA: granate (fundacional, "as equações") */
+.card-mna { border-left: 5px solid #7b1f3a; }
+.card-mna .section-title { color: #a93256; }
+body.dark-mode .card-mna .section-title { color: #e8b4be; }
+
+/* Card 3 — Superposição: dourado (iluminação passo a passo) */
+.card-superposicao { border-left: 5px solid #b9770e; }
+.card-superposicao .section-title { color: #b9770e; }
+body.dark-mode .card-superposicao .section-title { color: #f8c471; }
+.aviso-superposicao {
+    background: rgba(241, 196, 15, 0.10);
+    border-left: 4px solid #f1c40f;
+    padding: 12px 14px;
+    border-radius: 6px;
+    color: var(--text-primary);
+    line-height: 1.5;
+}
+body.dark-mode .aviso-superposicao {
+    background: rgba(241, 196, 15, 0.06);
+}
+
+/* Card 4 — Resultados Finais: teal escuro (conclusão) */
+.card-resultados { border-left: 5px solid #0e6655; }
+.card-resultados .section-title { color: #0e6655; }
+body.dark-mode .card-resultados .section-title { color: #76d7c4; }
+.resultado-linha {
+    border-bottom: 1px solid var(--border-color, #eee);
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+}
+.resultado-linha:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+.card-resultados .numeric-result[title] {
+    cursor: help;
+    border-bottom: 1px dotted #0e6655;
+    display: inline-block;
+}
+body.dark-mode .card-resultados .numeric-result[title] {
+    border-bottom-color: #76d7c4;
+}
+
+/* Card 7 — Análise de Malhas: roxo (mantido, agora via classe) */
+.card-malhas { border-left: 5px solid #8e44ad; }
+.card-malhas .section-title { color: #8e44ad; }
+body.dark-mode .card-malhas .section-title { color: #c39bd3; }
+
+/* Card de erro genérico (Validação, Erro do servidor, exceção) */
+.card-erro {
+    border-left: 5px solid #c0392b;
+    background: rgba(231, 76, 60, 0.04);
+}
+.card-erro .section-title { color: #c0392b; }
+body.dark-mode .card-erro {
+    background: rgba(231, 76, 60, 0.06);
+}
+body.dark-mode .card-erro .section-title { color: #ec7063; }
+
+/* Card de aviso genérico (Circuito Vazio, etc.) */
+.card-aviso {
+    border-left: 5px solid #e67e22;
+    background: rgba(230, 126, 34, 0.04);
+}
+.card-aviso .section-title { color: #d35400; }
+body.dark-mode .card-aviso {
+    background: rgba(230, 126, 34, 0.06);
+}
+body.dark-mode .card-aviso .section-title { color: #f5b041; }
+
+/* Botão +Trafo: marrom-bronze (núcleo de ferrite, distinto do roxo
+   das fontes dependentes). Override do style="background:#8e44ad" inline. */
+.btn-add-trafo,
+button.btn-add-trafo {
+    background: #9c640c !important;
+}
+.btn-add-trafo:hover,
+button.btn-add-trafo:hover {
+    background: #7e510a !important;
+}

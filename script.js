@@ -70,8 +70,21 @@ const exemplos = {
  */
 function carregarExemplo(chave) {
     const ch = (chave == null ? '' : String(chave)).trim();
-    if (!ch || !Object.prototype.hasOwnProperty.call(exemplos, ch)) return;
+    if (!ch) return;
 
+    // FASE 6 — exemplos personalizados salvos pelo usuário (localStorage)
+    if (ch.startsWith('custom:')) {
+        const idx = parseInt(ch.slice('custom:'.length), 10);
+        const lib = _lerBibliotecaCustom();
+        if (!Number.isFinite(idx) || idx < 0 || idx >= lib.length) return;
+        const entry = lib[idx];
+        if (!entry || !entry.state) return;
+        restaurarEstadoSalvo(entry.state);
+        _atualizarBotaoApagarExemplo();
+        return;
+    }
+
+    if (!Object.prototype.hasOwnProperty.call(exemplos, ch)) return;
     const lista = document.getElementById('listaComponentes');
     if (!lista) return;
 
@@ -81,6 +94,7 @@ function carregarExemplo(chave) {
     exemplos[ch].forEach(comp => {
         add(comp.Tipo, comp.Componente, comp.Nos, comp.Valor, comp.Alvo);
     });
+    _atualizarBotaoApagarExemplo();
 }
 
 /**
@@ -92,6 +106,74 @@ function limparTudo() {
     lista.innerHTML = "";
     idCounter = 1;
     try { localStorage.removeItem(_STORAGE_KEY_CIRCUITO); } catch (e) { /* ignore */ }
+}
+
+/**
+ * FASE 6 — Renumera os nós do circuito para 1,2,3,... (sem buracos),
+ * preservando o nó 0 (GND) e a topologia. Útil após muitos add/remove
+ * que deixam números esparsos como [0, 4, 7, 12].
+ *
+ * Mapeamento determinístico: ordena os nós não-GND por valor crescente
+ * e atribui 1,2,3 nessa ordem. Atualiza inputs no DOM, metadados de
+ * inserção em série, e re-dispara a renderização do esquemático.
+ *
+ * @returns {void}
+ */
+function renumerarNos() {
+    const lista = document.getElementById('listaComponentes');
+    if (!lista) return;
+    const itens = Array.from(lista.querySelectorAll('.comp-item'));
+    if (!itens.length) {
+        alert('Adicione componentes antes de renumerar os nós.');
+        return;
+    }
+
+    // Coleta todos os números de nó atualmente usados (todos os inputs .no-*)
+    const usados = new Set();
+    itens.forEach(it => {
+        it.querySelectorAll('input.no-a, input.no-b, input.no-c, input.no-d').forEach(inp => {
+            const n = parseInt((inp.value || '').trim(), 10);
+            if (Number.isFinite(n) && n !== 0) usados.add(n);
+        });
+    });
+
+    if (!usados.size) {
+        alert('Não há nós para renumerar (todos os componentes estão no GND).');
+        return;
+    }
+
+    const ordenados = [...usados].sort((a, b) => a - b);
+    const map = new Map();
+    ordenados.forEach((antigo, i) => map.set(antigo, i + 1));
+
+    // Verifica se já está sequencial — evita poluir o estado e o autosave
+    const jaSequencial = ordenados.every((n, i) => n === i + 1);
+    if (jaSequencial) {
+        alert('Os nós já estão numerados sequencialmente (1, 2, 3, ...). Nada a fazer.');
+        return;
+    }
+
+    const remap = (v) => {
+        const n = parseInt((v || '').trim(), 10);
+        if (!Number.isFinite(n)) return v;
+        if (n === 0) return '0';
+        return String(map.get(n) ?? n);
+    };
+
+    itens.forEach(it => {
+        it.querySelectorAll('input.no-a, input.no-b, input.no-c, input.no-d').forEach(inp => {
+            inp.value = remap(inp.value);
+        });
+        // Atualiza também os metadados de inserção em série (data-series-old-value e data-series-new-node)
+        const ds = it.dataset;
+        if (ds.seriesOldValue) ds.seriesOldValue = remap(ds.seriesOldValue);
+        if (ds.seriesNewNode) ds.seriesNewNode = remap(ds.seriesNewNode);
+    });
+
+    // Re-dispara a sincronização (esquemático ao vivo + autosave + validação)
+    if (typeof agendarRerenderEsquematico === 'function') agendarRerenderEsquematico();
+    if (typeof validarTopologia === 'function') validarTopologia();
+    if (typeof salvarEstadoLocal === 'function') salvarEstadoLocal();
 }
 
 /**
@@ -460,6 +542,7 @@ function gerarJSON() {
     const nomeComp = (item) => item.querySelector('.nome-comp').value;
 
     itens.forEach(item => {
+        if (item.dataset.removing === '1') return;
         const tipo = item.dataset.tipo;
         const fonteIndep = tipo === 'VoltageSource' || tipo === 'CurrentSource';
 
@@ -692,6 +775,64 @@ function formatarResultadoEng(valorStr, unidade, deslocFaseGraus = 0) {
     return { valor: mantissa, unidade: prefix + (unidade || '') };
 }
 
+/**
+ * FASE 6 — Gera um tooltip multi-linha com o mesmo valor expresso em
+ * algumas escalas SI vizinhas (M, k, base, m, µ), facilitando a leitura
+ * sem precisar fazer cálculo mental.
+ *
+ * Exemplos:
+ *   30 V          → "30 V\n0.030 kV\n30000 mV"
+ *   1.5 ∠ -8.2° A → "1.5 A ∠ -8.2°\n1500 mA ∠ -8.2°\n0.0015 kA ∠ -8.2°"
+ *
+ * @param {string} valorStr
+ * @param {string} unidade
+ * @param {number} deslocFaseGraus
+ * @returns {string} Texto pronto para o atributo title (com \n).
+ */
+function _gerarTooltipUnidadesAlternativas(valorStr, unidade, deslocFaseGraus = 0) {
+    const polar = parsePolar(valorStr);
+    if (!polar) return '';
+    if (!Number.isFinite(polar.mod) || polar.mod === 0) return '';
+
+    const u = String(unidade || '').trim();
+    const isPolar = /[\u2220<]/.test(String(valorStr || ''));
+    const fase = formatFaseLimpa(polar.fase + deslocFaseGraus);
+
+    // Escolhe 3 escalas vizinhas à melhor para essa magnitude
+    const ENG = [
+        { v: 1e9, s: 'G' }, { v: 1e6, s: 'M' }, { v: 1e3, s: 'k' },
+        { v: 1, s: '' },
+        { v: 1e-3, s: 'm' }, { v: 1e-6, s: 'µ' }, { v: 1e-9, s: 'n' }
+    ];
+    let bestIdx = ENG.length - 1;
+    for (let i = 0; i < ENG.length; i++) {
+        if (polar.mod >= ENG[i].v) { bestIdx = i; break; }
+    }
+    const desejados = [];
+    for (let off = -1; off <= 1; off++) {
+        const idx = bestIdx + off;
+        if (idx >= 0 && idx < ENG.length) desejados.push(ENG[idx]);
+    }
+    if (!desejados.length) return '';
+
+    const sinal = (isPolar || polar.fase !== 180) ? 1 : -1;
+    const formatNum = (n) => {
+        const abs = Math.abs(n);
+        if (abs === 0) return '0';
+        if (abs >= 1000 || abs < 0.001) return n.toPrecision(3);
+        const s = abs.toPrecision(3);
+        return n < 0 ? '-' + s : s;
+    };
+
+    const linhas = desejados.map(p => {
+        const num = sinal * polar.mod / p.v;
+        const txt = formatNum(num);
+        const sufixo = p.s + u;
+        return isPolar ? `${txt} ${sufixo} ∠ ${fase}°` : `${txt} ${sufixo}`;
+    });
+    return 'Equivalente em outras escalas:\n' + linhas.join('\n');
+}
+
 /* ============================================================
  * FASE 5.1 — Fontes senoidais (frontend-only)
  *
@@ -836,17 +977,24 @@ function renderOndasTemporais(resultados, container) {
 
     const corV = '#e74c3c';
     const corI = '#27ae60';
-    const colorsByTipo = (tipo, idx) => tipo === 'V' ? corV : corI;
+    const colorsByTipo = (tipo) => tipo === 'V' ? corV : corI;
     const dashByIdx = (idx) => idx === 0 ? '' : (idx % 3 === 1 ? '6 4' : (idx % 3 === 2 ? '2 3' : '8 2 2 2'));
+
+    // Chave estável por curva — sobrevive a reanálises do mesmo circuito
+    // e permite persistir as escolhas do usuário em localStorage.
+    const ondaKey = (o) => `${o.tipo}|${o.local}`;
+    const togglesSalvos = _carregarOndaToggles();
 
     const idxByTipo = { V: 0, I: 0 };
     const paths = fasores.map(o => {
         const i = idxByTipo[o.tipo]++;
         const pts = _ondaTemporalSamples(o.mod, o.faseUsr, f, conv, 240);
         const d = pts.map((p, k) => (k === 0 ? 'M ' : 'L ') + xScale(p.t).toFixed(2) + ',' + yScale(p.v).toFixed(2)).join(' ');
-        const color = colorsByTipo(o.tipo, i);
+        const color = colorsByTipo(o.tipo);
         const dash = dashByIdx(i);
-        return `<path d="${d}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" ${dash ? `stroke-dasharray="${dash}"` : ''} opacity="0.92"/>`;
+        const key = ondaKey(o);
+        const escondido = togglesSalvos[key] === false;
+        return `<path class="onda-path${escondido ? ' onda-hidden' : ''}" data-onda-key="${escapeXml(key)}" d="${d}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" ${dash ? `stroke-dasharray="${dash}"` : ''} opacity="0.92"/>`;
     }).join('');
 
     const yLabels = [vMax, vMax / 2, 0, -vMax / 2, -vMax].map(v => {
@@ -863,11 +1011,14 @@ function renderOndasTemporais(resultados, container) {
         const { mantissa, prefix } = formatMagnitudeEng(o.mod);
         const fase = formatFaseLimpa(o.faseUsr);
         const trig = conv === 'sen' ? 'sen' : 'cos';
-        return `<div class="onda-legend-item">
+        const key = ondaKey(o);
+        const checked = togglesSalvos[key] !== false;
+        return `<label class="onda-legend-item" data-onda-key="${escapeXml(key)}" data-onda-tipo="${o.tipo}">
+            <input type="checkbox" class="onda-toggle" ${checked ? 'checked' : ''} aria-label="Mostrar/ocultar ${escapeXml(o.local)}"/>
             <span class="fasor-legend-dot" style="background:${color}"></span>
             <span class="fasor-legend-name">${escapeXml(o.local)}</span>
             <span class="fasor-legend-val">${mantissa}${prefix ? ' ' + prefix : ''} ${trig}(ωt + ${fase}°) ${o.unidade}</span>
-        </div>`;
+        </label>`;
     };
     const legV = fasores.filter(o => o.tipo === 'V').map(o => itemLeg(o, corV)).join('');
     const legI = fasores.filter(o => o.tipo === 'I').map(o => itemLeg(o, corI)).join('');
@@ -877,6 +1028,13 @@ function renderOndasTemporais(resultados, container) {
     card.innerHTML = `
         <h3 class="section-title">6. Ondas no tempo</h3>
         <p class="onda-subtitulo">${titulo} &nbsp;·&nbsp; ${subtitulo}</p>
+        <div class="onda-controles">
+            <span class="onda-controles-label">Mostrar:</span>
+            <button type="button" class="onda-controle-btn" data-onda-acao="todas">Todas</button>
+            <button type="button" class="onda-controle-btn" data-onda-acao="so-v">Só Tensões</button>
+            <button type="button" class="onda-controle-btn" data-onda-acao="so-i">Só Correntes</button>
+            <button type="button" class="onda-controle-btn" data-onda-acao="nenhuma">Nenhuma</button>
+        </div>
         <div class="onda-svg-wrap">
             <svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" preserveAspectRatio="xMidYMid meet">
                 ${eixos}${gridT}${yLabels}${paths}
@@ -886,9 +1044,98 @@ function renderOndasTemporais(resultados, container) {
             ${legV ? `<div class="onda-legenda-col"><div class="onda-legenda-titulo" style="color:${corV}">Tensões</div>${legV}</div>` : ''}
             ${legI ? `<div class="onda-legenda-col"><div class="onda-legenda-titulo" style="color:${corI}">Correntes</div>${legI}</div>` : ''}
         </div>
-        <p class="onda-nota">As ondas mostradas cobrem dois períodos completos (0 a 2T). A escala vertical é normalizada pela maior amplitude (V e I compartilham o mesmo eixo apenas para visualização — em geral as escalas absolutas são diferentes).</p>
+        <p class="onda-nota">Clique nos itens da legenda para mostrar/esconder cada onda — sua escolha é lembrada na próxima análise. As ondas cobrem dois períodos completos (0 a 2T).</p>
     `;
     container.appendChild(card);
+    _setupOndaTogglesInteratividade(card);
+}
+
+/* ============================================================
+ * FASE 6 — Interatividade do card "Ondas no tempo"
+ * ============================================================ */
+
+const _ONDA_TOGGLES_KEY = 'simulador-circuitos:ondas-toggles';
+
+/**
+ * Lê o estado dos toggles salvos no localStorage.
+ * Estrutura: { "V|R1": true, "I|T1_p": false, ... } (true = visível, false = oculto)
+ *
+ * @returns {Object<string, boolean>}
+ */
+function _carregarOndaToggles() {
+    try {
+        const raw = localStorage.getItem(_ONDA_TOGGLES_KEY);
+        if (!raw) return {};
+        const obj = JSON.parse(raw);
+        return (obj && typeof obj === 'object') ? obj : {};
+    } catch (_) { return {}; }
+}
+
+/**
+ * Salva o estado dos toggles. Falha silenciosa se localStorage estiver indisponível.
+ *
+ * @param {Object<string, boolean>} mapa
+ */
+function _salvarOndaToggles(mapa) {
+    try {
+        localStorage.setItem(_ONDA_TOGGLES_KEY, JSON.stringify(mapa));
+    } catch (_) { /* quota exceeded ou modo privado: aceitamos perder a preferência */ }
+}
+
+/**
+ * Aplica a interatividade do card de Ondas:
+ *  - Marcar/desmarcar checkbox da legenda mostra/esconde o path correspondente
+ *  - Botões "Todas / Só V / Só I / Nenhuma" agem sobre o conjunto
+ *  - Cada mudança é persistida no localStorage para sobreviver a F5
+ *
+ * @param {HTMLElement} card raiz do card recém-criado
+ */
+function _setupOndaTogglesInteratividade(card) {
+    if (!card) return;
+
+    const aplicar = (key, visivel) => {
+        const path = card.querySelector(`path.onda-path[data-onda-key="${CSS.escape(key)}"]`);
+        if (path) path.classList.toggle('onda-hidden', !visivel);
+        const item = card.querySelector(`label.onda-legend-item[data-onda-key="${CSS.escape(key)}"]`);
+        if (item) item.classList.toggle('is-off', !visivel);
+    };
+    const persistir = (key, visivel) => {
+        const mapa = _carregarOndaToggles();
+        if (visivel) delete mapa[key];
+        else mapa[key] = false;
+        _salvarOndaToggles(mapa);
+    };
+
+    card.querySelectorAll('label.onda-legend-item').forEach(item => {
+        const key = item.dataset.ondaKey;
+        const cb = item.querySelector('input.onda-toggle');
+        if (!cb) return;
+        if (!cb.checked) item.classList.add('is-off');
+        cb.addEventListener('change', () => {
+            aplicar(key, cb.checked);
+            persistir(key, cb.checked);
+        });
+    });
+
+    card.querySelectorAll('button.onda-controle-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const acao = btn.dataset.ondaAcao;
+            card.querySelectorAll('label.onda-legend-item').forEach(item => {
+                const tipo = item.dataset.ondaTipo;
+                const cb = item.querySelector('input.onda-toggle');
+                if (!cb) return;
+                let novo;
+                if (acao === 'todas') novo = true;
+                else if (acao === 'nenhuma') novo = false;
+                else if (acao === 'so-v') novo = (tipo === 'V');
+                else if (acao === 'so-i') novo = (tipo === 'I');
+                if (cb.checked === novo) return;
+                cb.checked = novo;
+                aplicar(item.dataset.ondaKey, novo);
+                persistir(item.dataset.ondaKey, novo);
+            });
+        });
+    });
 }
 
 /* ============================================================
@@ -1394,13 +1641,14 @@ function drawPhasorPlot(fasores, cor, titulo) {
         const rad = f.fase * Math.PI / 180;
         const x2 = cx + f.mod * scale * Math.cos(rad);
         const y2 = cy - f.mod * scale * Math.sin(rad);
-        parts.push(`<line x1="${cx}" y1="${cy}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}" stroke="${cor}" stroke-width="2.6" marker-end="url(#${markerId})" stroke-linecap="round"/>`);
+        const key = `${f.tipo}|${f.local}`;
+        parts.push(`<line class="fasor-vetor" data-fasor-key="${escapeXml(key)}" x1="${cx}" y1="${cy}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}" stroke="${cor}" stroke-width="2.6" marker-end="url(#${markerId})" stroke-linecap="round"/>`);
 
         const offset = 16;
         const lx = x2 + offset * Math.cos(rad);
         const ly = y2 - offset * Math.sin(rad);
         const anchor = Math.cos(rad) > 0.3 ? 'start' : (Math.cos(rad) < -0.3 ? 'end' : 'middle');
-        tipLabels.push(`<text x="${lx.toFixed(2)}" y="${ly.toFixed(2)}" font-size="12" fill="${cor}" font-weight="700" text-anchor="${anchor}" dominant-baseline="middle" paint-order="stroke" stroke="var(--bg-card)" stroke-width="3">${f.local}</text>`);
+        tipLabels.push(`<text class="fasor-tip" data-fasor-key="${escapeXml(key)}" x="${lx.toFixed(2)}" y="${ly.toFixed(2)}" font-size="12" fill="${cor}" font-weight="700" text-anchor="${anchor}" dominant-baseline="middle" paint-order="stroke" stroke="var(--bg-card)" stroke-width="3">${f.local}</text>`);
     });
     parts.push(tipLabels.join(''));
 
@@ -1444,22 +1692,27 @@ function renderFasorial(resultados, container) {
     const plotV = drawPhasorPlot(fV, '#e74c3c', 'Tensões nodais (V)');
     const plotI = drawPhasorPlot(fI, '#27ae60', 'Correntes de ramo (A)');
 
+    const togglesSalvos = _carregarFasorToggles();
+
     const itemLegenda = (f, cor) => {
         const { mantissa, prefix } = formatMagnitudeEng(f.mod);
         const fase = formatFaseLimpa(f.fase);
-        return `<div class="fasor-legend-item">
+        const key = `${f.tipo}|${f.local}`;
+        const checked = togglesSalvos[key] !== false;
+        return `<label class="fasor-legend-item" data-fasor-key="${escapeXml(key)}" data-fasor-tipo="${f.tipo}">
+            <input type="checkbox" class="fasor-toggle" ${checked ? 'checked' : ''} aria-label="Mostrar/ocultar fasor ${escapeXml(f.local)}"/>
             <span class="fasor-legend-dot" style="background:${cor}"></span>
             <span class="fasor-legend-name">${f.local}</span>
             <span class="fasor-legend-val">${mantissa} ∠ ${fase}° ${prefix}${f.unidade || ''}</span>
-        </div>`;
+        </label>`;
     };
 
     const legendV = fV.map(f => itemLegenda(f, '#e74c3c')).join('');
     const legendI = fI.map(f => itemLegenda(f, '#27ae60')).join('');
 
     const escalaNote = (fV.length > 0 && fI.length > 0)
-        ? `<p class="fasor-note">As escalas de tensão e corrente são normalizadas independentemente para preservar a leitura angular. Os módulos absolutos aparecem na legenda.</p>`
-        : `<p class="fasor-note">Os vetores estão normalizados pelo maior módulo do grupo. Confira os valores absolutos na legenda.</p>`;
+        ? `<p class="fasor-note">As escalas de tensão e corrente são normalizadas independentemente para preservar a leitura angular. Os módulos absolutos aparecem na legenda — clique nos itens para mostrar/esconder cada vetor.</p>`
+        : `<p class="fasor-note">Os vetores estão normalizados pelo maior módulo do grupo. Clique nos itens da legenda para mostrar/esconder cada vetor.</p>`;
 
     const convNota = getConvencaoTemporal() === 'sen'
         ? `<p class="fasor-conv-aviso">Fases exibidas na convenção <code>sen(ωt + φ)</code> (escolhida nas Configurações AC).</p>`
@@ -1471,12 +1724,100 @@ function renderFasorial(resultados, container) {
         <h3 class="section-title">5. Diagrama Fasorial</h3>
         ${convNota}
         ${escalaNote}
+        <div class="onda-controles fasor-controles">
+            <span class="onda-controles-label">Mostrar:</span>
+            <button type="button" class="onda-controle-btn" data-fasor-acao="todas">Todos</button>
+            <button type="button" class="onda-controle-btn" data-fasor-acao="so-v">Só Tensões</button>
+            <button type="button" class="onda-controle-btn" data-fasor-acao="so-i">Só Correntes</button>
+            <button type="button" class="onda-controle-btn" data-fasor-acao="nenhuma">Nenhum</button>
+        </div>
         <div class="fasorial-grid${(fV.length && fI.length) ? ' fasorial-grid--dual' : ''}">
             ${fV.length ? `<div class="fasorial-cell"><div class="fasorial-svg-wrap">${plotV}</div><div class="fasorial-legend fasorial-legend--v">${legendV}</div></div>` : ''}
             ${fI.length ? `<div class="fasorial-cell"><div class="fasorial-svg-wrap">${plotI}</div><div class="fasorial-legend fasorial-legend--i">${legendI}</div></div>` : ''}
         </div>
     `;
     container.appendChild(card);
+    _setupFasorTogglesInteratividade(card);
+    // Aplica imediatamente o estado salvo (alguns vetores podem nascer escondidos)
+    Object.entries(togglesSalvos).forEach(([k, v]) => {
+        if (v === false) _toggleFasor(card, k, false, /*persistir*/ false);
+    });
+}
+
+/* ============================================================
+ * FASE 6 — Interatividade do Diagrama Fasorial
+ * ============================================================ */
+
+const _FASOR_TOGGLES_KEY = 'simulador-circuitos:fasor-toggles';
+
+function _carregarFasorToggles() {
+    try {
+        const raw = localStorage.getItem(_FASOR_TOGGLES_KEY);
+        if (!raw) return {};
+        const obj = JSON.parse(raw);
+        return (obj && typeof obj === 'object') ? obj : {};
+    } catch (_) { return {}; }
+}
+
+function _salvarFasorToggles(mapa) {
+    try { localStorage.setItem(_FASOR_TOGGLES_KEY, JSON.stringify(mapa)); }
+    catch (_) { /* perda silenciosa de preferência se quota cheia / privado */ }
+}
+
+/**
+ * Aplica visibilidade (CSS class .fasor-hidden) ao vetor SVG e seu rótulo
+ * em todas as ocorrências dentro do card. Opcionalmente persiste a escolha.
+ *
+ * @param {HTMLElement} card
+ * @param {string} key — formato "V|local" ou "I|local"
+ * @param {boolean} visivel
+ * @param {boolean} [persistir=true]
+ */
+function _toggleFasor(card, key, visivel, persistir = true) {
+    const sel = `[data-fasor-key="${CSS.escape(key)}"]`;
+    card.querySelectorAll(sel).forEach(el => {
+        if (el.tagName.toLowerCase() === 'label') {
+            el.classList.toggle('is-off', !visivel);
+        } else {
+            el.classList.toggle('fasor-hidden', !visivel);
+        }
+    });
+    if (persistir) {
+        const mapa = _carregarFasorToggles();
+        if (visivel) delete mapa[key]; else mapa[key] = false;
+        _salvarFasorToggles(mapa);
+    }
+}
+
+function _setupFasorTogglesInteratividade(card) {
+    if (!card) return;
+    card.querySelectorAll('label.fasor-legend-item').forEach(item => {
+        const key = item.dataset.fasorKey;
+        const cb = item.querySelector('input.fasor-toggle');
+        if (!cb) return;
+        if (!cb.checked) item.classList.add('is-off');
+        cb.addEventListener('change', () => {
+            _toggleFasor(card, key, cb.checked);
+        });
+    });
+    card.querySelectorAll('button.onda-controle-btn[data-fasor-acao]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const acao = btn.dataset.fasorAcao;
+            card.querySelectorAll('label.fasor-legend-item').forEach(item => {
+                const tipo = item.dataset.fasorTipo;
+                const cb = item.querySelector('input.fasor-toggle');
+                if (!cb) return;
+                let novo;
+                if (acao === 'todas') novo = true;
+                else if (acao === 'nenhuma') novo = false;
+                else if (acao === 'so-v') novo = (tipo === 'V');
+                else if (acao === 'so-i') novo = (tipo === 'I');
+                if (cb.checked === novo) return;
+                cb.checked = novo;
+                _toggleFasor(card, item.dataset.fasorKey, novo);
+            });
+        });
+    });
 }
 
 /**
@@ -1493,8 +1834,8 @@ async function calcular() {
     // Validação antes de enviar
     const validacao = validarAntesEnvio();
     if (!validacao.valido) {
-        divRes.innerHTML = `<div class="card" style="color:red; border-left: 5px solid #e74c3c;">
-            <h3 style="color:#e74c3c; margin-top:0;">❌ Erros de Validação</h3>
+        divRes.innerHTML = `<div class="card card-erro">
+            <h3 class="section-title">Erros de Validação</h3>
             <p><strong>Corrija os seguintes erros antes de calcular:</strong></p>
             <ul style="margin:10px 0; padding-left:20px;">
                 ${validacao.erros.map(erro => `<li>${erro}</li>`).join('')}
@@ -1506,32 +1847,29 @@ async function calcular() {
     const netlistObj = gerarJSON();
     const listaComp = netlistObj.Netlist;
 
-    // --- NOVO CÓDIGO DE BLOQUEIO AQUI ---
     if (!listaComp || listaComp.length === 0) {
-        divRes.innerHTML = `<div class="card" style="color:#e67e22; border-left: 5px solid #e67e22;">
-            <h3 style="margin-top:0;">⚠️ Circuito Vazio</h3>
+        divRes.innerHTML = `<div class="card card-aviso">
+            <h3 class="section-title">Circuito Vazio</h3>
             <p>Adicione pelo menos um componente à área de trabalho antes de analisar.</p>
         </div>`;
         return;
     }
-    // ------------------------------------
     
-    // Verifica se o circuito possui componentes reativos (Capacitor ou Indutor)
     const temComponentesReativos = listaComp.some(comp => comp.Tipo === 'Capacitor' || comp.Tipo === 'Inductor');
-    load.style.display = "block";
-    
+    _ativarLoading(load);
+
     const formData = new FormData();
     formData.append("netlist", JSON.stringify(netlistObj));
 
     try {
         const resp = await fetch(API_URL, { method: "POST", body: formData });
         const dados = await resp.json();
-        load.style.display = "none";
+        _desativarLoading(load);
         divRes.innerHTML = "";
 
-        if (dados.Erro) { 
-            divRes.innerHTML = `<div class="card" style="color:red">❌ ${dados.Erro}</div>`; 
-            return; 
+        if (dados.Erro) {
+            divRes.innerHTML = `<div class="card card-erro"><h3 class="section-title">Erro do servidor</h3><p>${dados.Erro}</p></div>`;
+            return;
         }
 
         if (dados.Equacoes) {
@@ -1540,7 +1878,7 @@ async function calcular() {
             const notaReatancias = (modoAc && topPassivos)
                 ? `<p class="mna-reatancias-nota">Reatâncias substituídas automaticamente: <code>Z_L = jωL</code> para indutores, <code>Z_C = 1/(jωC)</code> para capacitores. O detalhamento numérico está no painel <em>Impedâncias do circuito</em> abaixo.</p>`
                 : '';
-            let html = `<div class="card"><h3 class="section-title">1. Equações do Sistema (MNA)</h3>${notaReatancias}`;
+            let html = `<div class="card card-mna"><h3 class="section-title">1. Equações do Sistema (MNA)</h3>${notaReatancias}`;
             dados.Equacoes.forEach(eq => {
                 const limpa = limparEquacaoAC(eq).replace("==", "=");
                 html += `<div class="formula">\` ${limpa} \`</div>`;
@@ -1554,7 +1892,7 @@ async function calcular() {
 
         // Superposição: a API pode omitir a chave, enviar null ou [] — ainda assim mostramos o bloco 2 com passos ou avisos locais.
         if (Array.isArray(dados.Superposicao) && dados.Superposicao.length > 0) {
-            let html = `<div class="card"><h3 class="section-title">3. Superposição</h3><div class="super-container">`;
+            let html = `<div class="card card-superposicao"><h3 class="section-title">3. Superposição</h3><div class="super-container">`;
             dados.Superposicao.forEach(passo => {
                 html += `<div class="super-card"><div class="didactic-text">Fonte Ativa: <strong>${passo.FonteAtiva}</strong></div>`;
                 passo.ResultadosParciais.forEach((res, idx) => {
@@ -1570,7 +1908,7 @@ async function calcular() {
                 c.Tipo === 'VCVS' || c.Tipo === 'VCCS' || c.Tipo === 'CCVS' || c.Tipo === 'CCCS'
             );
 
-            const avisoSuper = (msg) => `<div class="card"><h3 class="section-title">3. Superposição</h3><div style="background:#fffcf5; border-left:5px solid #f1c40f; padding:12px; border-radius:6px;"><p style="margin:0;">⚠️ <em>${msg}</em></p></div></div>`;
+            const avisoSuper = (msg) => `<div class="card card-superposicao"><h3 class="section-title">3. Superposição</h3><div class="aviso-superposicao"><p style="margin:0;"><em>${msg}</em></p></div></div>`;
 
             if (qtdFontes <= 1 && !temComponentesReativos) {
                 divRes.innerHTML += avisoSuper('A Superposição não é aplicável pois o circuito possui apenas uma fonte independente.');
@@ -1586,10 +1924,12 @@ async function calcular() {
 
         if (dados.Resultados) {
             const desloc = deslocFaseConvencao();
-            let html = `<div class="card"><h3 class="section-title">4. Resultados Finais</h3>`;
+            let html = `<div class="card card-resultados"><h3 class="section-title">4. Resultados Finais</h3>`;
             dados.Resultados.forEach(r => {
                 const f = formatarResultadoEng(r.ValorNumerico, r.Unidade, desloc);
-                html += `<div style="border-bottom:1px solid #eee; margin-bottom:10px;"><strong>${r.Local}:</strong><div class="numeric-result">= ${f.valor} ${f.unidade}</div></div>`;
+                const tip = _gerarTooltipUnidadesAlternativas(r.ValorNumerico, r.Unidade, desloc);
+                const tipAttr = tip ? ` title="${escapeAttr(tip)}"` : '';
+                html += `<div class="resultado-linha"><strong>${r.Local}:</strong><div class="numeric-result"${tipAttr}>= ${f.valor} ${f.unidade}</div></div>`;
             });
             divRes.innerHTML += html + `</div>`;
         }
@@ -1600,7 +1940,7 @@ async function calcular() {
         }
 
         if (dados.Malhas) {
-            let html = `<div class="card" style="border-left: 5px solid #8e44ad;"><h3 class="section-title" style="color: #8e44ad;">7. Análise de Malhas</h3>`;
+            let html = `<div class="card card-malhas"><h3 class="section-title">7. Análise de Malhas</h3>`;
             if (dados.Malhas.length === 0) {
                  html += `<p style="color:#999;">Topologia simples ou linear (sem laços fundamentais detectados).</p>`;
             } else {
@@ -1612,9 +1952,42 @@ async function calcular() {
         }
         renderMathJaxSafe();
     } catch (e) {
-        load.style.display = "none";
-        divRes.innerHTML = `<div class="card" style="color:red">❌ ${e.message}</div>`;
+        _desativarLoading(load);
+        divRes.innerHTML = `<div class="card card-erro"><h3 class="section-title">Erro</h3><p>${e.message}</p></div>`;
     }
+}
+
+/* ============================================================
+ * FASE 6 — Spinner de loading com cronômetro
+ * ============================================================ */
+
+let _loadingTimerId = null;
+let _loadingT0 = 0;
+
+function _ativarLoading(load) {
+    if (!load) return;
+    load.classList.add('is-active');
+    load.style.display = '';
+    _loadingT0 = performance.now();
+    const tempo = load.querySelector('#loadingTempo');
+    if (tempo) tempo.textContent = '0,0 s';
+    if (_loadingTimerId) cancelAnimationFrame(_loadingTimerId);
+    const tick = () => {
+        const elapsed = (performance.now() - _loadingT0) / 1000;
+        if (tempo) tempo.textContent = `${elapsed.toFixed(1).replace('.', ',')} s`;
+        _loadingTimerId = requestAnimationFrame(tick);
+    };
+    _loadingTimerId = requestAnimationFrame(tick);
+}
+
+function _desativarLoading(load) {
+    if (_loadingTimerId) {
+        cancelAnimationFrame(_loadingTimerId);
+        _loadingTimerId = null;
+    }
+    if (!load) return;
+    load.classList.remove('is-active');
+    load.style.display = 'none';
 }
 
 /**
@@ -1708,6 +2081,7 @@ function getTopologiaAtual() {
     const lista = [];
     const modoAc = getModoSimulacao() === 'AC';
     itens.forEach(item => {
+        if (item.dataset.removing === '1') return;
         const tipo = item.dataset.tipo;
         const nomeEl = item.querySelector('.nome-comp');
         const nome = nomeEl ? (nomeEl.value || '?').trim() : '?';
@@ -2555,6 +2929,10 @@ function executarAdicaoRelacionada(modo, tipo, lado) {
  */
 function removerComponente(li) {
     if (!li) return;
+    // FASE 6 — marca como "em remoção" antes de qualquer manipulação,
+    // assim getTopologiaAtual()/gerarJSON() já o ignoram durante a animação
+    // (e durante os ajustes de splice em série feitos abaixo).
+    li.dataset.removing = '1';
     const myUid = li.dataset.uid;
 
     const childrenAll = myUid
@@ -2615,7 +2993,16 @@ function removerComponente(li) {
         }
     }
 
-    li.remove();
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        li.remove();
+    } else {
+        li.classList.add('removendo');
+        const finalize = () => { li.remove(); };
+        li.addEventListener('animationend', finalize, { once: true });
+        // Fallback se animationend não disparar (animação cancelada por display:none, etc.)
+        setTimeout(() => { if (li.isConnected) li.remove(); }, 300);
+    }
+    if (typeof agendarRerenderEsquematico === 'function') agendarRerenderEsquematico();
 }
 
 /**
@@ -3268,12 +3655,12 @@ function validarTopologia() {
     painel.dataset.severity = erros.length ? 'error' : 'warning';
     let html = '';
     if (erros.length) {
-        html += `<h4>&#9940; ${erros.length} erro(s) detectado(s)</h4><ul>`
+        html += `<h4>${erros.length} erro(s) detectado(s)</h4><ul>`
             + erros.map(e => `<li>${e}</li>`).join('') + '</ul>';
     }
     if (avisos.length) {
         const sep = erros.length ? 'style="margin-top:8px"' : '';
-        html += `<h4 ${sep}>&#9888;&#65039; ${avisos.length} aviso(s)</h4><ul>`
+        html += `<h4 ${sep}>${avisos.length} aviso(s)</h4><ul>`
             + avisos.map(a => `<li>${a}</li>`).join('') + '</ul>';
     }
     painel.innerHTML = html;
@@ -3312,7 +3699,118 @@ function toggleDarkMode() {
     }
 }
 
-// Carrega preferência salva ao carregar a página
+/* ============================================================
+ * FASE 6 — Biblioteca de exemplos personalizados (localStorage)
+ * ============================================================
+ * Estrutura serializada:
+ *   [ { nome: "Filtro RC", state: <coletarEstadoCompleto()> }, ... ]
+ *
+ * O `state` reaproveita exatamente o formato do autosave (versão,
+ * componentes, modo DC/AC, frequência, convenção temporal). Assim
+ * o restaurarEstadoSalvo() já lida com fase, freq e tudo mais.
+ */
+const _LIB_CUSTOM_KEY = 'simulador-circuitos:biblioteca-custom';
+
+function _lerBibliotecaCustom() {
+    try {
+        const raw = localStorage.getItem(_LIB_CUSTOM_KEY);
+        if (!raw) return [];
+        const arr = JSON.parse(raw);
+        return Array.isArray(arr) ? arr : [];
+    } catch (_) { return []; }
+}
+
+function _salvarBibliotecaCustom(arr) {
+    try { localStorage.setItem(_LIB_CUSTOM_KEY, JSON.stringify(arr)); }
+    catch (_) {
+        alert('Não foi possível salvar — armazenamento local cheio ou desabilitado.');
+    }
+}
+
+function _popularBibliotecaCustomDropdown() {
+    const grupo = document.getElementById('exemplosCustomGroup');
+    if (!grupo) return;
+    const lib = _lerBibliotecaCustom();
+    grupo.innerHTML = '';
+    if (!lib.length) {
+        grupo.hidden = true;
+        return;
+    }
+    grupo.hidden = false;
+    lib.forEach((entry, idx) => {
+        const opt = document.createElement('option');
+        opt.value = `custom:${idx}`;
+        const ts = entry.state && entry.state.timestamp
+            ? new Date(entry.state.timestamp).toLocaleDateString('pt-BR')
+            : '';
+        opt.textContent = ts ? `${entry.nome} (${ts})` : entry.nome;
+        grupo.appendChild(opt);
+    });
+}
+
+function salvarCircuitoComoExemplo() {
+    const state = coletarEstadoCompleto();
+    if (!state.componentes.length) {
+        alert('Adicione pelo menos um componente antes de salvar como exemplo.');
+        return;
+    }
+
+    const lib = _lerBibliotecaCustom();
+    const nomesExistentes = new Set(lib.map(e => (e.nome || '').toLowerCase()));
+
+    let nome = prompt('Nome para este exemplo:', `Meu circuito ${lib.length + 1}`);
+    if (nome == null) return;
+    nome = String(nome).trim();
+    if (!nome) {
+        alert('Nome não pode ficar vazio.');
+        return;
+    }
+    if (nome.length > 50) nome = nome.slice(0, 50);
+
+    if (nomesExistentes.has(nome.toLowerCase())) {
+        if (!confirm(`Já existe um exemplo chamado "${nome}". Sobrescrever?`)) return;
+        const idxExistente = lib.findIndex(e => (e.nome || '').toLowerCase() === nome.toLowerCase());
+        if (idxExistente >= 0) lib.splice(idxExistente, 1);
+    }
+
+    lib.push({ nome, state });
+    _salvarBibliotecaCustom(lib);
+    _popularBibliotecaCustomDropdown();
+
+    // Seleciona o recém-salvo no dropdown para feedback visual
+    const select = document.getElementById('exemplosSelect');
+    if (select) {
+        select.value = `custom:${lib.length - 1}`;
+        _atualizarBotaoApagarExemplo();
+    }
+}
+
+function removerExemploCustomSelecionado() {
+    const select = document.getElementById('exemplosSelect');
+    if (!select) return;
+    const ch = String(select.value || '').trim();
+    if (!ch.startsWith('custom:')) return;
+    const idx = parseInt(ch.slice('custom:'.length), 10);
+    const lib = _lerBibliotecaCustom();
+    if (!Number.isFinite(idx) || idx < 0 || idx >= lib.length) return;
+
+    const entry = lib[idx];
+    if (!confirm(`Apagar o exemplo "${entry.nome}"? Esta ação não pode ser desfeita.`)) return;
+
+    lib.splice(idx, 1);
+    _salvarBibliotecaCustom(lib);
+    _popularBibliotecaCustomDropdown();
+    select.value = '';
+    _atualizarBotaoApagarExemplo();
+}
+
+function _atualizarBotaoApagarExemplo() {
+    const select = document.getElementById('exemplosSelect');
+    const btn = document.getElementById('btnRemoverExemplo');
+    if (!select || !btn) return;
+    btn.hidden = !String(select.value || '').startsWith('custom:');
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     const darkMode = localStorage.getItem('darkMode');
     const switchElement = document.getElementById('darkModeSwitch');
@@ -3353,6 +3851,13 @@ document.addEventListener('DOMContentLoaded', function() {
     setupDialogoRelacionar();
     setupAtalhosTeclado();
     aplicarTooltipsGlobais();
+
+    // FASE 6 — popular dropdown de exemplos custom + listener para botão Apagar
+    _popularBibliotecaCustomDropdown();
+    const selectExemplos = document.getElementById('exemplosSelect');
+    if (selectExemplos) {
+        selectExemplos.addEventListener('change', _atualizarBotaoApagarExemplo);
+    }
 
     const estadoSalvo = lerEstadoSalvo();
     if (estadoSalvo) mostrarBannerRestauracao(estadoSalvo);
