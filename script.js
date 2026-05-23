@@ -1610,11 +1610,66 @@ async function calcular() {
             }
             divRes.innerHTML += html + `</div>`;
         }
-        MathJax.typeset();
+        renderMathJaxSafe();
     } catch (e) {
         load.style.display = "none";
         divRes.innerHTML = `<div class="card" style="color:red">❌ ${e.message}</div>`;
     }
+}
+
+/**
+ * Dispara typeset do MathJax de forma defensiva.
+ *
+ * Motivação: o MathJax 3 carrega o componente AsciiMath de forma assíncrona
+ * via CDN. Em hard-refresh + cache busting recente, o objeto global MathJax
+ * existe (com a config inicial) mas .typeset / .typesetPromise ainda são
+ * undefined até que o startup termine. A chamada direta a MathJax.typeset()
+ * crashava com "MathJax.typeset is not a function".
+ *
+ * Estratégia (em ordem de preferência):
+ *  1) Se typesetPromise está disponível, usá-lo (renderização assíncrona).
+ *  2) Se typeset (síncrono) está disponível, usá-lo direto.
+ *  3) Se startup.promise existe, agendar o typeset para depois do ready.
+ *  4) Como último recurso, fazer polling curto (até 2s).
+ *
+ * Em qualquer caminho, falhas internas do MathJax NÃO interrompem o fluxo —
+ * só geram warning no console (a UI já mostrou os números brutos).
+ */
+function renderMathJaxSafe() {
+    const mj = (typeof window !== 'undefined') ? window.MathJax : null;
+    if (!mj) return;
+
+    if (typeof mj.typesetPromise === 'function') {
+        mj.typesetPromise().catch(err => console.warn('MathJax typesetPromise:', err));
+        return;
+    }
+    if (typeof mj.typeset === 'function') {
+        try { mj.typeset(); } catch (err) { console.warn('MathJax typeset:', err); }
+        return;
+    }
+    if (mj.startup && mj.startup.promise && typeof mj.startup.promise.then === 'function') {
+        mj.startup.promise
+            .then(() => {
+                const m = window.MathJax;
+                if (m && typeof m.typesetPromise === 'function') return m.typesetPromise();
+                if (m && typeof m.typeset === 'function') return m.typeset();
+            })
+            .catch(err => console.warn('MathJax startup:', err));
+        return;
+    }
+    let tentativas = 0;
+    const id = setInterval(() => {
+        const m = window.MathJax;
+        if (m && (typeof m.typesetPromise === 'function' || typeof m.typeset === 'function')) {
+            clearInterval(id);
+            try {
+                if (typeof m.typesetPromise === 'function') m.typesetPromise();
+                else m.typeset();
+            } catch (err) { console.warn('MathJax (poll):', err); }
+        } else if (++tentativas > 20) {
+            clearInterval(id);
+        }
+    }, 100);
 }
 
 /* ============================================================
