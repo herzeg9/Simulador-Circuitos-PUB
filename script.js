@@ -562,7 +562,7 @@ function gerarJSON() {
 function validarAntesEnvio() {
     const erros = [];
     const itens = document.querySelectorAll('.comp-item');
-    
+
     const modoAc = getModoSimulacao() === 'AC';
     itens.forEach(item => {
         const tipo = item.dataset.tipo;
@@ -580,7 +580,24 @@ function validarAntesEnvio() {
             }
         }
     });
-    
+
+    // FASE 5.2.1 — Bloqueia o submit quando há ilhas eletricamente isoladas
+    // do GND. Sem essa checagem, o backend devolve "Falha na resolução da
+    // matriz" (sistema MNA singular), mensagem que confunde o usuário.
+    // Aqui antecipamos com uma explicação concreta e acionável.
+    const itensArr = Array.from(itens);
+    const ilhas = (typeof detectarIlhasIsoladas === 'function')
+        ? detectarIlhasIsoladas(itensArr)
+        : [];
+    ilhas.forEach(({ nos }) => {
+        const lista = nos.join(', ');
+        erros.push(
+            `Malha eletricamente isolada do GND (nó${nos.length > 1 ? 's' : ''} ${lista}). ` +
+            `Em circuitos com transformador ideal, o secundário precisa de uma referência de terra: ` +
+            `conecte um dos seus nós ao nó <code>0</code> (GND).`
+        );
+    });
+
     return {
         valido: erros.length === 0,
         erros: erros
@@ -2943,6 +2960,108 @@ function aplicarTooltipsComponente(li) {
 }
 
 /**
+ * FASE 5.2.1 — Detecta malhas eletricamente isoladas do GND usando Union-Find
+ * sobre o grafo do circuito.
+ *
+ * Regra de conectividade elétrica (importante para trafos):
+ *  - Resistor / Capacitor / Indutor / VoltageSource / CurrentSource:
+ *      conecta no-a ↔ no-b
+ *  - VCVS / VCCS / CCVS / CCCS: conecta apenas a saída (no-a ↔ no-b);
+ *      a entrada (sense, no-c/no-d, ou Alvo) é alta impedância e NÃO
+ *      cria caminho elétrico
+ *  - Transformer (ideal): conecta primário (no-a ↔ no-b) E secundário
+ *      (no-c ↔ no-d) como duas componentes conexas SEPARADAS — é o ponto
+ *      central do isolamento galvânico e a razão pela qual o secundário
+ *      flutuante gera sistema MNA singular.
+ *
+ * Retorna um array de "ilhas", cada uma com:
+ *   - nos: array de números, os nós eletricamente conectados entre si
+ *           e desconectados do GND
+ *   - componentesInternos: array de elementos DOM .comp-item que estão
+ *           ENTEIRAMENTE dentro da ilha (todos os seus nós no conjunto).
+ *           Componentes "fronteira" (parte na ilha, parte no GND-side)
+ *           — tipicamente o próprio trafo — não são marcados como erro
+ *           porque são justamente quem causa o isolamento, não vítimas.
+ *
+ * @param {Element[]} items
+ * @returns {Array<{nos:number[], componentesInternos:Element[]}>}
+ */
+function detectarIlhasIsoladas(items) {
+    const parent = new Map();
+    const rank = new Map();
+    const ensure = (n) => {
+        if (!parent.has(n)) { parent.set(n, n); rank.set(n, 0); }
+    };
+    const find = (n) => {
+        let r = n;
+        while (parent.get(r) !== r) r = parent.get(r);
+        let x = n;
+        while (parent.get(x) !== r) {
+            const next = parent.get(x);
+            parent.set(x, r);
+            x = next;
+        }
+        return r;
+    };
+    const union = (a, b) => {
+        ensure(a); ensure(b);
+        const ra = find(a), rb = find(b);
+        if (ra === rb) return;
+        const sa = rank.get(ra), sb = rank.get(rb);
+        if (sa < sb) parent.set(ra, rb);
+        else if (sa > sb) parent.set(rb, ra);
+        else { parent.set(rb, ra); rank.set(ra, sa + 1); }
+    };
+
+    const itemNos = new Map();
+    items.forEach(it => {
+        const tipo = it.dataset.tipo;
+        const a = parseInt(it.querySelector('.no-a')?.value, 10);
+        const b = parseInt(it.querySelector('.no-b')?.value, 10);
+        const c = parseInt(it.querySelector('.no-c')?.value, 10);
+        const d = parseInt(it.querySelector('.no-d')?.value, 10);
+
+        const meus = [];
+        if (Number.isFinite(a)) meus.push(a);
+        if (Number.isFinite(b)) meus.push(b);
+        if (tipo === 'Transformer') {
+            if (Number.isFinite(c)) meus.push(c);
+            if (Number.isFinite(d)) meus.push(d);
+        }
+        if (meus.length) itemNos.set(it, meus);
+
+        if (Number.isFinite(a) && Number.isFinite(b)) union(a, b);
+        if (tipo === 'Transformer'
+            && Number.isFinite(c) && Number.isFinite(d)) {
+            union(c, d);
+        }
+    });
+
+    if (!parent.size) return [];
+
+    const grupos = new Map();
+    parent.forEach((_, n) => {
+        const r = find(n);
+        if (!grupos.has(r)) grupos.set(r, new Set());
+        grupos.get(r).add(n);
+    });
+
+    const rGnd = parent.has(0) ? find(0) : null;
+    const ilhas = [];
+    grupos.forEach((nos, r) => {
+        if (r === rGnd) return;
+        const nosArr = Array.from(nos).sort((x, y) => x - y);
+        const setNos = new Set(nosArr);
+        const componentesInternos = [];
+        itemNos.forEach((meus, it) => {
+            if (meus.every(n => setNos.has(n))) componentesInternos.push(it);
+        });
+        ilhas.push({ nos: nosArr, componentesInternos });
+    });
+    return ilhas;
+}
+
+/**
  * Valida topologia em tempo real e marca visualmente os componentes
  * problemáticos. Emite avisos (amarelo) e erros (vermelho) no painel
  * #painelAvisosTopologia.
@@ -2951,7 +3070,11 @@ function aplicarTooltipsComponente(li) {
  *  - Nomes duplicados (erro)
  *  - Curto-circuito interno (nA === nB) — erro, ou aviso se ambos == 0
  *  - CCVS/CCCS com Alvo vazio ou apontando para nome inexistente (erro)
+ *  - Transformer com 4 nós válidos, primário/secundário distintos, razão
+ *    válida e positiva (erro)
  *  - Nó isolado (grau 1 no grafo completo, exceto GND) — aviso
+ *  - Ilha eletricamente isolada do GND (típica de secundário de trafo
+ *    sem aterramento) — erro
  */
 function validarTopologia() {
     const painel = document.getElementById('painelAvisosTopologia');
@@ -3057,6 +3180,27 @@ function validarTopologia() {
             avisos.push(`Nó <code>${node}</code> só aparece em <code>${escapeXml(nome)}</code> (sem fechamento de malha).`);
             it.classList.add('has-warning');
         }
+    });
+
+    // FASE 5.2.1 — Ilhas eletricamente isoladas do GND.
+    //
+    // Trafos ideais isolam galvanicamente primário e secundário: se o secundário
+    // (ou qualquer outro grupo de nós) ficar sem caminho condutivo até o nó 0,
+    // o sistema MNA é matematicamente singular (infinitas soluções, todas
+    // diferentes por uma constante de offset DC livre). O Wolfram detecta isso
+    // e devolve "Falha na resolução da matriz" — uma mensagem opaca para o
+    // usuário, que não sabe que precisa aterrar o secundário.
+    //
+    // Aqui rodamos um Union-Find sobre o grafo elétrico para detectar essas
+    // ilhas e oferecer uma mensagem pedagógica antes mesmo do submit.
+    detectarIlhasIsoladas(items).forEach(({ nos, componentesInternos }) => {
+        const lista = nos.map(n => `<code>${n}</code>`).join(', ');
+        erros.push(
+            `Malha eletricamente isolada do GND (nó${nos.length > 1 ? 's' : ''} ${lista}). ` +
+            `Em circuitos com trafo ideal, o secundário precisa de uma referência de ` +
+            `terra: conecte um dos seus nós ao nó <code>0</code> (GND).`
+        );
+        componentesInternos.forEach(it => it.classList.add('has-error'));
     });
 
     if (!erros.length && !avisos.length) {
