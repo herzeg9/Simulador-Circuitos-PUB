@@ -2281,9 +2281,8 @@ function getTopologiaAtual() {
  * @param {Array} topologia
  */
 function analyzeTopology(topologia) {
-    // FASE 5.2: trafos têm 4 nós e não cabem na lógica shunt/series do
-    // renderizador atual. Separamos antes para que sejam desenhados em um
-    // painel próprio abaixo do esquemático principal.
+    // FASE 5.2: trafos têm 4 nós — não entram em shunt/série; são desenhados
+    // inline no SVG principal (com fallback em painel para topologias atípicas).
     const trafos = topologia.filter(c => c.tipo === 'Transformer');
     const semTrafos = topologia.filter(c => c.tipo !== 'Transformer');
 
@@ -2292,6 +2291,10 @@ function analyzeTopology(topologia) {
         nodesSet.add(c.nA); nodesSet.add(c.nB);
         if (c.nC != null) nodesSet.add(c.nC);
         if (c.nD != null) nodesSet.add(c.nD);
+    });
+    trafos.forEach(c => {
+        nodesSet.add(c.nA); nodesSet.add(c.nB);
+        if (c.nC != null) { nodesSet.add(c.nC); nodesSet.add(c.nD); }
     });
     const nonGroundNodes = [...nodesSet].filter(n => n !== 0).sort((a, b) => a - b);
 
@@ -2699,6 +2702,150 @@ function drawSimbolo(comp, cx, cy, orient) {
     return svg;
 }
 
+/** Âncora de um terminal de trafo no esquemático (barra de nós ou linha GND). */
+function trafoAnchorNo(no, parceiro, nodeX, NODE_Y, GND_Y) {
+    if (no === 0) {
+        const xRef = parceiro !== 0 && nodeX.has(parceiro) ? nodeX.get(parceiro) : null;
+        if (xRef == null) return null;
+        return { x: xRef, y: GND_Y };
+    }
+    if (!nodeX.has(no)) return null;
+    return { x: nodeX.get(no), y: NODE_Y };
+}
+
+function trafoPodeDesenharInline(trafo, nodeX) {
+    if (trafo.nC == null || trafo.nD == null) return false;
+    const nos = [trafo.nA, trafo.nB, trafo.nC, trafo.nD].filter(n => n !== 0);
+    if (!nos.length) return false;
+    return nos.every(n => nodeX.has(n));
+}
+
+function trafoBandY(NODE_Y, GND_Y, index, total) {
+    const yStart = NODE_Y + ESQ.NODE_R + 14;
+    const yEnd = GND_Y - 22;
+    const band = (yEnd - yStart) / Math.max(1, total);
+    return {
+        yTop: yStart + index * band + 4,
+        yBot: yStart + (index + 1) * band - 6
+    };
+}
+
+function svgTrafoRouteToCoilTop(xBus, yBus, xCoil, yTop) {
+    if (Math.abs(xBus - xCoil) < 0.5) {
+        return `<line class="trafo-stub" x1="${xBus}" y1="${yBus}" x2="${xCoil}" y2="${yTop}"/>`;
+    }
+    return `<path class="trafo-stub" fill="none" d="M ${xBus} ${yBus} L ${xBus} ${yTop} L ${xCoil} ${yTop}"/>`;
+}
+
+function svgTrafoRouteToCoilBot(xGnd, yGnd, xCoil, yBot) {
+    if (Math.abs(xGnd - xCoil) < 0.5) {
+        return `<line class="trafo-stub" x1="${xGnd}" y1="${yGnd}" x2="${xCoil}" y2="${yBot}"/>`;
+    }
+    return `<path class="trafo-stub" fill="none" d="M ${xGnd} ${yGnd} L ${xGnd} ${yBot} L ${xCoil} ${yBot}"/>`;
+}
+
+function svgTrafoEspiral(cx, yTop, yBot, coilClass) {
+    const arcs = [];
+    const step = Math.max(12, (yBot - yTop - 8) / 4);
+    for (let i = 0; i < 4; i++) {
+        const yA = yTop + 4 + i * step;
+        const yB = Math.min(yBot - 4, yA + step * 0.85);
+        arcs.push(`<path class="trafo-coil ${coilClass}" d="M ${cx},${yA} Q ${cx + 10},${(yA + yB) / 2} ${cx},${yB}"/>`);
+    }
+    return arcs.join('');
+}
+
+/**
+ * Símbolo IEEE de trafo (duas bobinas + núcleo + polaridade) para uso inline ou no painel.
+ */
+function svgTrafoSymbol(xPri, xSec, yTop, yBot, trafo, opts = {}) {
+    const { showName = true, compact = false } = opts;
+    const xCoreL = (xPri + xSec) / 2 - 4;
+    const xCoreR = (xPri + xSec) / 2 + 4;
+    const nucleo = `
+        <line class="trafo-nucleo" x1="${xCoreL}" y1="${yTop + 2}" x2="${xCoreL}" y2="${yBot - 2}"/>
+        <line class="trafo-nucleo" x1="${xCoreR}" y1="${yTop + 2}" x2="${xCoreR}" y2="${yBot - 2}"/>`;
+    const dotPri = `
+        <circle class="trafo-dot trafo-dot--pri" cx="${xPri + 12}" cy="${yTop + 2}" r="3.5"/>
+        <text class="trafo-pol-label trafo-pol-label--pri" x="${xPri + 12}" y="${yTop - 3}" text-anchor="middle">+</text>`;
+    const dotSec = `
+        <circle class="trafo-dot trafo-dot--sec" cx="${xSec - 12}" cy="${yTop + 2}" r="3.5"/>
+        <text class="trafo-pol-label trafo-pol-label--sec" x="${xSec - 12}" y="${yTop - 3}" text-anchor="middle">+</text>`;
+    const labels = compact ? '' : `
+        <text class="trafo-side-label trafo-side-label--pri" x="${xPri - 6}" y="${yTop - 10}" text-anchor="middle">Pri</text>
+        <text class="trafo-side-label trafo-side-label--sec" x="${xSec + 6}" y="${yTop - 10}" text-anchor="middle">Sec</text>`;
+    const nome = showName
+        ? `<text class="trafo-symbol-name" x="${(xPri + xSec) / 2}" y="${yBot + 14}" text-anchor="middle">${escapeXml(trafo.nome)}</text>`
+        : '';
+    return `
+        <g class="esq-trafo" data-nome="${escapeXml(trafo.nome)}">
+            ${svgTrafoEspiral(xPri, yTop, yBot, 'trafo-coil--pri')}
+            ${svgTrafoEspiral(xSec, yTop, yBot, 'trafo-coil--sec')}
+            ${nucleo}
+            ${dotPri}
+            ${dotSec}
+            ${labels}
+            ${nome}
+        </g>`;
+}
+
+/**
+ * Desenha trafos integrados no SVG principal; devolve SVG parcial e lista de fallback.
+ */
+function drawTrafosInline(trafos, nodeX, NODE_Y, GND_Y) {
+    if (!trafos || !trafos.length) return { svg: '', fallback: [] };
+
+    const inline = [];
+    const fallback = [];
+    trafos.forEach(t => {
+        if (trafoPodeDesenharInline(t, nodeX)) inline.push(t);
+        else fallback.push(t);
+    });
+
+    const parts = [];
+    const total = inline.length;
+    inline.forEach((t, idx) => {
+        const ancA = trafoAnchorNo(t.nA, t.nB, nodeX, NODE_Y, GND_Y);
+        const ancB = trafoAnchorNo(t.nB, t.nA, nodeX, NODE_Y, GND_Y);
+        const ancC = trafoAnchorNo(t.nC, t.nD, nodeX, NODE_Y, GND_Y);
+        const ancD = trafoAnchorNo(t.nD, t.nC, nodeX, NODE_Y, GND_Y);
+        if (!ancA || !ancB || !ancC || !ancD) {
+            fallback.push(t);
+            return;
+        }
+
+        const xPriRef = t.nA !== 0 ? ancA.x : ancB.x;
+        const xSecRef = t.nC !== 0 ? ancC.x : ancD.x;
+        const { yTop, yBot } = trafoBandY(NODE_Y, GND_Y, idx, total);
+
+        const xLo = Math.min(xPriRef, xSecRef);
+        const xHi = Math.max(xPriRef, xSecRef);
+        const span = Math.max(xHi - xLo, 40);
+        const gap = Math.max(56, span * 0.38);
+        const xMid = (xLo + xHi) / 2;
+        const priLeft = xPriRef <= xSecRef;
+        const xCoilPri = priLeft ? xMid - gap / 2 : xMid + gap / 2;
+        const xCoilSec = priLeft ? xMid + gap / 2 : xMid - gap / 2;
+
+        const routeTo = (anc, xCoil, coilY) => {
+            if (Math.abs(coilY - yTop) < 1) {
+                return svgTrafoRouteToCoilTop(anc.x, anc.y, xCoil, yTop);
+            }
+            return svgTrafoRouteToCoilBot(anc.x, anc.y, xCoil, yBot);
+        };
+
+        parts.push(`<g class="esq-trafo-wires" data-nome="${escapeXml(t.nome)}">`);
+        parts.push(routeTo(ancA, xCoilPri, yTop));
+        parts.push(routeTo(ancB, xCoilPri, yBot));
+        parts.push(routeTo(ancC, xCoilSec, yTop));
+        parts.push(routeTo(ancD, xCoilSec, yBot));
+        parts.push('</g>');
+        parts.push(svgTrafoSymbol(xCoilPri, xCoilSec, yTop, yBot, t, { compact: true }));
+    });
+
+    return { svg: parts.join(''), fallback };
+}
+
 /**
  * Renderiza o esquemático com base no estado atual do DOM, dentro do contêiner #esquematicoWrap.
  */
@@ -2719,8 +2866,7 @@ function renderEsquematico() {
         return;
     }
     if (!nonGroundNodes.length && trafos && trafos.length) {
-        // Caso raro: só há trafos no circuito. Renderiza apenas o painel de trafos.
-        wrap.innerHTML = renderPainelTrafos(trafos);
+        wrap.innerHTML = renderPainelTrafos(trafos, false);
         return;
     }
 
@@ -2796,6 +2942,9 @@ function renderEsquematico() {
         parts.push(drawSimbolo(s, laneX, midY, 'V'));
     });
 
+    const { svg: trafoSvg, fallback: trafosFallback } = drawTrafosInline(trafos, nodeX, NODE_Y, GND_Y);
+    if (trafoSvg) parts.push(trafoSvg);
+
     visibleNodes.forEach(n => {
         const x = nodeX.get(n);
         if (x == null) return;
@@ -2805,8 +2954,7 @@ function renderEsquematico() {
 
     parts.push(`</svg>`);
 
-    // FASE 5.2: trafos são desenhados em um painel próprio abaixo do SVG.
-    const painelTrafos = (trafos && trafos.length) ? renderPainelTrafos(trafos) : '';
+    const painelTrafos = trafosFallback.length ? renderPainelTrafos(trafosFallback, true) : '';
 
     wrap.innerHTML = parts.join('') + painelTrafos;
 }
@@ -2817,36 +2965,14 @@ function renderEsquematico() {
  * em espiral (símbolo IEEE) com os 4 nós rotulados e a razão N1:N2.
  *
  * @param {Array} trafos - Lista de objetos {tipo:'Transformer', nome, nA, nB, nC, nD, valor}.
+ * @param {boolean} [fallback=false] - Se true, painel exibido só para topologias não integráveis.
  * @returns {string}
  */
-function renderPainelTrafos(trafos) {
+function renderPainelTrafos(trafos, fallback = false) {
     if (!trafos || !trafos.length) return '';
     const cards = trafos.map(t => {
         const W = 240, H = 145;
         const xPri = 78, xSec = 162, yTop = 38, yBot = 108;
-        const xCoreL = (xPri + xSec) / 2 - 4;
-        const xCoreR = (xPri + xSec) / 2 + 4;
-
-        const espiral = (cx, coilClass) => {
-            const arcs = [];
-            for (let i = 0; i < 4; i++) {
-                const yA = yTop + 7 + i * 17;
-                const yB = yA + 14;
-                arcs.push(`<path class="trafo-coil ${coilClass}" d="M ${cx},${yA} Q ${cx + 10},${(yA + yB) / 2} ${cx},${yB}"/>`);
-            }
-            return arcs.join('');
-        };
-
-        const nucleo = `
-            <line class="trafo-nucleo" x1="${xCoreL}" y1="${yTop + 3}" x2="${xCoreL}" y2="${yBot - 3}"/>
-            <line class="trafo-nucleo" x1="${xCoreR}" y1="${yTop + 3}" x2="${xCoreR}" y2="${yBot - 3}"/>`;
-
-        const dotPri = `
-            <circle class="trafo-dot trafo-dot--pri" cx="${xPri + 12}" cy="${yTop + 3}" r="3.5"/>
-            <text class="trafo-pol-label trafo-pol-label--pri" x="${xPri + 12}" y="${yTop - 2}" text-anchor="middle">+</text>`;
-        const dotSec = `
-            <circle class="trafo-dot trafo-dot--sec" cx="${xSec - 12}" cy="${yTop + 3}" r="3.5"/>
-            <text class="trafo-pol-label trafo-pol-label--sec" x="${xSec - 12}" y="${yTop - 2}" text-anchor="middle">+</text>`;
 
         const stubs = `
             <line class="trafo-stub" x1="22" y1="${yTop}" x2="${xPri}" y2="${yTop}"/>
@@ -2856,21 +2982,14 @@ function renderPainelTrafos(trafos) {
             <text class="trafo-node-label" x="12" y="${yTop + 4}" text-anchor="middle">${escapeXml(t.nA)}</text>
             <text class="trafo-node-label" x="12" y="${yBot + 14}" text-anchor="middle">${escapeXml(t.nB)}</text>
             <text class="trafo-node-label" x="${W - 12}" y="${yTop + 4}" text-anchor="middle">${escapeXml(t.nC)}</text>
-            <text class="trafo-node-label" x="${W - 12}" y="${yBot + 14}" text-anchor="middle">${escapeXml(t.nD)}</text>
-            <text class="trafo-side-label trafo-side-label--pri" x="${xPri - 6}" y="18" text-anchor="middle">Pri</text>
-            <text class="trafo-side-label trafo-side-label--sec" x="${xSec + 6}" y="18" text-anchor="middle">Sec</text>`;
+            <text class="trafo-node-label" x="${W - 12}" y="${yBot + 14}" text-anchor="middle">${escapeXml(t.nD)}</text>`;
 
         const valorTexto = (t.valor || '1').includes(':') ? t.valor : `n=${t.valor}`;
         return `
             <div class="trafo-card">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" class="trafo-svg" role="img" aria-label="Transformador ${escapeXml(t.nome)}">
                     ${stubs}
-                    ${espiral(xPri, 'trafo-coil--pri')}
-                    ${espiral(xSec, 'trafo-coil--sec')}
-                    ${nucleo}
-                    ${dotPri}
-                    ${dotSec}
-                    <text class="trafo-symbol-name" x="${W / 2}" y="${H - 6}" text-anchor="middle">${escapeXml(t.nome)}</text>
+                    ${svgTrafoSymbol(xPri, xSec, yTop, yBot, t, { showName: true, compact: false })}
                 </svg>
                 <div class="trafo-info">
                     <strong>${escapeXml(t.nome)}</strong>
@@ -2879,10 +2998,13 @@ function renderPainelTrafos(trafos) {
                 </div>
             </div>`;
     }).join('');
+    const nota = fallback
+        ? 'Estes transformadores usam topologia que n&atilde;o coube no esquem&aacute;tico principal (n&oacute;s internos ou liga&ccedil;&otilde;es incomuns). Os demais aparecem integrados ao circuito.'
+        : 'Trafos ideais (4 terminais). Os marcadores <strong class="trafo-legend-pri">+ Pri</strong> e <strong class="trafo-legend-sec">+ Sec</strong> indicam a polaridade convencional.';
     return `
         <div class="trafo-panel">
-            <h4 class="trafo-panel-title">Transformadores ideais</h4>
-            <p class="trafo-panel-note">Trafos ideais (4 terminais) s&atilde;o renderizados em separado. Os marcadores <strong class="trafo-legend-pri">+ Pri</strong> e <strong class="trafo-legend-sec">+ Sec</strong> indicam a polaridade convencional (mesma fase de tens&atilde;o entre os enrolamentos).</p>
+            <h4 class="trafo-panel-title">${fallback ? 'Transformadores (visualiza\u00e7\u00e3o alternativa)' : 'Transformadores ideais'}</h4>
+            <p class="trafo-panel-note">${nota}</p>
             <div class="trafo-panel-grid">${cards}</div>
         </div>`;
 }
