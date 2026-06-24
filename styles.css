@@ -1730,6 +1730,60 @@ body.dark-mode .dlg-tipo-L.is-selected { color: #cbd5e0; border-color: #a0aec0; 
 }
 .ajuda-section:first-of-type { border-top: none; }
 
+/* FASE 7 — bloco "Mais ajuda" colapsável (6 seções aninhadas) */
+.ajuda-mais {
+    margin-top: 4px;
+    border-top: 1px solid var(--border-color);
+}
+.ajuda-mais:not([open]) > .ajuda-summary--mais {
+    background: rgba(22, 160, 133, 0.05);
+}
+body.dark-mode .ajuda-mais:not([open]) > .ajuda-summary--mais {
+    background: rgba(118, 215, 196, 0.06);
+}
+.ajuda-summary--mais {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 2px 10px;
+}
+.ajuda-mais-titulo {
+    flex: 1 1 auto;
+}
+.ajuda-mais-hint {
+    flex: 1 1 100%;
+    font-size: 0.84em;
+    font-weight: 400;
+    color: var(--text-secondary);
+    line-height: 1.35;
+}
+.ajuda-summary--mais::after {
+    align-self: center;
+    margin-top: 2px;
+}
+.ajuda-mais-inner {
+    margin: 2px 0 6px;
+    padding: 2px 0 4px 14px;
+    border-left: 3px solid rgba(22, 160, 133, 0.35);
+}
+body.dark-mode .ajuda-mais-inner {
+    border-left-color: rgba(118, 215, 196, 0.35);
+}
+.ajuda-section--nested {
+    padding: 3px 0;
+    border-top: 1px solid var(--border-color);
+}
+.ajuda-section--nested:first-child {
+    border-top: none;
+}
+.ajuda-section--nested > .ajuda-summary {
+    padding: 8px 6px;
+    font-size: 0.94em;
+}
+.ajuda-section--nested > .ajuda-content {
+    padding-left: 18px;
+    font-size: 0.9em;
+}
+
 .ajuda-summary {
     list-style: none;
     cursor: pointer;
