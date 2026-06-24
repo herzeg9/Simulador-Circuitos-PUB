@@ -24,16 +24,15 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: npm
-
-      - name: Instalar dependências
-        run: npm install
 
       - name: Auditoria estrutural
-        run: npm run test:esquematico
+        run: node tests/esquematico-audit.mjs
 
       - name: Snapshots SVG
-        run: npm run test:svg
+        run: node tests/svg-snapshot.mjs
+
+      - name: Instalar dependências (regressão PNG)
+        run: npm install --no-audit --no-fund
 
       - name: Regressão visual (screenshots PNG)
         run: npm run test:visual
