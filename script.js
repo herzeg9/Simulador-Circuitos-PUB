@@ -2,65 +2,107 @@ const API_URL = "https://www.wolframcloud.com/obj/herzeghenrique/simulador-circu
 
 let idCounter = 1;
 
+/**
+ * Cada exemplo tem dois campos:
+ *  - regime: { modo: 'DC'|'AC', frequencia?: string }
+ *    Modo natural do exemplo. Aplicado automaticamente ao carregar para
+ *    desambiguar a leitura — antes os nomes diziam "Capacitor em DC"
+ *    mas o simulador não trocava o toggle ao carregar.
+ *  - circuito: lista de componentes no mesmo schema do gerarJSON()
+ *    (com campo opcional "Fase" para fontes AC já pré-configuradas).
+ *
+ * O campo "Fase" só é consumido pelo carregarExemplo() quando o
+ * regime do exemplo é AC e o componente é uma fonte independente.
+ */
 const exemplos = {
-    "divisor": [
-        {"Componente": "V1", "Tipo": "VoltageSource", "Valor": "10", "Nos": [1, 0]},
-        {"Componente": "R1", "Tipo": "Resistor", "Valor": "100", "Nos": [1, 2]},
-        {"Componente": "R2", "Tipo": "Resistor", "Valor": "100", "Nos": [2, 0]}
-    ],
-    "ponte": [
-        {"Componente": "V1", "Tipo": "VoltageSource", "Valor": "12", "Nos": [1, 0]},
-        {"Componente": "R1", "Tipo": "Resistor", "Valor": "1k", "Nos": [1, 2]},
-        {"Componente": "R2", "Tipo": "Resistor", "Valor": "1k", "Nos": [2, 0]},
-        {"Componente": "R3", "Tipo": "Resistor", "Valor": "1k", "Nos": [1, 3]},
-        {"Componente": "R4", "Tipo": "Resistor", "Valor": "1k", "Nos": [3, 0]},
-        {"Componente": "R_Ponte", "Tipo": "Resistor", "Valor": "500", "Nos": [2, 3]}
-    ],
-    "amp": [
-        {"Componente": "V_In", "Tipo": "VoltageSource", "Valor": "5", "Nos": [1, 0]},
-        {"Componente": "R1", "Tipo": "Resistor", "Valor": "1k", "Nos": [1, 0]},
-        {"Componente": "E_Amp", "Tipo": "VCVS", "Valor": "3", "Nos": [2, 0, 1, 0]}, 
-        {"Componente": "R_Carga", "Tipo": "Resistor", "Valor": "10k", "Nos": [2, 0]}
-    ],
-    "misto": [
-         {"Componente": "V1", "Tipo": "VoltageSource", "Valor": "20", "Nos": [1, 0]},
-         {"Componente": "R1", "Tipo": "Resistor", "Valor": "2", "Nos": [1, 2]},
-         {"Componente": "R2", "Tipo": "Resistor", "Valor": "2", "Nos": [2, 0]},
-         {"Componente": "R3", "Tipo": "Resistor", "Valor": "2", "Nos": [2, 3]},
-         {"Componente": "V2", "Tipo": "VoltageSource", "Valor": "10", "Nos": [3, 0]}
-    ],
-    "capacitor_dc": [
-        {"Componente": "V1", "Tipo": "VoltageSource", "Valor": "10", "Nos": [1, 0]},
-        {"Componente": "R1", "Tipo": "Resistor", "Valor": "1k", "Nos": [1, 2]},
-        {"Componente": "C1", "Tipo": "Capacitor", "Valor": "100u", "Nos": [2, 0]}
-    ],
-    "indutor_dc": [
-        {"Componente": "V1", "Tipo": "VoltageSource", "Valor": "10", "Nos": [1, 0]},
-        {"Componente": "R1", "Tipo": "Resistor", "Valor": "100", "Nos": [1, 2]},
-        {"Componente": "L1", "Tipo": "Inductor", "Valor": "100m", "Nos": [2, 0]}
-    ],
-    "vccs_amp": [
-        {"Componente": "V_In", "Tipo": "VoltageSource", "Valor": "5", "Nos": [1, 0]},
-        {"Componente": "R_In", "Tipo": "Resistor", "Valor": "1k", "Nos": [1, 0]},
-        {"Componente": "G_Amp", "Tipo": "VCCS", "Valor": "0.01", "Nos": [2, 0, 1, 0]},
-        {"Componente": "R_Carga", "Tipo": "Resistor", "Valor": "100", "Nos": [2, 0]}
-    ],
-    "ccvs_teste": [
-        {"Componente": "V1", "Tipo": "VoltageSource", "Valor": "10", "Nos": [1, 0]},
-        {"Componente": "R1", "Tipo": "Resistor", "Valor": "5", "Nos": [1, 2]},
-        {"Componente": "H1", "Tipo": "CCVS", "Valor": "2", "Nos": [2, 0], "Alvo": "R1"}
-    ],
-    "cccs_bjt": [
-        {"Componente": "I_Base", "Tipo": "CurrentSource", "Valor": "1m", "Nos": [1, 0]},
-        {"Componente": "R_Base", "Tipo": "Resistor", "Valor": "1k", "Nos": [1, 0]},
-        {"Componente": "F_BJT", "Tipo": "CCCS", "Valor": "100", "Nos": [2, 0], "Alvo": "R_Base"},
-        {"Componente": "R_Col", "Tipo": "Resistor", "Valor": "10", "Nos": [2, 0]}
-    ],
-    "trafo_step_up": [
-        {"Componente": "V1", "Tipo": "VoltageSource", "Valor": "10", "Nos": [1, 0]},
-        {"Componente": "T1", "Tipo": "Transformer", "Valor": "1:2", "Nos": [1, 0, 2, 0]},
-        {"Componente": "R_Carga", "Tipo": "Resistor", "Valor": "100", "Nos": [2, 0]}
-    ]
+    "divisor": {
+        regime: { modo: 'DC' },
+        circuito: [
+            {"Componente": "V1", "Tipo": "VoltageSource", "Valor": "10", "Nos": [1, 0]},
+            {"Componente": "R1", "Tipo": "Resistor", "Valor": "100", "Nos": [1, 2]},
+            {"Componente": "R2", "Tipo": "Resistor", "Valor": "100", "Nos": [2, 0]}
+        ]
+    },
+    "ponte": {
+        regime: { modo: 'DC' },
+        circuito: [
+            {"Componente": "V1", "Tipo": "VoltageSource", "Valor": "12", "Nos": [1, 0]},
+            {"Componente": "R1", "Tipo": "Resistor", "Valor": "1k", "Nos": [1, 2]},
+            {"Componente": "R2", "Tipo": "Resistor", "Valor": "1k", "Nos": [2, 0]},
+            {"Componente": "R3", "Tipo": "Resistor", "Valor": "1k", "Nos": [1, 3]},
+            {"Componente": "R4", "Tipo": "Resistor", "Valor": "1k", "Nos": [3, 0]},
+            {"Componente": "R_Ponte", "Tipo": "Resistor", "Valor": "500", "Nos": [2, 3]}
+        ]
+    },
+    "amp": {
+        regime: { modo: 'DC' },
+        circuito: [
+            {"Componente": "V_In", "Tipo": "VoltageSource", "Valor": "5", "Nos": [1, 0]},
+            {"Componente": "R1", "Tipo": "Resistor", "Valor": "1k", "Nos": [1, 0]},
+            {"Componente": "E_Amp", "Tipo": "VCVS", "Valor": "3", "Nos": [2, 0, 1, 0]},
+            {"Componente": "R_Carga", "Tipo": "Resistor", "Valor": "10k", "Nos": [2, 0]}
+        ]
+    },
+    "misto": {
+        regime: { modo: 'AC', frequencia: '60' },
+        circuito: [
+            {"Componente": "V1", "Tipo": "VoltageSource", "Valor": "20", "Fase": "60", "Nos": [1, 0]},
+            {"Componente": "R1", "Tipo": "Resistor", "Valor": "2", "Nos": [1, 2]},
+            {"Componente": "R2", "Tipo": "Resistor", "Valor": "2", "Nos": [2, 0]},
+            {"Componente": "R3", "Tipo": "Resistor", "Valor": "2", "Nos": [2, 3]},
+            {"Componente": "V2", "Tipo": "VoltageSource", "Valor": "10", "Fase": "-30", "Nos": [3, 0]}
+        ]
+    },
+    "capacitor_dc": {
+        regime: { modo: 'DC' },
+        circuito: [
+            {"Componente": "V1", "Tipo": "VoltageSource", "Valor": "10", "Nos": [1, 0]},
+            {"Componente": "R1", "Tipo": "Resistor", "Valor": "1k", "Nos": [1, 2]},
+            {"Componente": "C1", "Tipo": "Capacitor", "Valor": "100u", "Nos": [2, 0]}
+        ]
+    },
+    "indutor_dc": {
+        regime: { modo: 'DC' },
+        circuito: [
+            {"Componente": "V1", "Tipo": "VoltageSource", "Valor": "10", "Nos": [1, 0]},
+            {"Componente": "R1", "Tipo": "Resistor", "Valor": "100", "Nos": [1, 2]},
+            {"Componente": "L1", "Tipo": "Inductor", "Valor": "100m", "Nos": [2, 0]}
+        ]
+    },
+    "vccs_amp": {
+        regime: { modo: 'DC' },
+        circuito: [
+            {"Componente": "V_In", "Tipo": "VoltageSource", "Valor": "5", "Nos": [1, 0]},
+            {"Componente": "R_In", "Tipo": "Resistor", "Valor": "1k", "Nos": [1, 0]},
+            {"Componente": "G_Amp", "Tipo": "VCCS", "Valor": "0.01", "Nos": [2, 0, 1, 0]},
+            {"Componente": "R_Carga", "Tipo": "Resistor", "Valor": "100", "Nos": [2, 0]}
+        ]
+    },
+    "ccvs_teste": {
+        regime: { modo: 'DC' },
+        circuito: [
+            {"Componente": "V1", "Tipo": "VoltageSource", "Valor": "10", "Nos": [1, 0]},
+            {"Componente": "R1", "Tipo": "Resistor", "Valor": "5", "Nos": [1, 2]},
+            {"Componente": "H1", "Tipo": "CCVS", "Valor": "2", "Nos": [2, 0], "Alvo": "R1"}
+        ]
+    },
+    "cccs_bjt": {
+        regime: { modo: 'DC' },
+        circuito: [
+            {"Componente": "I_Base", "Tipo": "CurrentSource", "Valor": "1m", "Nos": [1, 0]},
+            {"Componente": "R_Base", "Tipo": "Resistor", "Valor": "1k", "Nos": [1, 0]},
+            {"Componente": "F_BJT", "Tipo": "CCCS", "Valor": "100", "Nos": [2, 0], "Alvo": "R_Base"},
+            {"Componente": "R_Col", "Tipo": "Resistor", "Valor": "10", "Nos": [2, 0]}
+        ]
+    },
+    "trafo_step_up": {
+        regime: { modo: 'AC', frequencia: '60' },
+        circuito: [
+            {"Componente": "V1", "Tipo": "VoltageSource", "Valor": "10", "Nos": [1, 0]},
+            {"Componente": "T1", "Tipo": "Transformer", "Valor": "1:2", "Nos": [1, 0, 2, 0]},
+            {"Componente": "R_Carga", "Tipo": "Resistor", "Valor": "100", "Nos": [2, 0]}
+        ]
+    }
 };
 
 /**
@@ -84,17 +126,88 @@ function carregarExemplo(chave) {
         return;
     }
 
-    if (!Object.prototype.hasOwnProperty.call(exemplos, ch)) return;
+    const entry = exemplos[ch];
+    if (!entry) return;
     const lista = document.getElementById('listaComponentes');
     if (!lista) return;
+
+    // Suporta tanto o schema novo {regime, circuito} quanto o antigo (array
+    // direto) — defensivo caso algum exemplo legado tenha sobrevivido.
+    const circuito = Array.isArray(entry) ? entry : entry.circuito;
+    const regime = Array.isArray(entry) ? null : entry.regime;
+
+    // FASE 7 — aplica o regime natural do exemplo ANTES de adicionar os
+    // componentes, para que as fontes nasçam com os inputs de AC já visíveis
+    // (e a fase configurada via campo "Fase" seja aceita pelo .val-input-fase).
+    if (regime) {
+        const toggleAc = document.getElementById('toggleModoAc');
+        if (toggleAc) {
+            const queroAc = regime.modo === 'AC';
+            if (toggleAc.checked !== queroAc) {
+                toggleAc.checked = queroAc;
+            }
+            sincronizarModoSimulacao();
+        }
+        if (regime.frequencia != null) {
+            const freqEl = document.getElementById('inputFrequenciaAc');
+            if (freqEl) freqEl.value = String(regime.frequencia);
+        }
+    }
 
     lista.innerHTML = '';
     idCounter = 1;
 
-    exemplos[ch].forEach(comp => {
+    circuito.forEach(comp => {
         add(comp.Tipo, comp.Componente, comp.Nos, comp.Valor, comp.Alvo);
+
+        // Fase de fontes AC já pré-configurada no exemplo.
+        if (comp.Fase != null && (comp.Tipo === 'VoltageSource' || comp.Tipo === 'CurrentSource')) {
+            const li = lista.lastElementChild;
+            if (li) {
+                const faseEl = li.querySelector('.val-input-fase');
+                if (faseEl) faseEl.value = String(comp.Fase);
+            }
+        }
     });
+
     _atualizarBotaoApagarExemplo();
+    if (regime) _mostrarToastRegime(regime);
+}
+
+/**
+ * FASE 7 — Toast efêmero informando o regime aplicado ao carregar um exemplo.
+ * Some sozinho em ~2.5s. Idempotente: substitui qualquer toast anterior.
+ *
+ * @param {{modo:string, frequencia?:string}} regime
+ */
+function _mostrarToastRegime(regime) {
+    if (!regime) return;
+    const msg = regime.modo === 'AC'
+        ? `Carregado em modo AC, ${regime.frequencia || '60'} Hz`
+        : 'Carregado em modo DC';
+
+    let toast = document.getElementById('regimeToast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'regimeToast';
+        toast.className = 'regime-toast';
+        toast.setAttribute('role', 'status');
+        toast.setAttribute('aria-live', 'polite');
+        document.body.appendChild(toast);
+    }
+    toast.textContent = msg;
+    toast.classList.remove('regime-toast--ac', 'regime-toast--dc');
+    toast.classList.add(regime.modo === 'AC' ? 'regime-toast--ac' : 'regime-toast--dc');
+
+    // Restart animation: força reflow para reiniciar o fade-out
+    toast.classList.remove('is-visible');
+    void toast.offsetWidth;
+    toast.classList.add('is-visible');
+
+    if (toast._timerId) clearTimeout(toast._timerId);
+    toast._timerId = setTimeout(() => {
+        toast.classList.remove('is-visible');
+    }, 2500);
 }
 
 /**

@@ -8,7 +8,7 @@
     <script>MathJax = {loader: {load: ['input/asciimath', 'output/chtml']}, asciimath: {delimiters: [['`','`']]}};</script>
     <script type="text/javascript" id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/startup.js"></script>
 
-    <link rel="stylesheet" href="styles.css?v=20260524-fase6-ux">
+    <link rel="stylesheet" href="styles.css?v=20260624-fase7-biblioteca">
 </head>
 <body>
 
@@ -196,17 +196,21 @@
             <div class="biblioteca-row">
                 <select class="example-select" id="exemplosSelect" onchange="carregarExemplo(this.value)">
                     <option value="">-- Carregar Exemplo --</option>
-                    <optgroup label="Exemplos nativos">
-                        <option value="divisor">1. Divisor de Tens&atilde;o</option>
-                        <option value="ponte">2. Ponte de Wheatstone</option>
-                        <option value="amp">3. Amplificador (VCVS)</option>
-                        <option value="misto">4. Malhas Complexas</option>
-                        <option value="capacitor_dc">5. Capacitor em DC (Bloqueio)</option>
-                        <option value="indutor_dc">6. Indutor em DC (Curto)</option>
-                        <option value="vccs_amp">7. Transcondut&acirc;ncia (VCCS)</option>
-                        <option value="ccvs_teste">8. Transresist&ecirc;ncia (CCVS)</option>
-                        <option value="cccs_bjt">9. Modelo Transistor (CCCS)</option>
-                        <option value="trafo_step_up">10. Trafo step-up 1:2 + carga</option>
+                    <optgroup label="Resistivos (DC ou AC)">
+                        <option value="divisor">Divisor de Tens&atilde;o (resistivo)</option>
+                        <option value="ponte">Ponte de Wheatstone</option>
+                        <option value="amp">Amplificador inversor (VCVS)</option>
+                        <option value="vccs_amp">Amplificador de transcondut&acirc;ncia (VCCS)</option>
+                        <option value="ccvs_teste">Amplificador de transresist&ecirc;ncia (CCVS)</option>
+                        <option value="cccs_bjt">Modelo de transistor (CCCS)</option>
+                    </optgroup>
+                    <optgroup label="Reativos (impedâncias L/C)">
+                        <option value="capacitor_dc">RC s&eacute;rie (bloqueio em DC, filtro em AC)</option>
+                        <option value="indutor_dc">RL s&eacute;rie (curto em DC, filtro em AC)</option>
+                    </optgroup>
+                    <optgroup label="An&aacute;lise AC (fases + frequência)">
+                        <option value="misto">Malhas com 2 fontes (AC)</option>
+                        <option value="trafo_step_up">Transformador step-up 1:2 com carga (AC)</option>
                     </optgroup>
                     <optgroup id="exemplosCustomGroup" label="Meus circuitos" hidden></optgroup>
                 </select>
@@ -345,6 +349,6 @@
         </form>
     </dialog>
 
-    <script src="script.js?v=20260524-fase6-ux"></script>
+    <script src="script.js?v=20260624-fase7-biblioteca"></script>
 </body>
 </html>

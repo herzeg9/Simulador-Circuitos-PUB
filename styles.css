@@ -2109,3 +2109,32 @@ button.btn-add-trafo {
 button.btn-add-trafo:hover {
     background: #7e510a !important;
 }
+
+/* ============================================================
+   FASE 7 — Toast de regime ao carregar exemplo
+   ============================================================ */
+.regime-toast {
+    position: fixed;
+    bottom: 26px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    padding: 11px 22px;
+    border-radius: 24px;
+    font-size: 0.92em;
+    font-weight: 600;
+    color: white;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.22);
+    z-index: 9999;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.22s ease, transform 0.22s ease;
+}
+.regime-toast.is-visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+.regime-toast--dc { background: #2980b9; }
+.regime-toast--ac { background: #16a085; }
+@media (prefers-reduced-motion: reduce) {
+    .regime-toast { transition: opacity 0.1s ease; }
+}
