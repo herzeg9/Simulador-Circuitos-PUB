@@ -2503,6 +2503,88 @@ function nodePositions(nonGroundNodes, shunts, chains) {
     return { pos, totalW };
 }
 
+/** Nós na malha principal (série entre fontes/cargas), excluindo ramos só de trafo. */
+function esqBackboneNodes(chains, series) {
+    const bb = new Set();
+    series.forEach(c => { bb.add(c.nA); bb.add(c.nB); });
+    (chains || []).forEach(ch => { bb.add(ch.leftNode); bb.add(ch.rightNode); });
+    return bb;
+}
+
+/**
+ * Nós que são extremo de enrolamento de trafo mas não estão na malha principal
+ * (ex.: nó 5 entre Pri− do T1 e R3→GND).
+ */
+function esqTrafoSatellites(trafos, series, backbone) {
+    const sat = new Set();
+    (trafos || []).forEach(t => {
+        [[t.nA, t.nB], [t.nC, t.nD]].forEach(([a, b]) => {
+            if (a === 0 || b === 0) return;
+            const aSeries = series.some(c => c.nA === a || c.nB === a);
+            const bSeries = series.some(c => c.nA === b || c.nB === b);
+            if (backbone.has(a) && !backbone.has(b) && !bSeries) sat.add(b);
+            if (backbone.has(b) && !backbone.has(a) && !aSeries) sat.add(a);
+        });
+    });
+    return sat;
+}
+
+/** Shunts em nó satélite de trafo — desenhados no ramo de retorno do enrolamento. */
+function esqTrafoReturnBranches(trafos, series, shunts, backbone, satellites) {
+    const returns = new Map();
+    satellites.forEach(n => {
+        if (series.some(c => c.nA === n || c.nB === n)) return;
+        const shuntsAt = shunts.filter(s => s.nodeUp === n);
+        if (!shuntsAt.length) return;
+        let partner = null;
+        (trafos || []).forEach(t => {
+            [[t.nA, t.nB], [t.nC, t.nD]].forEach(([a, b]) => {
+                if (a === n && b !== 0) partner = b;
+                if (b === n && a !== 0) partner = a;
+            });
+        });
+        if (partner != null && backbone.has(partner)) {
+            returns.set(n, { partner, shunts: shuntsAt });
+        }
+    });
+    return returns;
+}
+
+function esqAlignSatellites(trafos, backbone, nodeX, satellites) {
+    satellites.forEach(n => {
+        (trafos || []).forEach(t => {
+            [[t.nA, t.nB], [t.nC, t.nD]].forEach(([a, b]) => {
+                if (a === n && b !== 0 && backbone.has(b) && nodeX.has(b)) nodeX.set(n, nodeX.get(b));
+                if (b === n && a !== 0 && backbone.has(a) && nodeX.has(a)) nodeX.set(n, nodeX.get(a));
+            });
+        });
+    });
+}
+
+function esqTrafoBusRef(nA, nB, backbone, nodeX) {
+    if (nA !== 0 && backbone.has(nA) && nodeX.has(nA)) return nodeX.get(nA);
+    if (nB !== 0 && backbone.has(nB) && nodeX.has(nB)) return nodeX.get(nB);
+    if (nA !== 0 && nodeX.has(nA)) return nodeX.get(nA);
+    if (nB !== 0 && nodeX.has(nB)) return nodeX.get(nB);
+    return null;
+}
+
+function svgTrafoReturnBranch(xCoil, yBot, GND_Y, shunts) {
+    const parts = [];
+    const halfBody = ESQ.BODY / 2;
+    let yCur = yBot;
+    shunts.forEach(s => {
+        const midY = yCur + 28;
+        parts.push(`<line class="trafo-stub" x1="${xCoil}" y1="${yCur}" x2="${xCoil}" y2="${midY - halfBody}" stroke="var(--esq-wire)" stroke-width="2"/>`);
+        s._positiveOnA = s.positiveOnTop;
+        s._fromAtoB = s.positiveOnTop;
+        parts.push(drawSimbolo(s, xCoil, midY, 'V'));
+        yCur = midY + halfBody;
+    });
+    parts.push(`<line class="trafo-stub" x1="${xCoil}" y1="${yCur}" x2="${xCoil}" y2="${GND_Y}" stroke="var(--esq-wire)" stroke-width="2"/>`);
+    return parts.join('');
+}
+
 /* ---------- Símbolos IEEE ---------- */
 
 function textosSym(cx, cy, orient, label, valor, unit) {
@@ -2791,9 +2873,12 @@ function svgTrafoSymbol(xPri, xSec, yTop, yBot, trafo, opts = {}) {
 
 /**
  * Desenha trafos integrados no SVG principal; devolve SVG parcial e lista de fallback.
+ * @param {Map<number,{partner:number,shunts:Array}>} [returnBranches]
  */
-function drawTrafosInline(trafos, nodeX, NODE_Y, GND_Y) {
+function drawTrafosInline(trafos, nodeX, NODE_Y, GND_Y, backbone, returnBranches) {
     if (!trafos || !trafos.length) return { svg: '', fallback: [] };
+    const returns = returnBranches || new Map();
+    const bb = backbone || new Set();
 
     const inline = [];
     const fallback = [];
@@ -2803,8 +2888,10 @@ function drawTrafosInline(trafos, nodeX, NODE_Y, GND_Y) {
     });
 
     const parts = [];
+    const branchLabels = [];
     const total = inline.length;
     inline.forEach((t, idx) => {
+        const isReturn = (no) => returns.has(no);
         const ancA = trafoAnchorNo(t.nA, t.nB, nodeX, NODE_Y, GND_Y);
         const ancB = trafoAnchorNo(t.nB, t.nA, nodeX, NODE_Y, GND_Y);
         const ancC = trafoAnchorNo(t.nC, t.nD, nodeX, NODE_Y, GND_Y);
@@ -2814,8 +2901,12 @@ function drawTrafosInline(trafos, nodeX, NODE_Y, GND_Y) {
             return;
         }
 
-        const xPriRef = t.nA !== 0 ? ancA.x : ancB.x;
-        const xSecRef = t.nC !== 0 ? ancC.x : ancD.x;
+        const xPriRef = esqTrafoBusRef(t.nA, t.nB, bb, nodeX);
+        const xSecRef = esqTrafoBusRef(t.nC, t.nD, bb, nodeX);
+        if (xPriRef == null || xSecRef == null) {
+            fallback.push(t);
+            return;
+        }
         const { yTop, yBot } = trafoBandY(NODE_Y, GND_Y, idx, total);
 
         const xLo = Math.min(xPriRef, xSecRef);
@@ -2827,7 +2918,8 @@ function drawTrafosInline(trafos, nodeX, NODE_Y, GND_Y) {
         const xCoilPri = priLeft ? xMid - gap / 2 : xMid + gap / 2;
         const xCoilSec = priLeft ? xMid + gap / 2 : xMid - gap / 2;
 
-        const routeTo = (anc, xCoil, coilY) => {
+        const routeTo = (anc, xCoil, coilY, skip) => {
+            if (skip) return '';
             if (Math.abs(coilY - yTop) < 1) {
                 return svgTrafoRouteToCoilTop(anc.x, anc.y, xCoil, yTop);
             }
@@ -2835,15 +2927,22 @@ function drawTrafosInline(trafos, nodeX, NODE_Y, GND_Y) {
         };
 
         parts.push(`<g class="esq-trafo-wires" data-nome="${escapeXml(t.nome)}">`);
-        parts.push(routeTo(ancA, xCoilPri, yTop));
-        parts.push(routeTo(ancB, xCoilPri, yBot));
-        parts.push(routeTo(ancC, xCoilSec, yTop));
-        parts.push(routeTo(ancD, xCoilSec, yBot));
+        parts.push(routeTo(ancA, xCoilPri, yTop, isReturn(t.nA)));
+        parts.push(routeTo(ancB, xCoilPri, yBot, isReturn(t.nB)));
+        parts.push(routeTo(ancC, xCoilSec, yTop, isReturn(t.nC)));
+        parts.push(routeTo(ancD, xCoilSec, yBot, isReturn(t.nD)));
         parts.push('</g>');
         parts.push(svgTrafoSymbol(xCoilPri, xCoilSec, yTop, yBot, t, { compact: true }));
+
+        [[t.nA, xCoilPri], [t.nB, xCoilPri], [t.nC, xCoilSec], [t.nD, xCoilSec]].forEach(([no, xCoil]) => {
+            if (!isReturn(no)) return;
+            const rb = returns.get(no);
+            parts.push(svgTrafoReturnBranch(xCoil, yBot, GND_Y, rb.shunts));
+            branchLabels.push(`<text x="${xCoil + 18}" y="${yBot + 22}" class="esq-label--node esq-label--branch">${no}</text>`);
+        });
     });
 
-    return { svg: parts.join(''), fallback };
+    return { svg: parts.join('') + branchLabels.join(''), fallback };
 }
 
 /**
@@ -2875,7 +2974,15 @@ function renderEsquematico() {
     assignSeriesRows(chains);
     assignShuntLanes(shunts);
 
-    const { pos: nodeX, totalW } = nodePositions(visibleNodes, shunts, chains);
+    const backbone = esqBackboneNodes(chains, series);
+    const satellites = esqTrafoSatellites(trafos, series, backbone);
+    const returnBranches = esqTrafoReturnBranches(trafos, series, shunts, backbone, satellites);
+    const shuntsInTrafoReturn = new Set();
+    returnBranches.forEach(rb => rb.shunts.forEach(s => shuntsInTrafoReturn.add(s)));
+
+    const layoutNodes = visibleNodes.filter(n => !satellites.has(n));
+    const { pos: nodeX, totalW } = nodePositions(layoutNodes, shunts, chains);
+    esqAlignSatellites(trafos, backbone, nodeX, satellites);
 
     const maxRow = chains.reduce((m, s) => Math.max(m, s._row), -1);
     const topAboveNodes = (maxRow + 1) * ESQ.SERIES_ROW_H + 40;
@@ -2927,7 +3034,7 @@ function renderEsquematico() {
         parts.push(`<line x1="${lastEndX}" y1="${y}" x2="${xR}" y2="${y}" stroke="var(--esq-wire)" stroke-width="2"/>`);
     });
 
-    shunts.forEach(s => {
+    shunts.filter(s => !shuntsInTrafoReturn.has(s)).forEach(s => {
         const xN = nodeX.get(s.nodeUp);
         const laneX = xN + s._lane * ESQ.LANE_W;
         if (Math.abs(laneX - xN) > 0.5) {
@@ -2942,10 +3049,10 @@ function renderEsquematico() {
         parts.push(drawSimbolo(s, laneX, midY, 'V'));
     });
 
-    const { svg: trafoSvg, fallback: trafosFallback } = drawTrafosInline(trafos, nodeX, NODE_Y, GND_Y);
+    const { svg: trafoSvg, fallback: trafosFallback } = drawTrafosInline(trafos, nodeX, NODE_Y, GND_Y, backbone, returnBranches);
     if (trafoSvg) parts.push(trafoSvg);
 
-    visibleNodes.forEach(n => {
+    visibleNodes.filter(n => !satellites.has(n)).forEach(n => {
         const x = nodeX.get(n);
         if (x == null) return;
         parts.push(`<circle cx="${x}" cy="${NODE_Y}" r="${ESQ.NODE_R}" fill="var(--esq-node-fill)" stroke="var(--esq-node-stroke)" stroke-width="2"/>`);

@@ -1532,6 +1532,12 @@ body.dark-mode .trafo-info strong { color: #c39bd3; }
     text-anchor: middle;
     dominant-baseline: central;
 }
+.esq-label--branch {
+    font-size: 10px;
+    fill: var(--esq-node-stroke);
+    text-anchor: start;
+    dominant-baseline: central;
+}
 .esq-label--ctrl {
     font-family: 'Segoe UI', Roboto, sans-serif;
     font-weight: 600;
