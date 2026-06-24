@@ -1073,6 +1073,131 @@ function _ondaTemporalSamples(mod, faseDeg, f, conv, nPts = 200) {
 }
 
 /**
+ * Chave estável de uma curva de onda temporal.
+ * @param {{tipo:string, local:string}} o
+ * @returns {string}
+ */
+function _ondaKey(o) {
+    return `${o.tipo}|${o.local}`;
+}
+
+/**
+ * Máxima amplitude entre ondas visíveis de um painel.
+ * @param {Array<{mod:number, tipo:string, local:string}>} fasores
+ * @param {Object<string, boolean>} togglesSalvos
+ * @returns {?number}
+ */
+function _ondaYMaxVisivel(fasores, togglesSalvos) {
+    let max = 0;
+    let any = false;
+    fasores.forEach(o => {
+        if (togglesSalvos[_ondaKey(o)] === false) return;
+        any = true;
+        if (o.mod > max) max = o.mod;
+    });
+    return any && max > 0 ? max : null;
+}
+
+/**
+ * Monta o SVG de um painel (só tensões ou só correntes) com escala própria.
+ *
+ * @param {Array<{mod:number, faseUsr:number, local:string, unidade:string, tipo:string}>} fasores
+ * @param {object} opts
+ * @returns {{ html: string, vazio: boolean }}
+ */
+function _buildOndaPanelSvg(fasores, opts) {
+    const { f, conv, togglesSalvos, cor, W = 720, H = 190 } = opts;
+    const vMax = _ondaYMaxVisivel(fasores, togglesSalvos);
+    if (!vMax) return { html: '', vazio: true };
+
+    const padL = 50, padR = 14, padT = 18, padB = 30;
+    const innerW = W - padL - padR;
+    const innerH = H - padT - padB;
+    const T = 1 / f;
+    const tMax = 2 * T;
+    const xScale = (t) => padL + (t / tMax) * innerW;
+    const yScale = (v) => padT + innerH / 2 - (v / vMax) * (innerH / 2 - 4);
+
+    const eixos = `
+        <line x1="${padL}" y1="${padT + innerH / 2}" x2="${padL + innerW}" y2="${padT + innerH / 2}" stroke="var(--z-axis, #bdc3c7)" stroke-width="1"/>
+        <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT + innerH}" stroke="var(--z-axis, #bdc3c7)" stroke-width="1"/>`;
+
+    const gridT = [0, 0.5, 1, 1.5, 2].map(k => {
+        const t = k * T;
+        const x = xScale(t);
+        const lbl = k === 0 ? '0' : (k === 1 ? 'T' : (k === 2 ? '2T' : (k === 0.5 ? 'T/2' : '3T/2')));
+        return `
+            <line x1="${x}" y1="${padT}" x2="${x}" y2="${padT + innerH}" stroke="var(--z-axis, #bdc3c7)" stroke-width="0.5" stroke-dasharray="2 4"/>
+            <text x="${x}" y="${padT + innerH + 14}" text-anchor="middle" font-size="10" fill="var(--text-secondary, #7f8c8d)">${lbl}</text>`;
+    }).join('');
+
+    const dashByIdx = (idx) => idx === 0 ? '' : (idx % 3 === 1 ? '6 4' : (idx % 3 === 2 ? '2 3' : '8 2 2 2'));
+    const paths = fasores.map((o, i) => {
+        const pts = _ondaTemporalSamples(o.mod, o.faseUsr, f, conv, 240);
+        const d = pts.map((p, k) => (k === 0 ? 'M ' : 'L ') + xScale(p.t).toFixed(2) + ',' + yScale(p.v).toFixed(2)).join(' ');
+        const dash = dashByIdx(i);
+        const key = _ondaKey(o);
+        const escondido = togglesSalvos[key] === false;
+        return `<path class="onda-path${escondido ? ' onda-hidden' : ''}" data-onda-key="${escapeXml(key)}" d="${d}" fill="none" stroke="${cor}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" ${dash ? `stroke-dasharray="${dash}"` : ''} opacity="0.92"/>`;
+    }).join('');
+
+    const yLabels = [vMax, vMax / 2, 0, -vMax / 2, -vMax].map(v => {
+        const y = yScale(v);
+        const { mantissa, prefix } = formatMagnitudeEng(Math.abs(v));
+        const txt = v === 0 ? '0' : `${v < 0 ? '−' : ''}${mantissa}${prefix ? ' ' + prefix : ''}`;
+        return `<text x="${padL - 6}" y="${y + 3}" text-anchor="end" font-size="9" fill="var(--text-secondary, #7f8c8d)">${txt}</text>`;
+    }).join('');
+
+    return {
+        html: `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" preserveAspectRatio="xMidYMid meet">${eixos}${gridT}${yLabels}${paths}</svg>`,
+        vazio: false
+    };
+}
+
+/**
+ * Redesenha os painéis V/I com escala baseada apenas nas ondas visíveis.
+ * @param {HTMLElement} card
+ */
+function _reflowOndasCard(card) {
+    const st = card._ondaState;
+    if (!st) return;
+    const toggles = _carregarOndaToggles();
+    const paineis = [
+        { tipo: 'V', titulo: 'Tensões', cor: '#e74c3c', vazio: 'Nenhuma tensão selecionada.' },
+        { tipo: 'I', titulo: 'Correntes', cor: '#27ae60', vazio: 'Nenhuma corrente selecionada.' }
+    ];
+
+    paineis.forEach(({ tipo, titulo, cor, vazio }) => {
+        const painel = card.querySelector(`[data-onda-painel="${tipo}"]`);
+        if (!painel) return;
+        const wrap = painel.querySelector('.onda-svg-wrap');
+        const fasTipo = st.fasores.filter(o => o.tipo === tipo);
+        if (!fasTipo.length) {
+            painel.classList.add('onda-painel--vazio');
+            if (wrap) wrap.innerHTML = '';
+            return;
+        }
+        const built = _buildOndaPanelSvg(fasTipo, {
+            f: st.f,
+            conv: st.conv,
+            togglesSalvos: toggles,
+            cor,
+            W: st.W,
+            H: st.H
+        });
+        if (built.vazio) {
+            painel.classList.add('onda-painel--vazio');
+            if (wrap) wrap.innerHTML = `<p class="onda-painel-vazio">${vazio}</p>`;
+        } else {
+            painel.classList.remove('onda-painel--vazio');
+            if (wrap) wrap.innerHTML = built.html;
+        }
+        const tituloEl = painel.querySelector('.onda-painel-titulo');
+        if (tituloEl) tituloEl.textContent = titulo;
+    });
+}
+
+/**
  * Renderiza o card "Ondas no tempo V(t), I(t)" na aba Resultados.
  * Recebe os resultados (já com a fase NA convenção do usuário) e
  * desenha um SVG com cada onda sobreposta, cores separando V e I.
@@ -1106,58 +1231,12 @@ function renderOndasTemporais(resultados, container) {
     });
     if (!fasores.length) return;
 
-    const W = 720, H = 220;
-    const padL = 50, padR = 14, padT = 22, padB = 36;
-    const innerW = W - padL - padR;
-    const innerH = H - padT - padB;
+    const W = 720, H = 190;
+    const togglesSalvos = _carregarOndaToggles();
     const T = 1 / f;
-    const tMax = 2 * T;
-
-    const vMax = Math.max(...fasores.map(o => o.mod));
-    const xScale = (t) => padL + (t / tMax) * innerW;
-    const yScale = (v) => padT + innerH / 2 - (v / vMax) * (innerH / 2 - 4);
-
-    const eixos = `
-        <line x1="${padL}" y1="${padT + innerH / 2}" x2="${padL + innerW}" y2="${padT + innerH / 2}" stroke="var(--z-axis, #bdc3c7)" stroke-width="1"/>
-        <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT + innerH}" stroke="var(--z-axis, #bdc3c7)" stroke-width="1"/>`;
-
-    const gridT = [0, 0.5, 1, 1.5, 2].map(k => {
-        const t = k * T;
-        const x = xScale(t);
-        const lbl = k === 0 ? '0' : (k === 1 ? 'T' : (k === 2 ? '2T' : (k === 0.5 ? 'T/2' : '3T/2')));
-        return `
-            <line x1="${x}" y1="${padT}" x2="${x}" y2="${padT + innerH}" stroke="var(--z-axis, #bdc3c7)" stroke-width="0.5" stroke-dasharray="2 4"/>
-            <text x="${x}" y="${padT + innerH + 14}" text-anchor="middle" font-size="10" fill="var(--text-secondary, #7f8c8d)">${lbl}</text>`;
-    }).join('');
 
     const corV = '#e74c3c';
     const corI = '#27ae60';
-    const colorsByTipo = (tipo) => tipo === 'V' ? corV : corI;
-    const dashByIdx = (idx) => idx === 0 ? '' : (idx % 3 === 1 ? '6 4' : (idx % 3 === 2 ? '2 3' : '8 2 2 2'));
-
-    // Chave estável por curva — sobrevive a reanálises do mesmo circuito
-    // e permite persistir as escolhas do usuário em localStorage.
-    const ondaKey = (o) => `${o.tipo}|${o.local}`;
-    const togglesSalvos = _carregarOndaToggles();
-
-    const idxByTipo = { V: 0, I: 0 };
-    const paths = fasores.map(o => {
-        const i = idxByTipo[o.tipo]++;
-        const pts = _ondaTemporalSamples(o.mod, o.faseUsr, f, conv, 240);
-        const d = pts.map((p, k) => (k === 0 ? 'M ' : 'L ') + xScale(p.t).toFixed(2) + ',' + yScale(p.v).toFixed(2)).join(' ');
-        const color = colorsByTipo(o.tipo);
-        const dash = dashByIdx(i);
-        const key = ondaKey(o);
-        const escondido = togglesSalvos[key] === false;
-        return `<path class="onda-path${escondido ? ' onda-hidden' : ''}" data-onda-key="${escapeXml(key)}" d="${d}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" ${dash ? `stroke-dasharray="${dash}"` : ''} opacity="0.92"/>`;
-    }).join('');
-
-    const yLabels = [vMax, vMax / 2, 0, -vMax / 2, -vMax].map(v => {
-        const y = yScale(v);
-        const { mantissa, prefix } = formatMagnitudeEng(Math.abs(v));
-        const txt = v === 0 ? '0' : `${v < 0 ? '−' : ''}${mantissa}${prefix ? ' ' + prefix : ''}`;
-        return `<text x="${padL - 6}" y="${y + 3}" text-anchor="end" font-size="9" fill="var(--text-secondary, #7f8c8d)">${txt}</text>`;
-    }).join('');
 
     const titulo = conv === 'sen' ? `V(t) = A·sen(ωt + φ)` : `V(t) = A·cos(ωt + φ)`;
     const subtitulo = `ω = 2π·${f} ≈ ${(2 * Math.PI * f).toPrecision(4)} rad/s &nbsp;·&nbsp; T = 1/f ≈ ${(1000 * T).toPrecision(3)} ms`;
@@ -1166,7 +1245,7 @@ function renderOndasTemporais(resultados, container) {
         const { mantissa, prefix } = formatMagnitudeEng(o.mod);
         const fase = formatFaseLimpa(o.faseUsr);
         const trig = conv === 'sen' ? 'sen' : 'cos';
-        const key = ondaKey(o);
+        const key = _ondaKey(o);
         const checked = togglesSalvos[key] !== false;
         return `<label class="onda-legend-item" data-onda-key="${escapeXml(key)}" data-onda-tipo="${o.tipo}">
             <input type="checkbox" class="onda-toggle" ${checked ? 'checked' : ''} aria-label="Mostrar/ocultar ${escapeXml(o.local)}"/>
@@ -1183,6 +1262,7 @@ function renderOndasTemporais(resultados, container) {
     card.innerHTML = `
         <h3 class="section-title">6. Ondas no tempo</h3>
         <p class="onda-subtitulo">${titulo} &nbsp;·&nbsp; ${subtitulo}</p>
+        <p class="onda-escala-nota">Tensões e correntes usam <strong>escalas independentes</strong> (painéis separados), pois magnitudes em V e A não são comparáveis no mesmo eixo.</p>
         <div class="onda-controles">
             <span class="onda-controles-label">Mostrar:</span>
             <button type="button" class="onda-controle-btn" data-onda-acao="todas">Todas</button>
@@ -1190,18 +1270,25 @@ function renderOndasTemporais(resultados, container) {
             <button type="button" class="onda-controle-btn" data-onda-acao="so-i">Só Correntes</button>
             <button type="button" class="onda-controle-btn" data-onda-acao="nenhuma">Nenhuma</button>
         </div>
-        <div class="onda-svg-wrap">
-            <svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" preserveAspectRatio="xMidYMid meet">
-                ${eixos}${gridT}${yLabels}${paths}
-            </svg>
+        <div class="onda-paineis">
+            <div class="onda-painel" data-onda-painel="V">
+                <div class="onda-painel-titulo" style="color:${corV}">Tensões</div>
+                <div class="onda-svg-wrap"></div>
+            </div>
+            <div class="onda-painel" data-onda-painel="I">
+                <div class="onda-painel-titulo" style="color:${corI}">Correntes</div>
+                <div class="onda-svg-wrap"></div>
+            </div>
         </div>
         <div class="onda-legenda-grid">
             ${legV ? `<div class="onda-legenda-col"><div class="onda-legenda-titulo" style="color:${corV}">Tensões</div>${legV}</div>` : ''}
             ${legI ? `<div class="onda-legenda-col"><div class="onda-legenda-titulo" style="color:${corI}">Correntes</div>${legI}</div>` : ''}
         </div>
-        <p class="onda-nota">Clique nos itens da legenda para mostrar/esconder cada onda — sua escolha é lembrada na próxima análise. As ondas cobrem dois períodos completos (0 a 2T).</p>
+        <p class="onda-nota">Clique nos itens da legenda para mostrar/esconder cada onda — sua escolha é lembrada na próxima análise. O eixo Y de cada painel ajusta-se às ondas visíveis. As ondas cobrem dois períodos completos (0 a 2T).</p>
     `;
+    card._ondaState = { fasores, f, conv, W, H };
     container.appendChild(card);
+    _reflowOndasCard(card);
     _setupOndaTogglesInteratividade(card);
 }
 
@@ -1248,9 +1335,7 @@ function _salvarOndaToggles(mapa) {
 function _setupOndaTogglesInteratividade(card) {
     if (!card) return;
 
-    const aplicar = (key, visivel) => {
-        const path = card.querySelector(`path.onda-path[data-onda-key="${CSS.escape(key)}"]`);
-        if (path) path.classList.toggle('onda-hidden', !visivel);
+    const atualizarLegenda = (key, visivel) => {
         const item = card.querySelector(`label.onda-legend-item[data-onda-key="${CSS.escape(key)}"]`);
         if (item) item.classList.toggle('is-off', !visivel);
     };
@@ -1259,6 +1344,7 @@ function _setupOndaTogglesInteratividade(card) {
         if (visivel) delete mapa[key];
         else mapa[key] = false;
         _salvarOndaToggles(mapa);
+        _reflowOndasCard(card);
     };
 
     card.querySelectorAll('label.onda-legend-item').forEach(item => {
@@ -1267,7 +1353,7 @@ function _setupOndaTogglesInteratividade(card) {
         if (!cb) return;
         if (!cb.checked) item.classList.add('is-off');
         cb.addEventListener('change', () => {
-            aplicar(key, cb.checked);
+            atualizarLegenda(key, cb.checked);
             persistir(key, cb.checked);
         });
     });
@@ -1275,6 +1361,7 @@ function _setupOndaTogglesInteratividade(card) {
     card.querySelectorAll('button.onda-controle-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const acao = btn.dataset.ondaAcao;
+            const mapa = _carregarOndaToggles();
             card.querySelectorAll('label.onda-legend-item').forEach(item => {
                 const tipo = item.dataset.ondaTipo;
                 const cb = item.querySelector('input.onda-toggle');
@@ -1286,9 +1373,13 @@ function _setupOndaTogglesInteratividade(card) {
                 else if (acao === 'so-i') novo = (tipo === 'I');
                 if (cb.checked === novo) return;
                 cb.checked = novo;
-                aplicar(item.dataset.ondaKey, novo);
-                persistir(item.dataset.ondaKey, novo);
+                atualizarLegenda(item.dataset.ondaKey, novo);
+                const key = item.dataset.ondaKey;
+                if (novo) delete mapa[key];
+                else mapa[key] = false;
             });
+            _salvarOndaToggles(mapa);
+            _reflowOndasCard(card);
         });
     });
 }
