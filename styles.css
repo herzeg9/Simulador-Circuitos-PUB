@@ -815,6 +815,71 @@ body.dark-mode .type-Inductor .comp-badge {
     color: #fff;
 }
 
+/* Transformador ideal — card Pri (bronze) / Sec (teal) */
+.type-Transformer {
+    position: relative;
+    border-left: none;
+    background: linear-gradient(
+        90deg,
+        rgba(156, 100, 12, 0.14) 0%,
+        rgba(156, 100, 12, 0.14) 48%,
+        rgba(22, 160, 133, 0.14) 52%,
+        rgba(22, 160, 133, 0.14) 100%
+    );
+}
+.type-Transformer::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 5px;
+    border-radius: 4px 0 0 4px;
+    background: linear-gradient(to bottom, #9c640c 50%, #16a085 50%);
+}
+.type-Transformer .comp-badge {
+    background: linear-gradient(135deg, #9c640c 0%, #9c640c 48%, #16a085 52%, #16a085 100%);
+    color: #fff;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.25);
+}
+.type-Transformer .trafo-comp-label {
+    font-size: 0.68em;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    margin-left: 4px;
+}
+.type-Transformer .trafo-comp-label--pri { color: #9c640c; }
+.type-Transformer .trafo-comp-label--sec { color: #16a085; }
+.type-Transformer .trafo-comp-no--pri:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(156, 100, 12, 0.35);
+}
+.type-Transformer .trafo-comp-no--sec:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(22, 160, 133, 0.35);
+}
+
+body.dark-mode .type-Transformer {
+    background: linear-gradient(
+        90deg,
+        rgba(240, 180, 41, 0.12) 0%,
+        rgba(240, 180, 41, 0.12) 48%,
+        rgba(118, 215, 196, 0.12) 52%,
+        rgba(118, 215, 196, 0.12) 100%
+    );
+}
+body.dark-mode .type-Transformer::before {
+    background: linear-gradient(to bottom, #f0b429 50%, #76d7c4 50%);
+}
+body.dark-mode .type-Transformer .comp-badge {
+    background: linear-gradient(135deg, #f0b429 0%, #f0b429 48%, #76d7c4 52%, #76d7c4 100%);
+    color: #1a1d24;
+    text-shadow: none;
+}
+body.dark-mode .type-Transformer .trafo-comp-label--pri { color: #f0b429; }
+body.dark-mode .type-Transformer .trafo-comp-label--sec { color: #76d7c4; }
+
 /* Resultados */
 .card { 
     background: var(--bg-card); 

@@ -1,0 +1,4 @@
+*.tmp.png
+*.received.png
+*.diff.png
+*.received.svg

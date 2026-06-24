@@ -2,6 +2,14 @@
   "name": "simulador-circuitos-pub",
   "private": true,
   "scripts": {
-    "test:esquematico": "node tests/esquematico-audit.mjs"
+    "test:esquematico": "node tests/esquematico-audit.mjs",
+    "test:svg": "node tests/svg-snapshot.mjs",
+    "test:visual": "node tests/visual-esquematico.mjs",
+    "test": "npm run test:esquematico && npm run test:svg && npm run test:visual"
+  },
+  "devDependencies": {
+    "pixelmatch": "^6.0.0",
+    "pngjs": "^7.0.0",
+    "puppeteer": "^24.0.0"
   }
 }

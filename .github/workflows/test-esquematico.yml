@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      update_snapshots:
+        description: 'Atualizar PNGs de referência (regressão visual)'
+        type: boolean
+        default: false
 
 jobs:
   audit:
@@ -19,6 +24,19 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: npm
 
-      - name: Rodar auditoria do esquemático
+      - name: Instalar dependências
+        run: npm install
+
+      - name: Auditoria estrutural
         run: npm run test:esquematico
+
+      - name: Snapshots SVG
+        run: npm run test:svg
+
+      - name: Regressão visual (screenshots PNG)
+        run: npm run test:visual
+        env:
+          CI: 'true'
+          UPDATE_SNAPSHOTS: ${{ github.event_name == 'workflow_dispatch' && inputs.update_snapshots && '1' || '' }}

@@ -611,12 +611,12 @@ function add(tipo, nomeFixo=null, nosInput=null, val=null, alvo=null) {
         valLabel = 'Razão N1/N2';
         if (nC === 1 && nD === 0) { nC = 2; nD = 0; }
         inputsNos = `
-        <span style="font-size:0.7em; color:#16a085;">Pri:</span>
-        <input type="number" class="no-a" value="${nA}" min="0" style="width:30px" placeholder="+">
-        <input type="number" class="no-b" value="${nB}" min="0" style="width:30px" placeholder="-">
-        <span style="font-size:0.7em; color:#16a085;">Sec:</span>
-        <input type="number" class="no-c" value="${nC}" min="0" style="width:30px" placeholder="+">
-        <input type="number" class="no-d" value="${nD}" min="0" style="width:30px" placeholder="-">`;
+        <span class="trafo-comp-label trafo-comp-label--pri">Pri</span>
+        <input type="number" class="no-a trafo-comp-no trafo-comp-no--pri" value="${nA}" min="0" style="width:30px" placeholder="+">
+        <input type="number" class="no-b trafo-comp-no trafo-comp-no--pri" value="${nB}" min="0" style="width:30px" placeholder="-">
+        <span class="trafo-comp-label trafo-comp-label--sec">Sec</span>
+        <input type="number" class="no-c trafo-comp-no trafo-comp-no--sec" value="${nC}" min="0" style="width:30px" placeholder="+">
+        <input type="number" class="no-d trafo-comp-no trafo-comp-no--sec" value="${nD}" min="0" style="width:30px" placeholder="-">`;
     }
 
     const defVal = defaultValPorTipo(tipo, val);
@@ -2829,6 +2829,34 @@ function trafoReturnReserve(trafo, returns) {
     return maxShunts * (ESQ.BODY + 18) + 14;
 }
 
+/** Atribui faixas horizontais quando vários trafos compartilham a mesma região x. */
+function layoutTrafosInline(inline, nodeX, bb) {
+    const layouts = inline.map(t => {
+        const xPriRef = esqTrafoBusRef(t.nA, t.nB, bb, nodeX);
+        const xSecRef = esqTrafoBusRef(t.nC, t.nD, bb, nodeX);
+        return {
+            trafo: t,
+            xPriRef,
+            xSecRef,
+            xLo: Math.min(xPriRef, xSecRef),
+            xHi: Math.max(xPriRef, xSecRef),
+            lane: 0
+        };
+    });
+
+    layouts.forEach((lay, i) => {
+        let lane = 0;
+        const pad = 24;
+        while (layouts.some((o, j) => j < i && o.lane === lane
+            && !(o.xHi + pad < lay.xLo || lay.xHi + pad < o.xLo))) {
+            lane++;
+        }
+        lay.lane = lane;
+    });
+
+    return layouts;
+}
+
 function svgTrafoRouteToCoilTop(xBus, yBus, xCoil, yTop) {
     if (Math.abs(xBus - xCoil) < 0.5) {
         return `<line class="trafo-stub" x1="${xBus}" y1="${yBus}" x2="${xCoil}" y2="${yTop}"/>`;
@@ -2906,8 +2934,13 @@ function drawTrafosInline(trafos, nodeX, NODE_Y, GND_Y, backbone, returnBranches
 
     const parts = [];
     const branchLabels = [];
-    const total = inline.length;
-    inline.forEach((t, idx) => {
+    const trafoLayouts = layoutTrafosInline(inline, nodeX, bb);
+    const total = trafoLayouts.length;
+    const maxLane = Math.max(0, ...trafoLayouts.map(l => l.lane));
+    const laneShiftX = 34;
+
+    trafoLayouts.forEach((lay, idx) => {
+        const t = lay.trafo;
         const isReturn = (no) => returns.has(no);
         const ancA = trafoAnchorNo(t.nA, t.nB, nodeX, NODE_Y, GND_Y);
         const ancB = trafoAnchorNo(t.nB, t.nA, nodeX, NODE_Y, GND_Y);
@@ -2918,8 +2951,8 @@ function drawTrafosInline(trafos, nodeX, NODE_Y, GND_Y, backbone, returnBranches
             return;
         }
 
-        const xPriRef = esqTrafoBusRef(t.nA, t.nB, bb, nodeX);
-        const xSecRef = esqTrafoBusRef(t.nC, t.nD, bb, nodeX);
+        const xPriRef = lay.xPriRef;
+        const xSecRef = lay.xSecRef;
         if (xPriRef == null || xSecRef == null) {
             fallback.push(t);
             return;
@@ -2927,14 +2960,15 @@ function drawTrafosInline(trafos, nodeX, NODE_Y, GND_Y, backbone, returnBranches
         const reserveBelow = trafoReturnReserve(t, returns);
         const { yTop, yBot } = trafoBandY(NODE_Y, GND_Y, idx, total, reserveBelow);
 
+        const xShift = (lay.lane - maxLane / 2) * laneShiftX;
         const xLo = Math.min(xPriRef, xSecRef);
         const xHi = Math.max(xPriRef, xSecRef);
         const span = Math.max(xHi - xLo, 40);
         const gap = Math.max(56, span * 0.38);
-        const xMid = (xLo + xHi) / 2;
+        const xMid = (xLo + xHi) / 2 + xShift;
         const priLeft = xPriRef <= xSecRef;
-        const xCoilPri = priLeft ? xMid - gap / 2 : xMid + gap / 2;
-        const xCoilSec = priLeft ? xMid + gap / 2 : xMid - gap / 2;
+        const xCoilPri = (priLeft ? xMid - gap / 2 : xMid + gap / 2);
+        const xCoilSec = (priLeft ? xMid + gap / 2 : xMid - gap / 2);
 
         const routeTo = (anc, xCoil, coilY, skip) => {
             if (skip) return '';
@@ -2962,6 +2996,17 @@ function drawTrafosInline(trafos, nodeX, NODE_Y, GND_Y, backbone, returnBranches
     });
 
     return { svg: parts.join('') + branchLabels.join(''), fallback };
+}
+
+function setupAjudaConvencoes() {
+    const el = document.getElementById('ajudaConvencoesBasicas');
+    if (!el) return;
+    try {
+        if (localStorage.getItem('simAjudaConvencoesOpen') === '1') el.open = true;
+        el.addEventListener('toggle', () => {
+            localStorage.setItem('simAjudaConvencoesOpen', el.open ? '1' : '0');
+        });
+    } catch (_) { /* ignore */ }
 }
 
 /**
@@ -4449,6 +4494,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     setupOutputTabs();
+    setupAjudaConvencoes();
     setupEsquematicoLive();
     setupDialogoRelacionar();
     setupAtalhosTeclado();
