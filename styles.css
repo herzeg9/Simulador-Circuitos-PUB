@@ -2232,6 +2232,111 @@ body.dark-mode .esq-export-btn:hover {
 .card-mna .section-title { color: #a93256; }
 body.dark-mode .card-mna .section-title { color: #e8b4be; }
 
+.mna-intro {
+    margin: 0 0 16px;
+    font-size: 0.9em;
+    line-height: 1.55;
+    color: var(--text-secondary);
+}
+.mna-intro code {
+    background: rgba(123, 31, 58, 0.08);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 0.92em;
+}
+body.dark-mode .mna-intro code { background: rgba(232, 180, 190, 0.1); }
+
+.mna-secao { margin-top: 18px; }
+.mna-secao:first-of-type { margin-top: 4px; }
+.mna-secao-titulo {
+    margin: 0 0 6px;
+    font-size: 0.95em;
+    font-weight: 700;
+    color: #7b1f3a;
+    letter-spacing: 0.01em;
+}
+body.dark-mode .mna-secao-titulo { color: #e8b4be; }
+.mna-secao-hint {
+    margin: 0 0 12px;
+    font-size: 0.82em;
+    color: var(--text-secondary);
+    font-style: italic;
+    line-height: 1.45;
+}
+
+.mna-no-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 10px;
+}
+.mna-no-bloco,
+.mna-comp-bloco {
+    background: rgba(123, 31, 58, 0.04);
+    border: 1px solid rgba(123, 31, 58, 0.14);
+    border-radius: 8px;
+    padding: 10px 12px;
+}
+body.dark-mode .mna-no-bloco,
+body.dark-mode .mna-comp-bloco {
+    background: rgba(232, 180, 190, 0.05);
+    border-color: rgba(232, 180, 190, 0.14);
+}
+.mna-no-cabecalho,
+.mna-comp-cabecalho {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+.mna-no-badge,
+.mna-comp-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 0.78em;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    background: #7b1f3a;
+    color: #fff;
+}
+body.dark-mode .mna-no-badge,
+body.dark-mode .mna-comp-badge {
+    background: #a93256;
+    color: #fff;
+}
+.mna-no-legenda,
+.mna-comp-meta {
+    font-size: 0.78em;
+    color: var(--text-secondary);
+}
+.mna-no-legenda code {
+    background: rgba(0, 0, 0, 0.06);
+    padding: 0 5px;
+    border-radius: 3px;
+    font-size: 0.95em;
+}
+body.dark-mode .mna-no-legenda code { background: rgba(255, 255, 255, 0.08); }
+
+.mna-comp-lista {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.mna-formula {
+    margin: 0;
+    font-size: 0.95em;
+}
+.mna-comp-bloco .mna-formula + .mna-formula {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px dashed rgba(123, 31, 58, 0.18);
+}
+body.dark-mode .mna-comp-bloco .mna-formula + .mna-formula {
+    border-top-color: rgba(232, 180, 190, 0.2);
+}
+
 /* Card 3 — Superposição: dourado (iluminação passo a passo) */
 .card-superposicao { border-left: 5px solid #b9770e; }
 .card-superposicao .section-title { color: #b9770e; }

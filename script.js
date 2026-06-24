@@ -1697,6 +1697,177 @@ function limparEquacaoAC(eq) {
     return s;
 }
 
+/** Rótulos didáticos dos tipos de componente no card MNA. */
+const MNA_TIPO_LABEL = {
+    Resistor: 'Resistor',
+    VoltageSource: 'Fonte de tensão',
+    CurrentSource: 'Fonte de corrente',
+    Capacitor: 'Capacitor',
+    Inductor: 'Indutor',
+    Transformer: 'Transformador',
+    VCVS: 'VCVS',
+    VCCS: 'VCCS',
+    CCVS: 'CCVS',
+    CCCS: 'CCCS'
+};
+
+/**
+ * Normaliza id de componente (T1_p / T1_s → T1) para agrupar equações.
+ * @param {string} id
+ * @returns {string}
+ */
+function normalizarIdComponenteMNA(id) {
+    return String(id).replace(/_(p|s)$/, '');
+}
+
+/**
+ * Extrai o componente principal de uma equação constitutiva MNA.
+ * @param {string} eq
+ * @returns {string}
+ */
+function idComponenteEquacaoMNA(eq) {
+    const ids = [...String(eq).matchAll(/\bi\s*\(\s*([A-Za-z][A-Za-z0-9_]*)\s*\)/g)].map(m => m[1]);
+    if (!ids.length) return 'outros';
+    const bases = [...new Set(ids.map(normalizarIdComponenteMNA))];
+    if (bases.length === 1) return bases[0];
+    const pri = ids.find(n => !/_([ps])$/.test(n));
+    return normalizarIdComponenteMNA(pri || ids[0]);
+}
+
+/**
+ * Formata uma equação bruta da API para exibição AsciiMath.
+ * @param {string} eq
+ * @returns {string}
+ */
+function formatarEquacaoMNA(eq) {
+    return limparEquacaoAC(eq).replace(/==/g, '=');
+}
+
+/**
+ * Separa equações MNA em KCL (por nó) e leis constitutivas (por componente).
+ * A ordem segue o backend: |NosLista| equações KCL, depois uma ou mais por componente.
+ *
+ * @param {string[]} equacoes
+ * @param {number[]} [nosLista]
+ * @param {object[]} [netlist]
+ * @returns {{ kcl: {no:number, eq:string}[], constitutivas: {id:string, tipo:string|null, eqs:string[]}[] }}
+ */
+function organizarEquacoesMNA(equacoes, nosLista, netlist) {
+    const todas = Array.isArray(equacoes) ? equacoes : [];
+    const nos = Array.isArray(nosLista) ? nosLista : [];
+    const kclCount = nos.length > 0 && nos.length <= todas.length ? nos.length : 0;
+
+    const kcl = [];
+    for (let i = 0; i < kclCount; i++) {
+        kcl.push({ no: nos[i], eq: todas[i] });
+    }
+
+    const restantes = todas.slice(kclCount);
+    const grupos = new Map();
+    restantes.forEach(eq => {
+        const id = idComponenteEquacaoMNA(eq);
+        if (!grupos.has(id)) grupos.set(id, { id, tipo: null, eqs: [] });
+        grupos.get(id).eqs.push(eq);
+    });
+
+    const tipoPorId = new Map();
+    (netlist || []).forEach(c => {
+        if (c && c.Componente) tipoPorId.set(c.Componente, c.Tipo || null);
+    });
+    grupos.forEach(g => { g.tipo = tipoPorId.get(g.id) || null; });
+
+    const constitutivas = [];
+    const usados = new Set();
+    (netlist || []).forEach(c => {
+        const id = c && c.Componente;
+        if (id && grupos.has(id) && !usados.has(id)) {
+            constitutivas.push(grupos.get(id));
+            usados.add(id);
+        }
+    });
+    grupos.forEach((g, id) => {
+        if (!usados.has(id)) constitutivas.push(g);
+    });
+
+    return { kcl, constitutivas };
+}
+
+/**
+ * Monta o HTML do card 1 — Equações do Sistema (MNA), agrupadas por nó e componente.
+ *
+ * @param {object} dados - Resposta da API (Equacoes, NosLista)
+ * @param {object[]} listaComp - Netlist enviada ao servidor
+ * @param {{ modoAc?: boolean, topPassivos?: boolean }} [opts]
+ * @returns {string}
+ */
+function renderCardEquacoesMNA(dados, listaComp, opts = {}) {
+    const { modoAc = false, topPassivos = false } = opts;
+    const notaReatancias = (modoAc && topPassivos)
+        ? `<p class="mna-reatancias-nota">Reatâncias substituídas automaticamente: <code>Z_L = jωL</code> para indutores, <code>Z_C = 1/(jωC)</code> para capacitores. O detalhamento numérico está no painel <em>Impedâncias do circuito</em> abaixo.</p>`
+        : '';
+
+    const { kcl, constitutivas } = organizarEquacoesMNA(dados.Equacoes, dados.NosLista, listaComp);
+
+    let html = `<div class="card card-mna">
+        <h3 class="section-title">1. Equações do Sistema (MNA)</h3>
+        <p class="mna-intro">O <strong>Método dos Nós</strong> monta o sistema em duas etapas: a <em>Lei das Correntes de Kirchhoff (KCL)</em> em cada nó (soma das correntes = 0) e, em seguida, a <em>lei constitutiva</em> de cada componente. O nó <strong>0</strong> é terra — sua tensão é referência (<code>v(0) = 0</code>) e não gera equação própria.</p>
+        ${notaReatancias}`;
+
+    if (kcl.length > 0) {
+        html += `<section class="mna-secao mna-secao--kcl">
+            <h4 class="mna-secao-titulo">Lei das Correntes (KCL) — por nó</h4>
+            <p class="mna-secao-hint">Em cada nó, a soma algébrica das correntes dos ramos conectados é zero.</p>
+            <div class="mna-no-grid">`;
+        kcl.forEach(({ no, eq }) => {
+            const limpa = formatarEquacaoMNA(eq);
+            html += `<div class="mna-no-bloco">
+                <div class="mna-no-cabecalho">
+                    <span class="mna-no-badge">Nó ${no}</span>
+                    <span class="mna-no-legenda">tensão desconhecida <code>v(${no})</code></span>
+                </div>
+                <div class="formula mna-formula">\` ${limpa} \`</div>
+            </div>`;
+        });
+        html += `</div></section>`;
+    }
+
+    if (constitutivas.length > 0) {
+        html += `<section class="mna-secao mna-secao--const">
+            <h4 class="mna-secao-titulo">Leis constitutivas — por componente</h4>
+            <p class="mna-secao-hint">Relação entre tensões nos terminais e corrente de cada elemento (Ohm, fontes, reatâncias, transformador…).</p>
+            <div class="mna-comp-lista">`;
+        constitutivas.forEach(({ id, tipo, eqs }) => {
+            const tipoLabel = (tipo && MNA_TIPO_LABEL[tipo]) ? MNA_TIPO_LABEL[tipo] : '';
+            const comp = (listaComp || []).find(c => c.Componente === id);
+            const nosTxt = comp && Array.isArray(comp.Nos)
+                ? `nós ${comp.Nos.join(' → ')}`
+                : '';
+            const meta = [tipoLabel, nosTxt].filter(Boolean).join(' · ');
+            html += `<div class="mna-comp-bloco">
+                <div class="mna-comp-cabecalho">
+                    <span class="mna-comp-badge">${id}</span>
+                    ${meta ? `<span class="mna-comp-meta">${meta}</span>` : ''}
+                </div>`;
+            eqs.forEach(eq => {
+                const limpa = formatarEquacaoMNA(eq);
+                html += `<div class="formula mna-formula">\` ${limpa} \`</div>`;
+            });
+            html += `</div>`;
+        });
+        html += `</div></section>`;
+    }
+
+    if (kcl.length === 0 && constitutivas.length === 0) {
+        (dados.Equacoes || []).forEach(eq => {
+            const limpa = formatarEquacaoMNA(eq);
+            html += `<div class="formula mna-formula">\` ${limpa} \`</div>`;
+        });
+    }
+
+    html += `</div>`;
+    return html;
+}
+
 /* ============================================================
  * FASE 3.A — Diagrama Fasorial (SVG nativo)
  * Consome dados.Resultados; ativa-se apenas em modo AC.
@@ -2030,15 +2201,7 @@ async function calcular() {
         if (dados.Equacoes) {
             const modoAc = getModoSimulacao() === 'AC';
             const topPassivos = getTopologiaAtual().some(c => c.tipo === 'Capacitor' || c.tipo === 'Inductor');
-            const notaReatancias = (modoAc && topPassivos)
-                ? `<p class="mna-reatancias-nota">Reatâncias substituídas automaticamente: <code>Z_L = jωL</code> para indutores, <code>Z_C = 1/(jωC)</code> para capacitores. O detalhamento numérico está no painel <em>Impedâncias do circuito</em> abaixo.</p>`
-                : '';
-            let html = `<div class="card card-mna"><h3 class="section-title">1. Equações do Sistema (MNA)</h3>${notaReatancias}`;
-            dados.Equacoes.forEach(eq => {
-                const limpa = limparEquacaoAC(eq).replace("==", "=");
-                html += `<div class="formula">\` ${limpa} \`</div>`;
-            });
-            divRes.innerHTML += html + `</div>`;
+            divRes.innerHTML += renderCardEquacoesMNA(dados, listaComp, { modoAc, topPassivos });
         }
 
         // FASE 4 (A): Painel de impedâncias entre MNA e Superposição.
@@ -4529,6 +4692,8 @@ if (typeof module !== 'undefined' && module.exports) {
         exemplos,
         circuitoExemploParaTopologia,
         buildEsquematicoFromTopologia,
-        auditarEsquematico
+        auditarEsquematico,
+        organizarEquacoesMNA,
+        formatarEquacaoMNA
     };
 }
