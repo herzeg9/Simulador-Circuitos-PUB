@@ -2965,49 +2965,81 @@ function drawTrafosInline(trafos, nodeX, NODE_Y, GND_Y, backbone, returnBranches
 }
 
 /**
- * Renderiza o esquemático com base no estado atual do DOM, dentro do contêiner #esquematicoWrap.
+ * Monta o HTML do esquemático a partir de uma topologia (sem ler o DOM).
+ * @param {Array} topologia
+ * @returns {{ html: string, meta: object }}
  */
-function renderEsquematico() {
-    const wrap = document.getElementById('esquematicoWrap');
-    if (!wrap) return;
+function buildEsquematicoFromTopologia(topologia) {
+    const meta = {
+        status: 'ok',
+        topologiaCount: topologia.length,
+        trafosInline: 0,
+        trafosFallback: 0,
+        satellites: [],
+        returnBranches: [],
+        visibleNodes: [],
+        hiddenNodes: [],
+        layoutNodes: [],
+        nodeX: new Map(),
+        NODE_Y: 0,
+        GND_Y: 0,
+        totalW: 0,
+        H: 0,
+        chains: [],
+        shunts: [],
+        shuntsInTrafoReturn: 0
+    };
 
-    const topologia = getTopologiaAtual();
     if (!topologia.length) {
-        wrap.innerHTML = '<div class="esq-empty">Adicione componentes para visualizar o esquemático.</div>';
-        return;
+        meta.status = 'empty';
+        return { html: '<div class="esq-empty">Adicione componentes para visualizar o esquemático.</div>', meta };
     }
 
     const { nonGroundNodes, shunts, series, trafos } = analyzeTopology(topologia);
+    meta.shunts = shunts;
 
     if (!nonGroundNodes.length && (!trafos || !trafos.length)) {
-        wrap.innerHTML = '<div class="esq-empty">Topologia degenerada: todos os terminais estão no terra. Conecte ao menos um nó não-zero.</div>';
-        return;
+        meta.status = 'degenerate';
+        return { html: '<div class="esq-empty">Topologia degenerada: todos os terminais estão no terra. Conecte ao menos um nó não-zero.</div>', meta };
     }
     if (!nonGroundNodes.length && trafos && trafos.length) {
-        wrap.innerHTML = renderPainelTrafos(trafos, false);
-        return;
+        meta.status = 'trafo_only';
+        meta.trafosFallback = trafos.length;
+        return { html: renderPainelTrafos(trafos, false), meta };
     }
 
-    const { visibleNodes, chains } = consolidateSeries(series, shunts, nonGroundNodes);
+    const { visibleNodes, hiddenNodes, chains } = consolidateSeries(series, shunts, nonGroundNodes);
+    meta.visibleNodes = [...visibleNodes];
+    meta.hiddenNodes = [...hiddenNodes];
+    meta.chains = chains;
 
     assignSeriesRows(chains);
     assignShuntLanes(shunts);
 
     const backbone = esqBackboneNodes(chains, series);
     const satellites = esqTrafoSatellites(trafos, series, backbone);
+    meta.satellites = [...satellites];
     const returnBranches = esqTrafoReturnBranches(trafos, series, shunts, backbone, satellites);
+    meta.returnBranches = [...returnBranches.keys()];
     const shuntsInTrafoReturn = new Set();
     returnBranches.forEach(rb => rb.shunts.forEach(s => shuntsInTrafoReturn.add(s)));
+    meta.shuntsInTrafoReturn = shuntsInTrafoReturn.size;
 
     const layoutNodes = visibleNodes.filter(n => !satellites.has(n));
+    meta.layoutNodes = [...layoutNodes];
     const { pos: nodeX, totalW } = nodePositions(layoutNodes, shunts, chains);
     esqAlignSatellites(trafos, backbone, nodeX, satellites);
+    meta.nodeX = new Map(nodeX);
+    meta.totalW = totalW;
 
     const maxRow = chains.reduce((m, s) => Math.max(m, s._row), -1);
     const topAboveNodes = (maxRow + 1) * ESQ.SERIES_ROW_H + 40;
     const NODE_Y = topAboveNodes + 50;
     const GND_Y = NODE_Y + ESQ.SHUNT_HEIGHT;
     const H = GND_Y + 80;
+    meta.NODE_Y = NODE_Y;
+    meta.GND_Y = GND_Y;
+    meta.H = H;
 
     const parts = [];
     parts.push(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${totalW} ${H}" class="esq-svg" role="img" aria-label="Esquemático do circuito">`);
@@ -3069,6 +3101,8 @@ function renderEsquematico() {
     });
 
     const { svg: trafoSvg, fallback: trafosFallback } = drawTrafosInline(trafos, nodeX, NODE_Y, GND_Y, backbone, returnBranches);
+    meta.trafosInline = (trafos || []).length - trafosFallback.length;
+    meta.trafosFallback = trafosFallback.length;
     if (trafoSvg) parts.push(trafoSvg);
 
     visibleNodes.filter(n => !satellites.has(n)).forEach(n => {
@@ -3081,8 +3115,163 @@ function renderEsquematico() {
     parts.push(`</svg>`);
 
     const painelTrafos = trafosFallback.length ? renderPainelTrafos(trafosFallback, true) : '';
+    if (painelTrafos) meta.status = 'fallback_panel';
 
-    wrap.innerHTML = parts.join('') + painelTrafos;
+    return { html: parts.join('') + painelTrafos, meta };
+}
+
+/**
+ * Converte lista de componente de exemplo para topologia do esquemático.
+ * @param {Array} circuito
+ */
+function circuitoExemploParaTopologia(circuito) {
+    return circuito.map(c => {
+        const nos = c.Nos || [];
+        const item = {
+            tipo: c.Tipo,
+            nome: c.Componente,
+            valor: String(c.Valor ?? ''),
+            nA: nos[0],
+            nB: nos[1],
+            nC: null,
+            nD: null,
+            alvo: c.Alvo || null
+        };
+        if (nos.length >= 4) { item.nC = nos[2]; item.nD = nos[3]; }
+        else if (nos.length === 3) { item.nC = nos[2]; }
+        return item;
+    });
+}
+
+/**
+ * Auditoria automática do esquemático (layout + SVG) para testes e regressão.
+ * @param {Array} topologia
+ * @returns {{ ok: boolean, errors: string[], warnings: string[], meta: object }}
+ */
+function auditarEsquematico(topologia) {
+    const errors = [];
+    const warnings = [];
+    let meta = {};
+
+    try {
+        const built = buildEsquematicoFromTopologia(topologia);
+        const { html } = built;
+        meta = built.meta;
+
+        if (meta.status === 'empty') {
+            warnings.push('circuito vazio');
+            return { ok: true, errors, warnings, meta };
+        }
+        if (meta.status === 'degenerate') {
+            warnings.push('topologia degenerada (só GND)');
+            return { ok: true, errors, warnings, meta };
+        }
+        if (meta.status === 'trafo_only') {
+            warnings.push('apenas painel de trafos (sem malha principal)');
+            return { ok: true, errors, warnings, meta };
+        }
+
+        if (meta.totalW <= 0 || meta.H <= 0) {
+            errors.push('viewBox inválido (largura ou altura ≤ 0)');
+        }
+        if (!html.includes('esq-svg') && meta.status !== 'trafo_only') {
+            errors.push('SVG principal ausente');
+        }
+
+        const nodeX = meta.nodeX;
+        const mustPosition = new Set([...meta.visibleNodes, ...meta.satellites]);
+        const nonGnd = new Set();
+        topologia.forEach(c => {
+            [c.nA, c.nB, c.nC, c.nD].forEach(n => { if (n !== 0 && n != null) nonGnd.add(n); });
+        });
+        nonGnd.forEach(n => {
+            if ((meta.hiddenNodes || []).includes(n)) return;
+            if (!mustPosition.has(n) && !meta.satellites.includes(n)) return;
+            if (!nodeX.has(n)) {
+                errors.push(`nó ${n} sem posição horizontal (nodeX)`);
+            }
+        });
+
+        meta.chains.forEach(ch => {
+            const xL = nodeX.get(ch.leftNode);
+            const xR = nodeX.get(ch.rightNode);
+            if (xL == null || xR == null) {
+                errors.push(`chain ${ch.leftNode}–${ch.rightNode} com nó sem posição`);
+            } else if (xL >= xR) {
+                errors.push(`chain ${ch.leftNode}–${ch.rightNode}: x esquerdo (${xL.toFixed(0)}) ≥ x direito (${xR.toFixed(0)})`);
+            }
+        });
+
+        const halfBody = ESQ.BODY / 2;
+        const gndMargin = 6;
+        const midY = (meta.NODE_Y + meta.GND_Y) / 2;
+        const returnNodeSet = new Set(meta.returnBranches);
+        meta.shunts.forEach(s => {
+            if (returnNodeSet.has(s.nodeUp)) {
+                const zoneTop = meta.NODE_Y + ESQ.NODE_R + 50;
+                const zoneBot = meta.GND_Y - 8;
+                const slotH = Math.max(ESQ.BODY + 12, zoneBot - zoneTop);
+                const compBot = zoneTop + slotH * 0.5 + halfBody;
+                if (compBot > meta.GND_Y - gndMargin) {
+                    errors.push(`ramo de retorno ${s.nome} (nó ${s.nodeUp}) invade GND`);
+                }
+                return;
+            }
+            const compBot = midY + halfBody;
+            if (compBot > meta.GND_Y - gndMargin) {
+                errors.push(`shunt ${s.nome} (nó ${s.nodeUp}) invade GND (base=${compBot.toFixed(0)}, GND=${meta.GND_Y})`);
+            }
+        });
+
+        if (meta.trafosFallback > 0) {
+            warnings.push(`${meta.trafosFallback} trafo(s) no painel alternativo (topologia atípica)`);
+        }
+
+        const satSet = new Set(meta.satellites);
+        const busXs = meta.visibleNodes
+            .filter(n => !satSet.has(n))
+            .map(n => nodeX.get(n))
+            .filter(x => x != null);
+        for (let i = 0; i < busXs.length; i++) {
+            for (let j = i + 1; j < busXs.length; j++) {
+                if (Math.abs(busXs[i] - busXs[j]) < 3) {
+                    warnings.push(`nós visíveis sobrepostos em x≈${busXs[i].toFixed(0)}`);
+                }
+            }
+        }
+
+        topologia.forEach(c => {
+            if (c.tipo === 'Transformer') return;
+            const esc = c.nome.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+            if (!html.includes(esc) && !html.includes(c.nome)) {
+                warnings.push(`rótulo "${c.nome}" não encontrado no SVG`);
+            }
+        });
+
+        if (meta.returnBranches.length > 0) {
+            const reserve = ESQ.BODY + 32;
+            meta.returnBranches.forEach(() => {
+                const yEnd = meta.GND_Y - 22 - reserve;
+                if (yEnd < meta.NODE_Y + ESQ.NODE_R + 40) {
+                    warnings.push('faixa do trafo muito comprimida para ramo de retorno');
+                }
+            });
+        }
+
+    } catch (e) {
+        errors.push(`exceção: ${e.message}`);
+    }
+
+    return { ok: errors.length === 0, errors, warnings, meta };
+}
+
+/**
+ * Renderiza o esquemático com base no estado atual do DOM, dentro do contêiner #esquematicoWrap.
+ */
+function renderEsquematico() {
+    const wrap = document.getElementById('esquematicoWrap');
+    if (!wrap) return;
+    wrap.innerHTML = buildEsquematicoFromTopologia(getTopologiaAtual()).html;
 }
 
 /**
@@ -4287,4 +4476,13 @@ function aplicarTooltipsGlobais() {
     if (radioCos && !radioCos.title) radioCos.title = 'V(t) = A·cos(ωt + φ). Convenção padrão de engenharia elétrica e análise fasorial.';
     const radioSen = document.querySelector('input[name="convencaoSeno"][value="sen"]');
     if (radioSen && !radioSen.title) radioSen.title = 'V(t) = A·sen(ωt + φ). Convenção comum em física geral. Os resultados são convertidos automaticamente.';
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        exemplos,
+        circuitoExemploParaTopologia,
+        buildEsquematicoFromTopologia,
+        auditarEsquematico
+    };
 }

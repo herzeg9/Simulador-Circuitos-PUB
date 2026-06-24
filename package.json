@@ -1,0 +1,7 @@
+{
+  "name": "simulador-circuitos-pub",
+  "private": true,
+  "scripts": {
+    "test:esquematico": "node tests/esquematico-audit.mjs"
+  }
+}
