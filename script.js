@@ -1,6 +1,47 @@
 const API_URL = "https://www.wolframcloud.com/obj/herzeghenrique/simulador-circuitos-api"; 
 
-let idCounter = 1;
+let idCounter = 1; // contador interno apenas para uid único (cuid-N), não para nomes
+
+/**
+ * Prefixo IEEE do nome automático por tipo de componente.
+ * @param {string} tipo
+ * @returns {string}
+ */
+function prefixoNomePorTipo(tipo) {
+    const map = {
+        Resistor: 'R',
+        VoltageSource: 'V',
+        CurrentSource: 'I',
+        Capacitor: 'C',
+        Inductor: 'L',
+        VCVS: 'E',
+        VCCS: 'G',
+        CCVS: 'H',
+        CCCS: 'F',
+        Transformer: 'T'
+    };
+    return map[tipo] || 'X';
+}
+
+/**
+ * Próximo índice disponível para um tipo (R1, R2… independente de V1, C1…).
+ * Reutiliza buracos: se só existir R3, o próximo resistor será R1.
+ *
+ * @param {string} tipo
+ * @returns {number}
+ */
+function proximoIndiceTipo(tipo) {
+    const prefix = prefixoNomePorTipo(tipo);
+    const re = new RegExp('^' + prefix + '(\\d+)$', 'i');
+    const usados = new Set();
+    document.querySelectorAll('.nome-comp').forEach(inp => {
+        const m = String(inp.value || '').trim().match(re);
+        if (m) usados.add(parseInt(m[1], 10));
+    });
+    let i = 1;
+    while (usados.has(i)) i++;
+    return i;
+}
 
 /**
  * Cada exemplo tem dois campos:
@@ -493,14 +534,15 @@ function anexarListenersValorFonte(li, tipo) {
  */
 function add(tipo, nomeFixo=null, nosInput=null, val=null, alvo=null) {
     const lista = document.getElementById('listaComponentes');
-    const id = idCounter++;
+    const uid = idCounter++;
+    const idx = proximoIndiceTipo(tipo);
     const li = document.createElement('li');
     li.className = `comp-item type-${tipo}`;
     li.dataset.tipo = tipo;
-    li.dataset.uid = 'cuid-' + id;
+    li.dataset.uid = 'cuid-' + uid;
 
     // Setups dos nomes, rótulos, e quantidade/ordem de nós por tipo
-    let label = 'Ω'; let nome = `R${id}`; let valLabel = "Val";
+    let label = 'Ω'; let nome = `R${idx}`; let valLabel = "Val";
     let nA=1, nB=0, nC=1, nD=0;
     if(Array.isArray(nosInput)) {
         nA=nosInput[0]; nB=nosInput[1];
@@ -513,13 +555,13 @@ function add(tipo, nomeFixo=null, nosInput=null, val=null, alvo=null) {
         <input type="number" class="no-a" value="${nA}" min="0" style="width:35px" placeholder="no+">
         <input type="number" class="no-b" value="${nB}" min="0" style="width:35px" placeholder="no-">`;
 
-    if (tipo === 'VoltageSource') { label='V'; nome=`V${id}`; }
-    if (tipo === 'CurrentSource') { label='A'; nome=`I${id}`; }
-    if (tipo === 'Capacitor') { label='C'; nome=`C${id}`; }
-    if (tipo === 'Inductor') { label='L'; nome=`L${id}`; }
+    if (tipo === 'VoltageSource') { label='V'; nome=`V${idx}`; }
+    if (tipo === 'CurrentSource') { label='A'; nome=`I${idx}`; }
+    if (tipo === 'Capacitor') { label='C'; nome=`C${idx}`; }
+    if (tipo === 'Inductor') { label='L'; nome=`L${idx}`; }
     if (tipo === 'VCVS') {
         label = 'G';
-        nome = `E${id}`;
+        nome = `E${idx}`;
         valLabel = 'Ganho';
         inputsNos = `
         <span style="font-size:0.7em; color:#9b59b6;">Out:</span>
@@ -531,7 +573,7 @@ function add(tipo, nomeFixo=null, nosInput=null, val=null, alvo=null) {
     }
     if (tipo === 'VCCS') {
         label = 'G';
-        nome = `G${id}`;
+        nome = `G${idx}`;
         valLabel = 'Transcond.';
         inputsNos = `
         <span style="font-size:0.7em; color:#9b59b6;">Out:</span>
@@ -543,7 +585,7 @@ function add(tipo, nomeFixo=null, nosInput=null, val=null, alvo=null) {
     }
     if (tipo === 'CCVS') {
         label = 'H';
-        nome = `H${id}`;
+        nome = `H${idx}`;
         valLabel = 'Transres.';
         inputsNos = `
         <span style="font-size:0.7em; color:#9b59b6;">Out:</span>
@@ -553,7 +595,7 @@ function add(tipo, nomeFixo=null, nosInput=null, val=null, alvo=null) {
     }
     if (tipo === 'CCCS') {
         label = 'F';
-        nome = `F${id}`;
+        nome = `F${idx}`;
         valLabel = 'Ganho';
         inputsNos = `
         <span style="font-size:0.7em; color:#9b59b6;">Out:</span>
@@ -565,7 +607,7 @@ function add(tipo, nomeFixo=null, nosInput=null, val=null, alvo=null) {
         // FASE 5.2: trafo ideal com 4 terminais (primário e secundário).
         // Razão n = N1/N2 = V_pri / V_sec; backend recebe via campo "Razao".
         label = 'T';
-        nome = `T${id}`;
+        nome = `T${idx}`;
         valLabel = 'Razão N1/N2';
         if (nC === 1 && nD === 0) { nC = 2; nD = 0; }
         inputsNos = `
@@ -2780,45 +2822,55 @@ function renderEsquematico() {
 function renderPainelTrafos(trafos) {
     if (!trafos || !trafos.length) return '';
     const cards = trafos.map(t => {
-        const W = 220, H = 130;
-        const xPri = 70, xSec = 150, yTop = 30, yBot = 100;
-        // 4 meias-elipses para a bobina primária (vertical) e secundária
-        const espiral = (cx) => {
+        const W = 240, H = 145;
+        const xPri = 78, xSec = 162, yTop = 38, yBot = 108;
+        const xCoreL = (xPri + xSec) / 2 - 4;
+        const xCoreR = (xPri + xSec) / 2 + 4;
+
+        const espiral = (cx, coilClass) => {
             const arcs = [];
             for (let i = 0; i < 4; i++) {
                 const yA = yTop + 7 + i * 17;
                 const yB = yA + 14;
-                arcs.push(`<path d="M ${cx},${yA} Q ${cx + 9},${(yA + yB) / 2} ${cx},${yB}" stroke="var(--esq-stroke, #2c3e50)" stroke-width="2" fill="none"/>`);
+                arcs.push(`<path class="trafo-coil ${coilClass}" d="M ${cx},${yA} Q ${cx + 10},${(yA + yB) / 2} ${cx},${yB}"/>`);
             }
             return arcs.join('');
         };
-        // Núcleo (duas barras verticais entre as bobinas)
+
         const nucleo = `
-            <line x1="${(xPri + xSec) / 2 - 4}" y1="${yTop + 5}" x2="${(xPri + xSec) / 2 - 4}" y2="${yBot - 5}" stroke="var(--esq-stroke, #2c3e50)" stroke-width="1.5"/>
-            <line x1="${(xPri + xSec) / 2 + 4}" y1="${yTop + 5}" x2="${(xPri + xSec) / 2 + 4}" y2="${yBot - 5}" stroke="var(--esq-stroke, #2c3e50)" stroke-width="1.5"/>`;
-        // Pontos de polaridade (topo de cada bobina, lado interno do núcleo)
-        const dotPri = `<circle cx="${xPri + 11}" cy="${yTop + 4}" r="2.5" fill="var(--esq-stroke, #2c3e50)"/>`;
-        const dotSec = `<circle cx="${xSec - 11}" cy="${yTop + 4}" r="2.5" fill="var(--esq-stroke, #2c3e50)"/>`;
-        // Stubs e labels dos nós
+            <line class="trafo-nucleo" x1="${xCoreL}" y1="${yTop + 3}" x2="${xCoreL}" y2="${yBot - 3}"/>
+            <line class="trafo-nucleo" x1="${xCoreR}" y1="${yTop + 3}" x2="${xCoreR}" y2="${yBot - 3}"/>`;
+
+        const dotPri = `
+            <circle class="trafo-dot trafo-dot--pri" cx="${xPri + 12}" cy="${yTop + 3}" r="3.5"/>
+            <text class="trafo-pol-label trafo-pol-label--pri" x="${xPri + 12}" y="${yTop - 2}" text-anchor="middle">+</text>`;
+        const dotSec = `
+            <circle class="trafo-dot trafo-dot--sec" cx="${xSec - 12}" cy="${yTop + 3}" r="3.5"/>
+            <text class="trafo-pol-label trafo-pol-label--sec" x="${xSec - 12}" y="${yTop - 2}" text-anchor="middle">+</text>`;
+
         const stubs = `
-            <line x1="20" y1="${yTop}" x2="${xPri}" y2="${yTop}" stroke="var(--esq-wire, #2c3e50)" stroke-width="2"/>
-            <line x1="20" y1="${yBot}" x2="${xPri}" y2="${yBot}" stroke="var(--esq-wire, #2c3e50)" stroke-width="2"/>
-            <line x1="${xSec}" y1="${yTop}" x2="${W - 20}" y2="${yTop}" stroke="var(--esq-wire, #2c3e50)" stroke-width="2"/>
-            <line x1="${xSec}" y1="${yBot}" x2="${W - 20}" y2="${yBot}" stroke="var(--esq-wire, #2c3e50)" stroke-width="2"/>
-            <text x="10" y="${yTop - 4}" font-size="11" text-anchor="middle" fill="var(--esq-stroke, #2c3e50)">${escapeXml(t.nA)}</text>
-            <text x="10" y="${yBot + 14}" font-size="11" text-anchor="middle" fill="var(--esq-stroke, #2c3e50)">${escapeXml(t.nB)}</text>
-            <text x="${W - 10}" y="${yTop - 4}" font-size="11" text-anchor="middle" fill="var(--esq-stroke, #2c3e50)">${escapeXml(t.nC)}</text>
-            <text x="${W - 10}" y="${yBot + 14}" font-size="11" text-anchor="middle" fill="var(--esq-stroke, #2c3e50)">${escapeXml(t.nD)}</text>`;
+            <line class="trafo-stub" x1="22" y1="${yTop}" x2="${xPri}" y2="${yTop}"/>
+            <line class="trafo-stub" x1="22" y1="${yBot}" x2="${xPri}" y2="${yBot}"/>
+            <line class="trafo-stub" x1="${xSec}" y1="${yTop}" x2="${W - 22}" y2="${yTop}"/>
+            <line class="trafo-stub" x1="${xSec}" y1="${yBot}" x2="${W - 22}" y2="${yBot}"/>
+            <text class="trafo-node-label" x="12" y="${yTop + 4}" text-anchor="middle">${escapeXml(t.nA)}</text>
+            <text class="trafo-node-label" x="12" y="${yBot + 14}" text-anchor="middle">${escapeXml(t.nB)}</text>
+            <text class="trafo-node-label" x="${W - 12}" y="${yTop + 4}" text-anchor="middle">${escapeXml(t.nC)}</text>
+            <text class="trafo-node-label" x="${W - 12}" y="${yBot + 14}" text-anchor="middle">${escapeXml(t.nD)}</text>
+            <text class="trafo-side-label trafo-side-label--pri" x="${xPri - 6}" y="18" text-anchor="middle">Pri</text>
+            <text class="trafo-side-label trafo-side-label--sec" x="${xSec + 6}" y="18" text-anchor="middle">Sec</text>`;
+
         const valorTexto = (t.valor || '1').includes(':') ? t.valor : `n=${t.valor}`;
         return `
             <div class="trafo-card">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" class="trafo-svg" role="img" aria-label="Transformador ${escapeXml(t.nome)}">
                     ${stubs}
-                    ${espiral(xPri)}
-                    ${espiral(xSec)}
+                    ${espiral(xPri, 'trafo-coil--pri')}
+                    ${espiral(xSec, 'trafo-coil--sec')}
                     ${nucleo}
                     ${dotPri}
                     ${dotSec}
+                    <text class="trafo-symbol-name" x="${W / 2}" y="${H - 6}" text-anchor="middle">${escapeXml(t.nome)}</text>
                 </svg>
                 <div class="trafo-info">
                     <strong>${escapeXml(t.nome)}</strong>
@@ -2830,7 +2882,7 @@ function renderPainelTrafos(trafos) {
     return `
         <div class="trafo-panel">
             <h4 class="trafo-panel-title">Transformadores ideais</h4>
-            <p class="trafo-panel-note">Trafos ideais (4 terminais) s&atilde;o renderizados em separado &mdash; os pontos pretos indicam a polaridade convencional (mesma fase de tens&atilde;o).</p>
+            <p class="trafo-panel-note">Trafos ideais (4 terminais) s&atilde;o renderizados em separado. Os marcadores <strong class="trafo-legend-pri">+ Pri</strong> e <strong class="trafo-legend-sec">+ Sec</strong> indicam a polaridade convencional (mesma fase de tens&atilde;o entre os enrolamentos).</p>
             <div class="trafo-panel-grid">${cards}</div>
         </div>`;
 }

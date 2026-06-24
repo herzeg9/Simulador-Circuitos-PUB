@@ -1406,10 +1406,83 @@ body.dark-mode .impedancias-nota code { background: rgba(255, 255, 255, 0.08); }
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 .trafo-svg {
-    width: 220px;
-    height: 130px;
+    width: 240px;
+    height: 145px;
     display: block;
 }
+/* Símbolo IEEE do trafo — cores distintas Pri/Sec para leitura em dark mode */
+.trafo-coil {
+    fill: none;
+    stroke-width: 2.6;
+    stroke-linecap: round;
+}
+.trafo-coil--pri { stroke: #9c640c; }
+.trafo-coil--sec { stroke: #16a085; }
+.trafo-nucleo {
+    stroke: var(--esq-stroke);
+    stroke-width: 2.2;
+    stroke-linecap: round;
+}
+.trafo-stub {
+    stroke: var(--esq-wire);
+    stroke-width: 2.2;
+    stroke-linecap: round;
+}
+.trafo-dot {
+    stroke: var(--esq-bg);
+    stroke-width: 1.5;
+}
+.trafo-dot--pri { fill: #e67e22; }
+.trafo-dot--sec { fill: #1abc9c; }
+.trafo-pol-label {
+    font-size: 9px;
+    font-weight: 800;
+    dominant-baseline: central;
+    text-anchor: middle;
+}
+.trafo-pol-label--pri { fill: #e67e22; }
+.trafo-pol-label--sec { fill: #1abc9c; }
+.trafo-node-label {
+    fill: var(--esq-label-name);
+    font-size: 11px;
+    font-weight: 700;
+}
+.trafo-side-label {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+.trafo-side-label--pri { fill: #9c640c; }
+.trafo-side-label--sec { fill: #16a085; }
+.trafo-symbol-name {
+    fill: var(--esq-label-name);
+    font-size: 11px;
+    font-weight: 700;
+}
+body.dark-mode .trafo-coil--pri { stroke: #f0b429; }
+body.dark-mode .trafo-coil--sec { stroke: #76d7c4; }
+body.dark-mode .trafo-dot--pri { fill: #f5b041; }
+body.dark-mode .trafo-dot--sec { fill: #76d7c4; }
+body.dark-mode .trafo-pol-label--pri { fill: #f5b041; }
+body.dark-mode .trafo-pol-label--sec { fill: #76d7c4; }
+body.dark-mode .trafo-side-label--pri { fill: #f0b429; }
+body.dark-mode .trafo-side-label--sec { fill: #76d7c4; }
+body.dark-mode .trafo-card {
+    background: #2a2f3a;
+    border-color: #4a5568;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+body.dark-mode .trafo-panel {
+    background: rgba(156, 100, 12, 0.06);
+    border-radius: 8px;
+    border-top: 1px dashed rgba(240, 180, 41, 0.35);
+}
+.trafo-legend-pri { color: #9c640c; }
+.trafo-legend-sec { color: #16a085; }
+body.dark-mode .trafo-legend-pri { color: #f0b429; }
+body.dark-mode .trafo-legend-sec { color: #76d7c4; }
+
 .trafo-info {
     display: flex;
     flex-direction: column;
