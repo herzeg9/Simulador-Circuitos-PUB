@@ -2572,16 +2572,24 @@ function esqTrafoBusRef(nA, nB, backbone, nodeX) {
 function svgTrafoReturnBranch(xCoil, yBot, GND_Y, shunts) {
     const parts = [];
     const halfBody = ESQ.BODY / 2;
-    let yCur = yBot;
-    shunts.forEach(s => {
-        const midY = yCur + 28;
-        parts.push(`<line class="trafo-stub" x1="${xCoil}" y1="${yCur}" x2="${xCoil}" y2="${midY - halfBody}" stroke="var(--esq-wire)" stroke-width="2"/>`);
+    const gndMargin = 8;
+    const zoneTop = yBot;
+    const zoneBot = GND_Y - gndMargin;
+    const n = Math.max(1, shunts.length);
+    const slotH = Math.max(ESQ.BODY + 12, (zoneBot - zoneTop) / n);
+
+    let yPrev = zoneTop;
+    shunts.forEach((s, i) => {
+        const midY = zoneTop + slotH * (i + 0.5);
+        const compTop = midY - halfBody;
+        const compBot = midY + halfBody;
+        parts.push(`<line class="trafo-stub" x1="${xCoil}" y1="${yPrev}" x2="${xCoil}" y2="${compTop}" stroke="var(--esq-wire)" stroke-width="2"/>`);
         s._positiveOnA = s.positiveOnTop;
         s._fromAtoB = s.positiveOnTop;
         parts.push(drawSimbolo(s, xCoil, midY, 'V'));
-        yCur = midY + halfBody;
+        yPrev = compBot;
     });
-    parts.push(`<line class="trafo-stub" x1="${xCoil}" y1="${yCur}" x2="${xCoil}" y2="${GND_Y}" stroke="var(--esq-wire)" stroke-width="2"/>`);
+    parts.push(`<line class="trafo-stub" x1="${xCoil}" y1="${yPrev}" x2="${xCoil}" y2="${GND_Y}" stroke="var(--esq-wire)" stroke-width="2"/>`);
     return parts.join('');
 }
 
@@ -2802,14 +2810,23 @@ function trafoPodeDesenharInline(trafo, nodeX) {
     return nos.every(n => nodeX.has(n));
 }
 
-function trafoBandY(NODE_Y, GND_Y, index, total) {
+function trafoBandY(NODE_Y, GND_Y, index, total, reserveBelow = 0) {
     const yStart = NODE_Y + ESQ.NODE_R + 14;
-    const yEnd = GND_Y - 22;
-    const band = (yEnd - yStart) / Math.max(1, total);
+    const yEnd = GND_Y - 22 - Math.max(0, reserveBelow);
+    const band = Math.max(36, (yEnd - yStart) / Math.max(1, total));
     return {
         yTop: yStart + index * band + 4,
         yBot: yStart + (index + 1) * band - 6
     };
+}
+
+function trafoReturnReserve(trafo, returns) {
+    let maxShunts = 0;
+    [trafo.nA, trafo.nB, trafo.nC, trafo.nD].forEach(no => {
+        if (returns.has(no)) maxShunts = Math.max(maxShunts, returns.get(no).shunts.length);
+    });
+    if (!maxShunts) return 0;
+    return maxShunts * (ESQ.BODY + 18) + 14;
 }
 
 function svgTrafoRouteToCoilTop(xBus, yBus, xCoil, yTop) {
@@ -2907,7 +2924,8 @@ function drawTrafosInline(trafos, nodeX, NODE_Y, GND_Y, backbone, returnBranches
             fallback.push(t);
             return;
         }
-        const { yTop, yBot } = trafoBandY(NODE_Y, GND_Y, idx, total);
+        const reserveBelow = trafoReturnReserve(t, returns);
+        const { yTop, yBot } = trafoBandY(NODE_Y, GND_Y, idx, total, reserveBelow);
 
         const xLo = Math.min(xPriRef, xSecRef);
         const xHi = Math.max(xPriRef, xSecRef);
@@ -2938,7 +2956,8 @@ function drawTrafosInline(trafos, nodeX, NODE_Y, GND_Y, backbone, returnBranches
             if (!isReturn(no)) return;
             const rb = returns.get(no);
             parts.push(svgTrafoReturnBranch(xCoil, yBot, GND_Y, rb.shunts));
-            branchLabels.push(`<text x="${xCoil + 18}" y="${yBot + 22}" class="esq-label--node esq-label--branch">${no}</text>`);
+            const labelY = yBot + (GND_Y - 8 - yBot) / 2;
+            branchLabels.push(`<text x="${xCoil + 18}" y="${labelY}" class="esq-label--node esq-label--branch">${no}</text>`);
         });
     });
 
