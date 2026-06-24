@@ -107,7 +107,7 @@
                         <tr><td><code>sen</code></td><td>F&iacute;sica geral, livros que partem de <code>sen(&omega;t)</code>.</td><td>Fase &minus; 90&deg; (corre&ccedil;&atilde;o autom&aacute;tica). Os resultados s&atilde;o exibidos j&aacute; convertidos de volta.</td></tr>
                     </tbody>
                 </table>
-                <p class="ajuda-nota">O card <strong>6. Ondas no tempo</strong> na aba Resultados desenha cada tens&atilde;o/corrente como uma senoide real, j&aacute; na conven&ccedil;&atilde;o escolhida. O diagrama fasorial e a tabela de resultados tamb&eacute;m s&atilde;o ajustados.</p>
+                <p class="ajuda-nota">O card <strong>6. Ondas no tempo</strong> na aba Resolu&ccedil;&atilde;o desenha cada tens&atilde;o/corrente como uma senoide real, j&aacute; na conven&ccedil;&atilde;o escolhida. O diagrama fasorial e a tabela de resultados tamb&eacute;m s&atilde;o ajustados.</p>
             </div>
         </details>
 
@@ -152,7 +152,7 @@
             <div class="ajuda-content">
                 <table class="ajuda-tabela ajuda-tabela--atalhos">
                     <tbody>
-                        <tr><td><kbd>Ctrl</kbd> + <kbd>Enter</kbd></td><td>Executa <strong>Analisar Completo</strong> (atalho para o bot&atilde;o principal)</td></tr>
+                        <tr><td><kbd>Ctrl</kbd> + <kbd>Enter</kbd></td><td>Executa <strong>Resolu&ccedil;&atilde;o do Circuito</strong> (atalho para o bot&atilde;o principal)</td></tr>
                         <tr><td><kbd>Esc</kbd></td><td>Fecha o di&aacute;logo de adi&ccedil;&atilde;o em s&eacute;rie/paralelo</td></tr>
                         <tr><td><kbd>Tab</kbd> &nbsp;/&nbsp; <kbd>Shift</kbd>+<kbd>Tab</kbd></td><td>Navega entre os campos dos componentes</td></tr>
                     </tbody>
@@ -251,7 +251,7 @@
             <div id="painelAvisosTopologia" class="topologia-avisos" hidden></div>
 
             <div class="button-group">
-                <button class="btn-calc" id="btnAnalisarCompleto" onclick="calcular()" title="Atalho: Ctrl+Enter"> Analisar Completo</button>
+                <button class="btn-calc" id="btnAnalisarCompleto" onclick="calcular()" title="Resolve o circuito e abre a aba Resolução (atalho: Ctrl+Enter)"> Resolu&ccedil;&atilde;o do Circuito</button>
                 <button type="button" class="btn-utility" onclick="renumerarNos()" title="Reordena os n&oacute;s sequencialmente (1,2,3,...) sem alterar a topologia">Renumerar n&oacute;s</button>
                 <button class="btn-clear" onclick="limparTudo()"> Limpar Tudo</button>
             </div>
@@ -266,19 +266,19 @@
 
         <div class="output-panel">
             <div class="output-tabs" role="tablist" aria-label="Vis\u00f5es do circuito">
-                <button type="button" class="output-tab is-active" role="tab" aria-selected="true" aria-controls="resultado" id="tabBtnResultados" data-tab="resultados">Resultados</button>
-                <button type="button" class="output-tab" role="tab" aria-selected="false" aria-controls="painelEsquematico" id="tabBtnEsquematico" data-tab="esquematico">Esquemático</button>
+                <button type="button" class="output-tab is-active" role="tab" aria-selected="true" aria-controls="painelEsquematico" id="tabBtnEsquematico" data-tab="esquematico">Esquemático</button>
+                <button type="button" class="output-tab" role="tab" aria-selected="false" aria-controls="resultado" id="tabBtnResultados" data-tab="resultados">Resolu&ccedil;&atilde;o</button>
             </div>
 
-            <div class="output-tab-panel is-active" id="resultado" role="tabpanel" aria-labelledby="tabBtnResultados">
+            <div class="output-tab-panel" id="resultado" role="tabpanel" aria-labelledby="tabBtnResultados" hidden>
                 <div class="card" style="text-align:center; color:#999; padding: 60px;">
                     <p><strong>Bem-vindo!</strong></p>
-                    <p>Adicione componentes ou escolha um exemplo.</p>
+                    <p>Monte o circuito no painel &agrave; esquerda e clique em <strong>Resolu&ccedil;&atilde;o do Circuito</strong> para ver os resultados.</p>
                     <p style="font-size:0.8em">Agora com suporte a Fontes Dependentes e Malhas.</p>
                 </div>
             </div>
 
-            <div class="output-tab-panel" id="painelEsquematico" role="tabpanel" aria-labelledby="tabBtnEsquematico" hidden>
+            <div class="output-tab-panel is-active" id="painelEsquematico" role="tabpanel" aria-labelledby="tabBtnEsquematico">
                 <div class="card card-esquematico">
                     <div class="esq-header">
                         <h3 class="section-title">Esquemático do Circuito</h3>
@@ -359,6 +359,6 @@
         </form>
     </dialog>
 
-    <script src="script.js?v=20260624-audit-esq"></script>
+    <script src="script.js?v=20260624-aba-resolucao"></script>
 </body>
 </html>

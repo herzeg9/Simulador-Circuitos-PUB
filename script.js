@@ -1043,7 +1043,7 @@ function sincronizarConvencaoTemporal() {
     try { localStorage.setItem('simConvencaoSeno', conv); } catch (e) { /* ignore */ }
     const divRes = document.getElementById('resultado');
     if (divRes && divRes.innerHTML.trim() !== '') {
-        divRes.innerHTML = '<div class="card" style="border-left:5px solid #f39c12;"><p style="margin:0; color:var(--text-primary);">Convenção temporal alterada — clique em <strong>Analisar Completo</strong> (ou Ctrl+Enter) para recalcular com a nova convenção.</p></div>';
+        divRes.innerHTML = '<div class="card" style="border-left:5px solid #f39c12;"><p style="margin:0; color:var(--text-primary);">Convenção temporal alterada — clique em <strong>Resolução do Circuito</strong> (ou Ctrl+Enter) para recalcular com a nova convenção.</p></div>';
     }
 }
 
@@ -4271,7 +4271,7 @@ function validarTopologia() {
 
 /**
  * Instala atalhos globais de teclado:
- *  - Ctrl+Enter (ou Cmd+Enter no macOS): aciona "Analisar Completo".
+ *  - Ctrl+Enter (ou Cmd+Enter no macOS): aciona "Resolução do Circuito".
  */
 function setupAtalhosTeclado() {
     document.addEventListener('keydown', (e) => {
@@ -4471,7 +4471,7 @@ function aplicarTooltipsGlobais() {
     const toggleAc = document.getElementById('toggleModoAc');
     if (toggleAc && !toggleAc.title) toggleAc.title = 'Alterna entre DC (corrente contínua) e AC (corrente alternada).';
     const btnAnalisar = document.getElementById('btnAnalisarCompleto');
-    if (btnAnalisar) btnAnalisar.title = 'Analisa o circuito (atalho: Ctrl+Enter)';
+    if (btnAnalisar) btnAnalisar.title = 'Resolve o circuito e abre a aba Resolução (atalho: Ctrl+Enter)';
     const radioCos = document.querySelector('input[name="convencaoSeno"][value="cos"]');
     if (radioCos && !radioCos.title) radioCos.title = 'V(t) = A·cos(ωt + φ). Convenção padrão de engenharia elétrica e análise fasorial.';
     const radioSen = document.querySelector('input[name="convencaoSeno"][value="sen"]');
