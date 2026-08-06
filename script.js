@@ -1,4 +1,4 @@
-const API_URL = "https://www.wolframcloud.com/obj/herzeghenrique/simulador-circuitos-api"; 
+const API_URL = "https://www.wolframcloud.com/obj/herzeghenrique/simulador-circuitos-api-v2"; 
 
 let idCounter = 1; // contador interno apenas para uid único (cuid-N), não para nomes
 
