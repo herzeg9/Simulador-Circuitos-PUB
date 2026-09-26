@@ -2475,3 +2475,250 @@ button.btn-add-trafo:hover {
 @media (prefers-reduced-motion: reduce) {
     .regime-toast { transition: opacity 0.1s ease; }
 }
+
+/* ============================================================
+   Placa de montagem (drag-and-drop)
+   ============================================================ */
+:root {
+    --placa-ponto: #c5ced6;
+    --placa-destaque: #16a085;
+    --placa-erro: #e74c3c;
+}
+body.dark-mode {
+    --placa-ponto: #444c5a;
+    --placa-destaque: #48c9b0;
+    --placa-erro: #ff6b6b;
+}
+
+.card-placa { border-left: 5px solid #16a085; padding: 18px 20px; }
+.card-placa .section-title { color: #138d75; margin: 0; }
+body.dark-mode .card-placa .section-title { color: #76d7c4; }
+
+.placa-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+.placa-resolver {
+    background: #16a085;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 9px 22px;
+    font-weight: 700;
+    font-size: 0.95em;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+.placa-resolver:hover { background: #138d75; }
+
+.placa-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+.placa-pecas, .placa-ferrs { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.placa-peca {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    min-width: 62px;
+    padding: 6px 8px 4px;
+    background: var(--esq-bg);
+    color: var(--text-primary);
+    border: 1px solid var(--tab-border);
+    border-radius: 8px;
+    font-size: 0.75em;
+    font-weight: 700;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.placa-peca:hover { border-color: var(--placa-destaque); }
+.placa-peca.is-ativo {
+    border-color: var(--placa-destaque);
+    box-shadow: 0 0 0 2px var(--placa-destaque) inset;
+}
+.placa-icone { width: 46px; height: 24px; display: block; pointer-events: none; }
+.placa-icone .esq-label--name, .placa-icone .esq-label--val { display: none; }
+
+.placa-ferr {
+    padding: 7px 12px;
+    background: var(--esq-bg);
+    color: var(--text-primary);
+    border: 1px solid var(--tab-border);
+    border-radius: 8px;
+    font-size: 0.85em;
+    font-weight: 600;
+    cursor: pointer;
+}
+.placa-ferr:hover:not(:disabled) { border-color: var(--placa-destaque); }
+.placa-ferr.is-ativo {
+    background: var(--placa-destaque);
+    border-color: var(--placa-destaque);
+    color: #fff;
+}
+.placa-ferr:disabled { opacity: 0.45; cursor: default; }
+.placa-ferr--perigo:hover:not(:disabled) { border-color: var(--placa-erro); color: var(--placa-erro); }
+
+.placa-wrap {
+    position: relative;
+    height: 540px;
+    overflow: auto;
+    border: 1px solid var(--tab-border);
+    border-radius: 8px;
+    background: var(--esq-bg);
+}
+.placa-svg {
+    display: block;
+    touch-action: none;
+    user-select: none;
+    cursor: default;
+}
+.placa-svg--fio { cursor: crosshair; }
+.placa-svg--posicionar { cursor: copy; }
+.placa-sobreposicao { pointer-events: none; }
+.placa-ponto { fill: var(--placa-ponto); }
+
+.placa-hit { fill: transparent; }
+.placa-comp { cursor: move; }
+.placa-comp.is-fantasma { opacity: 0.55; pointer-events: none; }
+.placa-sel {
+    fill: none;
+    stroke: var(--placa-destaque);
+    stroke-width: 1.5;
+    stroke-dasharray: 5 3;
+}
+.placa-perna { stroke: var(--esq-wire); stroke-width: 2; stroke-linecap: round; }
+.placa-gnd { stroke: var(--esq-gnd); stroke-width: 2.5; stroke-linecap: round; }
+
+.placa-term {
+    fill: transparent;
+    stroke: transparent;
+    stroke-width: 1.5;
+    cursor: crosshair;
+    pointer-events: all;
+}
+.placa-comp:hover .placa-term { stroke: var(--placa-destaque); }
+.placa-term.is-solto { stroke: var(--placa-erro); fill: rgba(231, 76, 60, 0.18); }
+.placa-svg--posicionar .placa-term, .placa-svg--fio .placa-term { pointer-events: none; }
+
+.placa-fio { cursor: pointer; }
+.placa-fio-hit { fill: none; stroke: transparent; stroke-width: 12; }
+.placa-fio-linha {
+    fill: none;
+    stroke: var(--esq-wire);
+    stroke-width: 2;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+    pointer-events: none;
+}
+.placa-fio:hover .placa-fio-linha { stroke: var(--placa-destaque); }
+.placa-fio.is-selecionado .placa-fio-linha { stroke: var(--placa-destaque); stroke-width: 3; }
+.placa-fio-previa {
+    fill: none;
+    stroke: var(--placa-destaque);
+    stroke-width: 2;
+    stroke-dasharray: 6 4;
+    pointer-events: none;
+}
+.placa-mira { stroke: var(--placa-destaque); stroke-width: 1.5; pointer-events: none; }
+.placa-juncao { fill: var(--esq-wire); pointer-events: none; }
+.placa-no { pointer-events: none; }
+.placa-no circle { fill: var(--esq-node-fill); stroke: var(--esq-node-stroke); stroke-width: 1; }
+.placa-no .esq-label--node { font-size: 10px; }
+
+.placa-vazia {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: min(460px, 85%);
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 0.9em;
+    line-height: 1.5;
+    pointer-events: none;
+}
+.placa-vazia p { margin: 6px 0; }
+.placa-vazia-nota { font-style: italic; font-size: 0.92em; }
+.placa-vazia kbd, .placa-status kbd {
+    padding: 1px 5px;
+    border: 1px solid var(--tab-border);
+    border-radius: 4px;
+    font-size: 0.85em;
+}
+
+.placa-props {
+    position: absolute;
+    z-index: 5;
+    width: 230px;
+    background: var(--bg-card);
+    color: var(--text-primary);
+    border: 1px solid var(--tab-border);
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+    padding: 12px;
+}
+.placa-props-titulo { font-weight: 700; margin-bottom: 8px; color: var(--placa-destaque); }
+.placa-props-campo { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 0.85em; }
+.placa-props-campo span { flex: 0 0 62px; color: var(--text-secondary); }
+.placa-props-campo input {
+    flex: 1;
+    min-width: 0;
+    padding: 5px 7px;
+    border: 1px solid var(--tab-border);
+    border-radius: 6px;
+    background: var(--esq-bg);
+    color: var(--text-primary);
+    font-family: 'Consolas', 'Monaco', monospace;
+}
+.placa-props-nota { margin: 6px 0; font-size: 0.75em; color: var(--text-secondary); }
+.placa-props-erro { margin: 6px 0; font-size: 0.8em; color: var(--placa-erro); font-weight: 600; }
+.placa-props-botoes { display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px; }
+.placa-props-botoes button {
+    padding: 5px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--tab-border);
+    background: var(--esq-bg);
+    color: var(--text-primary);
+    cursor: pointer;
+    font-weight: 600;
+}
+.placa-props-botoes .placa-props-ok { background: #16a085; border-color: #16a085; color: #fff; }
+
+.placa-status { margin-top: 8px; font-size: 0.85em; color: var(--text-secondary); }
+.placa-status-resumo { font-weight: 600; margin-right: 10px; }
+.placa-status-ok { color: var(--placa-destaque); font-weight: 600; }
+.placa-status-lista { margin: 6px 0 0; padding-left: 18px; }
+.placa-status-erro { color: var(--placa-erro); }
+.placa-status-aviso { color: #d68910; }
+body.dark-mode .placa-status-aviso { color: #f5b041; }
+
+.placa-erros, .placa-dessinc {
+    margin-bottom: 10px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 0.88em;
+}
+.placa-erros { background: rgba(231, 76, 60, 0.1); border: 1px solid rgba(231, 76, 60, 0.4); color: var(--text-primary); }
+.placa-erros ul { margin: 4px 0 0; padding-left: 18px; }
+.placa-dessinc { background: rgba(241, 196, 15, 0.12); border: 1px solid rgba(214, 137, 16, 0.45); }
+.placa-dessinc p { margin: 0 0 8px; }
+.placa-dessinc-acoes { display: flex; flex-wrap: wrap; gap: 8px; }
+.placa-dessinc-acoes button {
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--tab-border);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    cursor: pointer;
+    font-weight: 600;
+}

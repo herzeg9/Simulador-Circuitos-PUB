@@ -3653,6 +3653,7 @@ function setupEsquematicoLive() {
 function setupOutputTabs() {
     const tabs = document.querySelectorAll('.output-tab');
     const panels = {
+        'placa': document.getElementById('painelPlaca'),
         'resultados': document.getElementById('resultado'),
         'esquematico': document.getElementById('painelEsquematico')
     };
@@ -3675,7 +3676,8 @@ function setupOutputTabs() {
 }
 
 function ativarTab(tabId) {
-    const btn = document.getElementById(tabId === 'resultados' ? 'tabBtnResultados' : 'tabBtnEsquematico');
+    const ids = { placa: 'tabBtnPlaca', resultados: 'tabBtnResultados', esquematico: 'tabBtnEsquematico' };
+    const btn = document.getElementById(ids[tabId] || ids.esquematico);
     if (btn) btn.click();
 }
 

@@ -8,7 +8,7 @@
     <script>MathJax = {loader: {load: ['input/asciimath', 'output/chtml']}, asciimath: {delimiters: [['`','`']]}};</script>
     <script type="text/javascript" id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/startup.js"></script>
 
-    <link rel="stylesheet" href="styles.css?v=20260806-api-v2b">
+    <link rel="stylesheet" href="styles.css?v=20260926-placa3">
 </head>
 <body>
 
@@ -253,7 +253,7 @@
             <div class="button-group">
                 <button class="btn-calc" id="btnAnalisarCompleto" onclick="calcular()" title="Resolve o circuito e abre a aba Resolução (atalho: Ctrl+Enter)"> Resolu&ccedil;&atilde;o do Circuito</button>
                 <button type="button" class="btn-utility" onclick="renumerarNos()" title="Reordena os n&oacute;s sequencialmente (1,2,3,...) sem alterar a topologia">Renumerar n&oacute;s</button>
-                <button class="btn-clear" onclick="limparTudo()"> Limpar Tudo</button>
+                <button class="btn-clear" onclick="limparTudo(); Placa.limpar();"> Limpar Tudo</button>
             </div>
             <div id="loading" class="loading" role="status" aria-live="polite">
                 <div class="loading-spinner" aria-hidden="true"></div>
@@ -266,7 +266,8 @@
 
         <div class="output-panel">
             <div class="output-tabs" role="tablist" aria-label="Vis\u00f5es do circuito">
-                <button type="button" class="output-tab is-active" role="tab" aria-selected="true" aria-controls="painelEsquematico" id="tabBtnEsquematico" data-tab="esquematico">Esquemático</button>
+                <button type="button" class="output-tab is-active" role="tab" aria-selected="true" aria-controls="painelPlaca" id="tabBtnPlaca" data-tab="placa">Placa</button>
+                <button type="button" class="output-tab" role="tab" aria-selected="false" aria-controls="painelEsquematico" id="tabBtnEsquematico" data-tab="esquematico">Esquemático</button>
                 <button type="button" class="output-tab" role="tab" aria-selected="false" aria-controls="resultado" id="tabBtnResultados" data-tab="resultados">Resolu&ccedil;&atilde;o</button>
             </div>
 
@@ -278,7 +279,50 @@
                 </div>
             </div>
 
-            <div class="output-tab-panel is-active" id="painelEsquematico" role="tabpanel" aria-labelledby="tabBtnEsquematico">
+            <div class="output-tab-panel is-active" id="painelPlaca" role="tabpanel" aria-labelledby="tabBtnPlaca">
+                <div class="card card-placa">
+                    <div class="placa-header">
+                        <h3 class="section-title">Placa de montagem</h3>
+                        <button type="button" class="placa-resolver" id="placaBtnResolver" title="Resolve o circuito montado na placa">Resolver</button>
+                    </div>
+                    <div class="placa-toolbar" role="toolbar" aria-label="Componentes e ferramentas da placa">
+                        <div class="placa-pecas">
+                            <button type="button" class="placa-peca" data-tipo="Resistor" title="Resistor: arraste para a placa ou clique e depois clique na placa">R</button>
+                            <button type="button" class="placa-peca" data-tipo="Capacitor" title="Capacitor: arraste para a placa">C</button>
+                            <button type="button" class="placa-peca" data-tipo="Inductor" title="Indutor: arraste para a placa">L</button>
+                            <button type="button" class="placa-peca" data-tipo="VoltageSource" title="Fonte de tensão: arraste para a placa">V</button>
+                            <button type="button" class="placa-peca" data-tipo="CurrentSource" title="Fonte de corrente: arraste para a placa">I</button>
+                            <button type="button" class="placa-peca" data-tipo="GND" title="Terra (GND): nó 0, referência das tensões">GND</button>
+                        </div>
+                        <div class="placa-ferrs">
+                            <button type="button" class="placa-ferr" data-acao="fio" title="Desenhar fios (W). Também dá para arrastar direto de um terminal.">Fio</button>
+                            <button type="button" class="placa-ferr" data-acao="girar" title="Girar 90° (R)">Girar</button>
+                            <button type="button" class="placa-ferr" data-acao="apagar" title="Apagar o selecionado (Del)">Apagar</button>
+                            <button type="button" class="placa-ferr placa-ferr--perigo" data-acao="limpar" title="Apagar tudo da placa">Limpar</button>
+                        </div>
+                    </div>
+                    <div id="placaDessinc" class="placa-dessinc" role="alert" hidden>
+                        <p>A lista de componentes foi alterada fora da placa (exemplo carregado ou nó editado à mão). A resolução usa o que está na lista.</p>
+                        <div class="placa-dessinc-acoes">
+                            <button type="button" id="placaBtnRefazerLista">Refazer a lista a partir da placa</button>
+                            <button type="button" id="placaBtnLimparPlaca">Limpar a placa</button>
+                        </div>
+                    </div>
+                    <div id="placaErros" class="placa-erros" role="alert" hidden></div>
+                    <div class="placa-wrap" id="placaWrap">
+                        <div id="placaVazia" class="placa-vazia">
+                            <p><strong>Arraste componentes da barra acima para a placa.</strong></p>
+                            <p>Ligue os terminais com fios: arraste a partir de um terminal ou use a ferramenta <em>Fio</em>. Coloque pelo menos um terra (GND).</p>
+                            <p>Duplo clique edita nome e valor &middot; <kbd>R</kbd> gira &middot; <kbd>Del</kbd> apaga &middot; <kbd>Esc</kbd> cancela.</p>
+                            <p id="placaVaziaLista" class="placa-vazia-nota" hidden>O circuito que está na lista à esquerda não aparece aqui: por enquanto a placa só envia circuitos para a lista, não o contrário.</p>
+                        </div>
+                        <div id="placaProps" class="placa-props" hidden></div>
+                    </div>
+                    <div id="placaStatus" class="placa-status" aria-live="polite"></div>
+                </div>
+            </div>
+
+            <div class="output-tab-panel" id="painelEsquematico" role="tabpanel" aria-labelledby="tabBtnEsquematico" hidden>
                 <div class="card card-esquematico">
                     <div class="esq-header">
                         <h3 class="section-title">Esquemático do Circuito</h3>
@@ -359,6 +403,7 @@
         </form>
     </dialog>
 
-    <script src="script.js?v=20260806-api-v2b"></script>
+    <script src="script.js?v=20260926-placa3"></script>
+    <script src="placa.js?v=20260926-placa3"></script>
 </body>
 </html>

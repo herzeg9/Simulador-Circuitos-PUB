@@ -5,7 +5,8 @@
     "test:esquematico": "node tests/esquematico-audit.mjs",
     "test:svg": "node tests/svg-snapshot.mjs",
     "test:visual": "node tests/visual-esquematico.mjs",
-    "test": "npm run test:esquematico && npm run test:svg && npm run test:visual"
+    "test:placa": "node tests/placa-netlist.mjs",
+    "test": "npm run test:placa && npm run test:esquematico && npm run test:svg && npm run test:visual"
   },
   "devDependencies": {
     "pixelmatch": "^6.0.0",
