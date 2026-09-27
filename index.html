@@ -8,7 +8,7 @@
     <script>MathJax = {loader: {load: ['input/asciimath', 'output/chtml']}, asciimath: {delimiters: [['`','`']]}};</script>
     <script type="text/javascript" id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/startup.js"></script>
 
-    <link rel="stylesheet" href="styles.css?v=20260926-placa3">
+    <link rel="stylesheet" href="styles.css?v=20260926-placa4">
 </head>
 <body>
 
@@ -252,7 +252,7 @@
 
             <div class="button-group">
                 <button class="btn-calc" id="btnAnalisarCompleto" onclick="calcular()" title="Resolve o circuito e abre a aba Resolução (atalho: Ctrl+Enter)"> Resolu&ccedil;&atilde;o do Circuito</button>
-                <button type="button" class="btn-utility" onclick="renumerarNos()" title="Reordena os n&oacute;s sequencialmente (1,2,3,...) sem alterar a topologia">Renumerar n&oacute;s</button>
+                <button type="button" id="btnRenumerarNos" class="btn-utility" onclick="renumerarNos()" title="Reordena os n&oacute;s sequencialmente (1,2,3,...) sem alterar a topologia">Renumerar n&oacute;s</button>
                 <button class="btn-clear" onclick="limparTudo(); Placa.limpar();"> Limpar Tudo</button>
             </div>
             <div id="loading" class="loading" role="status" aria-live="polite">
@@ -297,7 +297,7 @@
                         <div class="placa-ferrs">
                             <button type="button" class="placa-ferr" data-acao="fio" title="Desenhar fios (W). Também dá para arrastar direto de um terminal.">Fio</button>
                             <button type="button" class="placa-ferr" data-acao="girar" title="Girar 90° (R)">Girar</button>
-                            <button type="button" class="placa-ferr" data-acao="apagar" title="Apagar o selecionado (Del)">Apagar</button>
+                            <button type="button" class="placa-ferr" data-acao="apagar" title="Apagar o que está selecionado (Del)">Apagar</button>
                             <button type="button" class="placa-ferr placa-ferr--perigo" data-acao="limpar" title="Apagar tudo da placa">Limpar</button>
                         </div>
                     </div>
@@ -313,7 +313,8 @@
                         <div id="placaVazia" class="placa-vazia">
                             <p><strong>Arraste componentes da barra acima para a placa.</strong></p>
                             <p>Ligue os terminais com fios: arraste a partir de um terminal ou use a ferramenta <em>Fio</em>. Coloque pelo menos um terra (GND).</p>
-                            <p>Duplo clique edita nome e valor &middot; <kbd>R</kbd> gira &middot; <kbd>Del</kbd> apaga &middot; <kbd>Esc</kbd> cancela.</p>
+                            <p>Arraste um fio para ajeitar o traçado; arraste as pontas de um fio selecionado para religá-lo. Clique e arraste na área vazia para selecionar vários itens.</p>
+                            <p>Duplo clique edita nome e valor &middot; <kbd>R</kbd> gira &middot; <kbd>Espaço</kbd> inverte a dobra do fio &middot; <kbd>Ctrl</kbd>+<kbd>A</kbd> seleciona tudo &middot; <kbd>Del</kbd> apaga &middot; <kbd>Esc</kbd> cancela.</p>
                             <p id="placaVaziaLista" class="placa-vazia-nota" hidden>O circuito que está na lista à esquerda não aparece aqui: por enquanto a placa só envia circuitos para a lista, não o contrário.</p>
                         </div>
                         <div id="placaProps" class="placa-props" hidden></div>
@@ -403,7 +404,7 @@
         </form>
     </dialog>
 
-    <script src="script.js?v=20260926-formato"></script>
-    <script src="placa.js?v=20260926-placa3"></script>
+    <script src="script.js?v=20260926-seta"></script>
+    <script src="placa.js?v=20260926-seta"></script>
 </body>
 </html>

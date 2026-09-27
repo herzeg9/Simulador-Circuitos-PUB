@@ -2967,17 +2967,22 @@ function symVoltageSource(cx, cy, orient, label, valor, positiveOnA) {
     </g>`;
 }
 
+/**
+ * A seta vai do 1º para o 2º nó da netlist: é o sentido em que o backend
+ * faz a corrente da fonte circular por dentro dela (convenção SPICE).
+ * fromAtoB = true quando o 1º nó (A) está à esquerda ou em cima.
+ */
 function symCurrentSource(cx, cy, orient, label, valor, fromAtoB) {
     const r = 18;
     const half = ESQ.BODY / 2;
     let arrowD;
     if (orient === 'H') {
-        const x1 = fromAtoB ? cx + r * 0.55 : cx - r * 0.55;
-        const x2 = fromAtoB ? cx - r * 0.55 : cx + r * 0.55;
+        const x1 = fromAtoB ? cx - r * 0.55 : cx + r * 0.55;
+        const x2 = fromAtoB ? cx + r * 0.55 : cx - r * 0.55;
         arrowD = `<line x1="${x1}" y1="${cy}" x2="${x2}" y2="${cy}" stroke="var(--esq-stroke)" stroke-width="2" marker-end="url(#esq-arrow-curr)"/>`;
     } else {
-        const y1 = fromAtoB ? cy + r * 0.55 : cy - r * 0.55;
-        const y2 = fromAtoB ? cy - r * 0.55 : cy + r * 0.55;
+        const y1 = fromAtoB ? cy - r * 0.55 : cy + r * 0.55;
+        const y2 = fromAtoB ? cy + r * 0.55 : cy - r * 0.55;
         arrowD = `<line x1="${cx}" y1="${y1}" x2="${cx}" y2="${y2}" stroke="var(--esq-stroke)" stroke-width="2" marker-end="url(#esq-arrow-curr)"/>`;
     }
     const leadA = orient === 'H'

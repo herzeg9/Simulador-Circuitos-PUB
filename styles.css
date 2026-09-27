@@ -2491,6 +2491,11 @@ body.dark-mode {
 }
 
 .card-placa { border-left: 5px solid #16a085; padding: 18px 20px; }
+
+/* Os nós de componentes de dois terminais vêm da placa; trafo e fontes
+   dependentes ainda não estão na placa e continuam com os campos. */
+.comp-item:is(.type-Resistor, .type-Capacitor, .type-Inductor, .type-VoltageSource, .type-CurrentSource) .nodes-group,
+#btnRenumerarNos { display: none; }
 .card-placa .section-title { color: #138d75; margin: 0; }
 body.dark-mode .card-placa .section-title { color: #76d7c4; }
 
@@ -2628,6 +2633,23 @@ body.dark-mode .card-placa .section-title { color: #76d7c4; }
     stroke-width: 2;
     stroke-dasharray: 6 4;
     pointer-events: none;
+}
+.placa-fio--h { cursor: ns-resize; }
+.placa-fio--v { cursor: ew-resize; }
+.placa-ponta {
+    fill: var(--placa-destaque);
+    fill-opacity: 0.3;
+    stroke: var(--placa-destaque);
+    stroke-width: 2;
+    cursor: move;
+}
+.placa-ima { fill: none; stroke: var(--placa-destaque); stroke-width: 2.5; }
+.placa-caixa-sel {
+    fill: var(--placa-destaque);
+    fill-opacity: 0.08;
+    stroke: var(--placa-destaque);
+    stroke-width: 1;
+    stroke-dasharray: 4 3;
 }
 .placa-mira { stroke: var(--placa-destaque); stroke-width: 1.5; pointer-events: none; }
 .placa-juncao { fill: var(--esq-wire); pointer-events: none; }

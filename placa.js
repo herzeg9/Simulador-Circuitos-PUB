@@ -37,10 +37,7 @@
         }
     }
 
-    /**
-     * Terminais de um componente. "A" é o primeiro nó da netlist
-     * (+ da fonte de tensão, ponta da seta da fonte de corrente).
-     */
+    /** Terminais de um componente. "A" é o + da fonte de tensão e a ponta da seta da fonte de corrente. */
     function terminais(comp) {
         if (comp.tipo === 'GND') return [{ nome: 'A', x: comp.x, y: comp.y }];
         const [ax, ay] = girar(-MEIO, 0, comp.rot);
@@ -66,6 +63,12 @@
     }
 
     const noFio = (p, fio) => segmentos(fio).some(s => noSegmento(p, s));
+
+    /**
+     * Nós na ordem da netlist. No backend a corrente da fonte vai do 1º
+     * para o 2º nó por dentro dela, então a ponta da seta (A) vem por último.
+     */
+    const nosNetlist = (comp, nos) => comp.tipo === 'CurrentSource' ? [nos.B, nos.A] : [nos.A, nos.B];
 
     /**
      * Agrupa terminais eletricamente ligados. Um fio conecta tudo o que
@@ -155,6 +158,122 @@
         return [...cont.values()].filter(e => e.n >= 3);
     }
 
+    const ehPonta = (p, f) => (p.x === f.x1 && p.y === f.y1) || (p.x === f.x2 && p.y === f.y2);
+    const horizontal = s => s.y1 === s.y2 && s.x1 !== s.x2;
+    const vertical = s => s.x1 === s.x2 && s.y1 !== s.y2;
+
+    /**
+     * Deixa só trechos retos: quebra os "L", descarta trechos de comprimento
+     * zero e junta trechos colineares que se tocam ou se sobrepõem. A junção
+     * não acontece se uma das pontas que sumiriam estiver no meio de um fio
+     * perpendicular: ali ela é o que faz a ligação em T.
+     */
+    function normalizarFios(fios, novoId) {
+        const segs = [];
+        fios.forEach(f => segmentos(f).forEach((s, i) => {
+            if (s.x1 === s.x2 && s.y1 === s.y2) return;
+            const inverter = s.x1 > s.x2 || s.y1 > s.y2;
+            segs.push(inverter
+                ? { id: i === 0 ? f.id : novoId(), x1: s.x2, y1: s.y2, x2: s.x1, y2: s.y1, hv: true }
+                : { id: i === 0 ? f.id : novoId(), x1: s.x1, y1: s.y1, x2: s.x2, y2: s.y2, hv: true });
+        }));
+        const fazT = (p, m, a, b) => segs.some(s => s !== a && s !== b
+            && (horizontal(m) ? vertical(s) : horizontal(s)) && noSegmento(p, s) && !ehPonta(p, s));
+        let houveJuncao = true;
+        while (houveJuncao) {
+            houveJuncao = false;
+            procura: for (let i = 0; i < segs.length; i++) {
+                for (let j = i + 1; j < segs.length; j++) {
+                    const a = segs[i], b = segs[j];
+                    let m = null;
+                    if (horizontal(a) && horizontal(b) && a.y1 === b.y1 && a.x1 <= b.x2 && b.x1 <= a.x2) {
+                        m = { x1: Math.min(a.x1, b.x1), y1: a.y1, x2: Math.max(a.x2, b.x2), y2: a.y1 };
+                    } else if (vertical(a) && vertical(b) && a.x1 === b.x1 && a.y1 <= b.y2 && b.y1 <= a.y2) {
+                        m = { x1: a.x1, y1: Math.min(a.y1, b.y1), x2: a.x1, y2: Math.max(a.y2, b.y2) };
+                    }
+                    if (!m) continue;
+                    const somem = [a, b].flatMap(s => [{ x: s.x1, y: s.y1 }, { x: s.x2, y: s.y2 }]).filter(p => !ehPonta(p, m));
+                    if (somem.some(p => fazT(p, m, a, b))) continue;
+                    Object.assign(a, m);
+                    segs.splice(j, 1);
+                    houveJuncao = true;
+                    break procura;
+                }
+            }
+        }
+        return segs;
+    }
+
+    /** Com só uma ponta andando, o fio continua saindo da ponta parada na direção original. */
+    function manterDirecao(f, moveuPonta1) {
+        if (horizontal(f)) return !moveuPonta1;
+        if (vertical(f)) return moveuPonta1;
+        return f.hv;
+    }
+
+    /**
+     * Recalcula os fios a partir de uma cópia anterior ao arrasto.
+     * destino(ponto, fio) devolve a nova posição de um ponto que anda, ou null.
+     */
+    function reposicionarFios(base, destino) {
+        return base.map(b => {
+            const n1 = destino({ x: b.x1, y: b.y1 }, b);
+            const n2 = destino({ x: b.x2, y: b.y2 }, b);
+            const f = { ...b };
+            if (n1) { f.x1 = n1.x; f.y1 = n1.y; }
+            if (n2) { f.x2 = n2.x; f.y2 = n2.y; }
+            if (!n1 !== !n2) f.hv = manterDirecao(b, !!n1);
+            return f;
+        });
+    }
+
+    /**
+     * Desloca um trecho reto de fio na perpendicular. Fios perpendiculares
+     * presos a ele esticam; onde há mais alguma coisa ligada (terminal, fio
+     * na mesma direção, fio que recebe a ponta em T) entra um trecho novo
+     * para não perder a ligação.
+     */
+    function arrastarTrecho(comps, base, id, d, novoId) {
+        const fios = base.map(f => ({ ...f }));
+        const s = base.find(f => f.id === id);
+        if (!s || !d || (!horizontal(s) && !vertical(s))) return fios;
+        const ehH = horizontal(s);
+        const mover = p => ehH ? { x: p.x, y: p.y + d } : { x: p.x + d, y: p.y };
+        const p1 = mover({ x: s.x1, y: s.y1 });
+        const p2 = mover({ x: s.x2, y: s.y2 });
+        Object.assign(fios.find(f => f.id === id), { x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y });
+
+        const terms = comps.flatMap(c => terminais(c));
+        const pontos = new Map();
+        const incluir = p => pontos.set(`${p.x},${p.y}`, { x: p.x, y: p.y });
+        incluir({ x: s.x1, y: s.y1 });
+        incluir({ x: s.x2, y: s.y2 });
+        terms.forEach(t => { if (noSegmento(t, s)) incluir(t); });
+        base.forEach(f => {
+            if (f.id === id) return;
+            [{ x: f.x1, y: f.y1 }, { x: f.x2, y: f.y2 }].forEach(p => { if (noSegmento(p, s)) incluir(p); });
+        });
+
+        pontos.forEach(p => {
+            const alvo = mover(p);
+            const pontaDoTrecho = ehPonta(p, s);
+            let ponte = terms.some(t => t.x === p.x && t.y === p.y);
+            base.forEach((f, i) => {
+                if (f.id === id) return;
+                const temPonta = ehPonta(p, f);
+                if (temPonta && (ehH ? vertical(f) : horizontal(f))) {
+                    const g = fios[i];
+                    if (f.x1 === p.x && f.y1 === p.y) { g.x1 = alvo.x; g.y1 = alvo.y; }
+                    else { g.x2 = alvo.x; g.y2 = alvo.y; }
+                } else if (temPonta || (pontaDoTrecho && noSegmento(p, f))) {
+                    ponte = true;
+                }
+            });
+            if (ponte) fios.push({ id: novoId(), x1: p.x, y1: p.y, x2: alvo.x, y2: alvo.y, hv: true });
+        });
+        return fios;
+    }
+
     /**
      * Problemas que impedem ou comprometem a resolução.
      * @returns {{erros: string[], avisos: string[]}}
@@ -182,7 +301,7 @@
     }
 
     if (typeof module !== 'undefined' && module.exports) {
-        module.exports = { terminais, segmentos, extrairNos, juncoes, diagnosticar };
+        module.exports = { terminais, segmentos, extrairNos, juncoes, diagnosticar, normalizarFios, reposicionarFios, arrastarTrecho, nosNetlist };
     }
     if (typeof document === 'undefined') return;
 
@@ -191,9 +310,11 @@
     const estado = { comps: [], fios: [], seq: 1 };
     const ui = {
         modo: 'selecionar',
-        selecao: null,
+        selecao: { comps: new Set(), fios: new Set() },
         fantasma: null,
         fioInicio: null,
+        fioHv: null,
+        fioInverter: false,
         voltarAoSelecionar: false,
         cursor: { x: 0, y: 0 },
         cursorNaPlaca: false,
@@ -204,10 +325,32 @@
     let svg, conteudo, sobreposicao, wrap;
     let timerSync = null;
 
+    const RAIO_IMA = 12;
     const snap = v => Math.round(v / GRID) * GRID;
     const $ = id => document.getElementById(id);
     const acharComp = id => estado.comps.find(c => c.id === id);
+    const acharFio = id => estado.fios.find(f => f.id === id);
     const novoId = () => 'p' + (estado.seq++);
+
+    const selVazia = () => !ui.selecao.comps.size && !ui.selecao.fios.size;
+    const limparSelecao = () => { ui.selecao = { comps: new Set(), fios: new Set() }; };
+    const selecionarSo = (tipo, id) => {
+        limparSelecao();
+        ui.selecao[tipo === 'comp' ? 'comps' : 'fios'].add(id);
+    };
+    const tamanhoSel = () => ui.selecao.comps.size + ui.selecao.fios.size;
+    const tudoSelecionado = () => estado.comps.every(c => ui.selecao.comps.has(c.id)) && estado.fios.every(f => ui.selecao.fios.has(f.id));
+
+    /** Componente sozinho na seleção (sem fios), ou null. */
+    function compUnico() {
+        if (ui.selecao.comps.size !== 1 || ui.selecao.fios.size) return null;
+        return acharComp([...ui.selecao.comps][0]) || null;
+    }
+
+    function podarSelecao() {
+        ui.selecao.comps.forEach(id => { if (!acharComp(id)) ui.selecao.comps.delete(id); });
+        ui.selecao.fios.forEach(id => { if (!acharFio(id)) ui.selecao.fios.delete(id); });
+    }
 
     function proximoNome(tipo) {
         const prefixo = prefixoNomePorTipo(tipo);
@@ -256,7 +399,7 @@
             nome: c.nome || '',
             valor: c.nome ? valorExibido(c) : '',
             _positiveOnA: aPrimeiro,
-            _fromAtoB: aPrimeiro
+            _fromAtoB: !aPrimeiro
         }, x, y, orient));
     }
 
@@ -274,6 +417,13 @@
             <line class="placa-gnd" x1="${x - 4}" y1="${y + 24}" x2="${x + 4}" y2="${y + 24}"/>`;
     }
 
+    function caixaComp(c) {
+        if (c.tipo === 'GND') return { x: c.x - 16, y: c.y - 4, w: 32, h: 32 };
+        return (c.rot === 90 || c.rot === 270)
+            ? { x: c.x - 20, y: c.y - MEIO, w: 40, h: 2 * MEIO }
+            : { x: c.x - MEIO, y: c.y - 20, w: 2 * MEIO, h: 40 };
+    }
+
     function svgComp(c, opts) {
         const cls = ['placa-comp'];
         if (opts.fantasma) cls.push('is-fantasma');
@@ -283,17 +433,13 @@
             return `<circle class="placa-term${solto ? ' is-solto' : ''}" cx="${t.x}" cy="${t.y}" r="5" data-comp="${c.id}" data-term="${t.nome}"/>`;
         }).join('');
 
-        let caixa, corpo;
+        const caixa = caixaComp(c);
+        let corpo;
         if (c.tipo === 'GND') {
-            caixa = { x: c.x - 16, y: c.y - 4, w: 32, h: 32 };
             corpo = desenhoGnd(c.x, c.y);
         } else {
             const orient = (c.rot === 90 || c.rot === 270) ? 'V' : 'H';
-            const aPrimeiro = c.rot === 0 || c.rot === 90;
-            caixa = orient === 'H'
-                ? { x: c.x - MEIO, y: c.y - 20, w: 2 * MEIO, h: 40 }
-                : { x: c.x - 20, y: c.y - MEIO, w: 40, h: 2 * MEIO };
-            corpo = pernas(c.x, c.y, orient) + simbolo(c, c.x, c.y, orient, aPrimeiro);
+            corpo = pernas(c.x, c.y, orient) + simbolo(c, c.x, c.y, orient, c.rot === 0 || c.rot === 90);
         }
         const sel = opts.selecionado
             ? `<rect class="placa-sel" x="${caixa.x - 4}" y="${caixa.y - 4}" width="${caixa.w + 8}" height="${caixa.h + 8}" rx="6"/>`
@@ -313,7 +459,11 @@
 
     function svgFio(f, selecionado) {
         const d = caminhoFio(f);
-        return `<g class="placa-fio${selecionado ? ' is-selecionado' : ''}" data-fio="${f.id}">
+        const cls = ['placa-fio'];
+        if (horizontal(f)) cls.push('placa-fio--h');
+        else if (vertical(f)) cls.push('placa-fio--v');
+        if (selecionado) cls.push('is-selecionado');
+        return `<g class="${cls.join(' ')}" data-fio="${f.id}">
             <path class="placa-fio-hit" d="${d}"/>
             <path class="placa-fio-linha" d="${d}"/>
         </g>`;
@@ -327,16 +477,42 @@
         }).join('');
     }
 
-    const orientarFio = (a, b) => Math.abs(b.x - a.x) >= Math.abs(b.y - a.y);
+    /** Eixo do terminal em p: true = horizontal, false = vertical, null = não há terminal. */
+    function eixoTerminal(p) {
+        for (const c of estado.comps) {
+            if (!terminais(c).some(t => t.x === p.x && t.y === p.y)) continue;
+            return c.tipo !== 'GND' && (c.rot === 0 || c.rot === 180);
+        }
+        return null;
+    }
+
+    /**
+     * O fio sai do terminal na direção da perna (e chega ao terminal final
+     * na direção da perna dele); longe de terminais, segue o primeiro
+     * movimento do mouse. Espaço inverte a dobra.
+     */
+    function hvDoFio(inicio, fim) {
+        let hv = eixoTerminal(inicio);
+        if (hv === null) {
+            const e = eixoTerminal(fim);
+            if (e !== null) hv = !e;
+        }
+        if (hv === null) hv = ui.fioHv !== null ? ui.fioHv : Math.abs(fim.x - inicio.x) >= Math.abs(fim.y - inicio.y);
+        return ui.fioInverter ? !hv : hv;
+    }
 
     function render() {
         const analise = extrairNos(estado.comps, estado.fios);
         const soltos = new Set(analise.soltos.map(({ comp, term }) => `${comp.id}:${term.nome}`));
         const sel = ui.selecao;
-        let html = estado.fios.map(f => svgFio(f, !!sel && sel.tipo === 'fio' && sel.id === f.id)).join('');
-        html += estado.comps.map(c => svgComp(c, { selecionado: !!sel && sel.tipo === 'comp' && sel.id === c.id, soltos })).join('');
+        let html = estado.fios.map(f => svgFio(f, sel.fios.has(f.id))).join('');
+        html += estado.comps.map(c => svgComp(c, { selecionado: sel.comps.has(c.id), soltos })).join('');
         html += juncoes(estado.comps, estado.fios).map(j => `<circle class="placa-juncao" cx="${j.x}" cy="${j.y}" r="4"/>`).join('');
         html += svgRotulosNos(analise.grupos);
+        const fioSel = ui.modo === 'selecionar' && !sel.comps.size && sel.fios.size === 1 ? acharFio([...sel.fios][0]) : null;
+        if (fioSel) {
+            html += [1, 2].map(n => `<circle class="placa-ponta" cx="${fioSel['x' + n]}" cy="${fioSel['y' + n]}" r="6" data-fio="${fioSel.id}" data-ponta="${n}"/>`).join('');
+        }
 
         conteudo.innerHTML = html;
         renderSobreposicao();
@@ -351,9 +527,17 @@
     // cada movimento do mouse não recria os elementos que recebem cliques.
     function renderSobreposicao() {
         let html = '';
+        const a = ui.arrasto;
         if (ui.fioInicio && ui.cursorNaPlaca) {
-            const previa = { x1: ui.fioInicio.x, y1: ui.fioInicio.y, x2: ui.cursor.x, y2: ui.cursor.y, hv: orientarFio(ui.fioInicio, ui.cursor) };
+            const previa = { x1: ui.fioInicio.x, y1: ui.fioInicio.y, x2: ui.cursor.x, y2: ui.cursor.y, hv: hvDoFio(ui.fioInicio, ui.cursor) };
             html += `<path class="placa-fio-previa" d="${caminhoFio(previa)}"/>`;
+        }
+        if (ligando() && ui.cursorNaPlaca && pontoConectavel(ui.cursor, a && a.tipo === 'ponta' ? acharFio(a.id) : null)) {
+            html += `<circle class="placa-ima" cx="${ui.cursor.x}" cy="${ui.cursor.y}" r="9"/>`;
+        }
+        if (a && a.tipo === 'caixa') {
+            const r = retanguloCaixa(a);
+            html += `<rect class="placa-caixa-sel" x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}"/>`;
         }
         if (ui.modo === 'fio' && ui.cursorNaPlaca) {
             const { x, y } = ui.cursor;
@@ -395,16 +579,22 @@
         });
         const btnFio = document.querySelector('.placa-ferr[data-acao="fio"]');
         if (btnFio) btnFio.classList.toggle('is-ativo', ui.modo === 'fio');
-        const comp = ui.selecao && ui.selecao.tipo === 'comp' ? acharComp(ui.selecao.id) : null;
+        const comp = compUnico();
         const btnGirar = document.querySelector('.placa-ferr[data-acao="girar"]');
         if (btnGirar) btnGirar.disabled = !(ui.modo === 'posicionar' || (comp && comp.tipo !== 'GND'));
         const btnApagar = document.querySelector('.placa-ferr[data-acao="apagar"]');
-        if (btnApagar) btnApagar.disabled = !ui.selecao;
+        if (btnApagar) {
+            btnApagar.disabled = selVazia();
+            const n = tamanhoSel();
+            btnApagar.title = n > 1 ? `Apagar os ${n} itens selecionados (Del)` : 'Apagar o selecionado (Del)';
+        }
     }
 
     /* ---------- Edição ---------- */
 
     function mudou() {
+        estado.fios = normalizarFios(estado.fios, novoId);
+        podarSelecao();
         render();
         salvar();
         clearTimeout(timerSync);
@@ -414,7 +604,7 @@
     function cancelar() {
         ui.modo = 'selecionar';
         ui.fantasma = null;
-        ui.fioInicio = null;
+        comecarFio(null);
         ui.voltarAoSelecionar = false;
         ui.arrasto = null;
         ui.arrastoPaleta = false;
@@ -424,7 +614,7 @@
         const c = montarComp(ui.fantasma.tipo, p.x, p.y, ui.fantasma.rot, novoId());
         estado.comps.push(c);
         cancelar();
-        ui.selecao = { tipo: 'comp', id: c.id };
+        selecionarSo('comp', c.id);
         mudou();
     }
 
@@ -433,52 +623,66 @@
         return estado.fios.some(f => f !== ignorar && noFio(p, f));
     }
 
+    function comecarFio(p) {
+        ui.fioInicio = p;
+        ui.fioHv = null;
+        ui.fioInverter = false;
+    }
+
+    const ligando = () => ui.modo === 'fio' || !!ui.fioInicio || (!!ui.arrasto && ui.arrasto.tipo === 'ponta');
+
+    /** Terminal ou ponta de fio mais próxima do ponteiro, dentro do raio do ímã. */
+    function ima(p, ignorarFio) {
+        let melhor = null;
+        let dist = RAIO_IMA;
+        const testar = (x, y) => {
+            const d = Math.hypot(x - p.x, y - p.y);
+            if (d <= dist) { dist = d; melhor = { x, y }; }
+        };
+        estado.comps.forEach(c => terminais(c).forEach(t => testar(t.x, t.y)));
+        estado.fios.forEach(f => {
+            if (f.id === ignorarFio) return;
+            testar(f.x1, f.y1);
+            testar(f.x2, f.y2);
+        });
+        return melhor;
+    }
+
     function criarFio(a, b) {
-        const f = { id: novoId(), x1: a.x, y1: a.y, x2: b.x, y2: b.y, hv: orientarFio(a, b) };
+        const f = { id: novoId(), x1: a.x, y1: a.y, x2: b.x, y2: b.y, hv: hvDoFio(a, b) };
         estado.fios.push(f);
         return f;
     }
 
-    /** Termina um trecho de fio; se a ponta não encostou em nada, o traçado continua dali. */
-    function terminarTrecho(inicio, fim) {
+    /**
+     * Termina um trecho de fio. No modo Fio (cliques), se a ponta não
+     * encostou em nada o traçado continua dali; arrastando, o fio acaba
+     * onde o botão foi solto.
+     */
+    function terminarTrecho(inicio, fim, continuar) {
         const f = criarFio(inicio, fim);
-        if (pontoConectavel(fim, f)) {
-            ui.fioInicio = null;
-            if (ui.voltarAoSelecionar) cancelar();
-        } else {
+        if (continuar && !pontoConectavel(fim, f)) {
             ui.modo = 'fio';
-            ui.fioInicio = fim;
+            comecarFio(fim);
+        } else {
+            comecarFio(null);
+            if (ui.voltarAoSelecionar) cancelar();
         }
         mudou();
     }
 
     function cliqueFio(p) {
         if (!ui.fioInicio) {
-            ui.fioInicio = p;
+            comecarFio(p);
             render();
             return;
         }
         if (p.x === ui.fioInicio.x && p.y === ui.fioInicio.y) return;
-        terminarTrecho(ui.fioInicio, p);
+        terminarTrecho(ui.fioInicio, p, true);
     }
 
-    function fiosPresos(c) {
-        const presos = [];
-        terminais(c).forEach(t => estado.fios.forEach(f => {
-            if (f.x1 === t.x && f.y1 === t.y) presos.push({ fio: f, ponta: 1, term: t.nome });
-            if (f.x2 === t.x && f.y2 === t.y) presos.push({ fio: f, ponta: 2, term: t.nome });
-        }));
-        return presos;
-    }
-
-    function arrastarPresos(c, presos) {
-        const pos = {};
-        terminais(c).forEach(t => { pos[t.nome] = t; });
-        presos.forEach(({ fio, ponta, term }) => {
-            if (ponta === 1) { fio.x1 = pos[term].x; fio.y1 = pos[term].y; }
-            else { fio.x2 = pos[term].x; fio.y2 = pos[term].y; }
-        });
-    }
+    const copiarFios = () => estado.fios.map(f => ({ ...f }));
+    const mesmoPonto = (a, b) => a.x === b.x && a.y === b.y;
 
     function girarAtual() {
         if (ui.modo === 'posicionar' && ui.fantasma) {
@@ -486,22 +690,127 @@
             render();
             return;
         }
-        const c = ui.selecao && ui.selecao.tipo === 'comp' ? acharComp(ui.selecao.id) : null;
+        const c = compUnico();
         if (!c || c.tipo === 'GND') return;
-        const presos = fiosPresos(c);
+        const antes = terminais(c);
+        const outros = estado.comps.filter(k => k !== c).flatMap(k => terminais(k));
+        const presoNoMeio = antes.map(t => outros.some(o => mesmoPonto(o, t))
+            || estado.fios.some(f => !ehPonta(t, f) && noFio(t, f)));
         c.rot = (c.rot + 90) % 360;
-        arrastarPresos(c, presos);
+        const depois = terminais(c);
+        estado.fios = reposicionarFios(copiarFios(), p => {
+            const i = antes.findIndex(t => mesmoPonto(t, p));
+            return i >= 0 ? { x: depois[i].x, y: depois[i].y } : null;
+        });
+        // A dobra fica do lado de fora: o caminho pelo canto oposto passaria pelo corpo.
+        const vertical = c.rot === 90 || c.rot === 270;
+        antes.forEach((t, i) => {
+            if (presoNoMeio[i]) estado.fios.push({ id: novoId(), x1: t.x, y1: t.y, x2: depois[i].x, y2: depois[i].y, hv: !vertical });
+        });
         mudou();
     }
 
+    /** Apaga tudo o que está selecionado; com o circuito todo selecionado, a placa fica vazia. */
     function apagarSelecao() {
-        const sel = ui.selecao;
-        if (!sel) return;
-        if (sel.tipo === 'comp') estado.comps = estado.comps.filter(c => c.id !== sel.id);
-        else estado.fios = estado.fios.filter(f => f.id !== sel.id);
-        ui.selecao = null;
+        if (selVazia()) return;
+        const { comps, fios } = ui.selecao;
+        estado.comps = estado.comps.filter(c => !comps.has(c.id));
+        estado.fios = estado.fios.filter(f => !fios.has(f.id));
+        limparSelecao();
         fecharProps();
         mudou();
+    }
+
+    function selecionarTudo() {
+        ui.selecao = { comps: new Set(estado.comps.map(c => c.id)), fios: new Set(estado.fios.map(f => f.id)) };
+        render();
+    }
+
+    /**
+     * Arrasto da seleção: componentes e fios selecionados andam juntos;
+     * fios de fora presos a eles esticam, saindo da ponta parada na
+     * direção que já tinham.
+     */
+    function iniciarArrastoGrupo(p, reduzirA) {
+        const { comps, fios } = ui.selecao;
+        const base = copiarFios();
+        const movem = [];
+        const pontes = [];
+        estado.comps.forEach(c => {
+            if (!comps.has(c.id)) return;
+            const vertical = c.tipo === 'GND' || c.rot === 90 || c.rot === 270;
+            terminais(c).forEach(t => movem.push({ x: t.x, y: t.y, hv: vertical }));
+        });
+        const fiosSel = base.filter(f => fios.has(f.id));
+        fiosSel.forEach(f => movem.push({ x: f.x1, y: f.y1, hv: true }, { x: f.x2, y: f.y2, hv: true }));
+        // Onde um ponto que anda encosta em algo que fica (terminal de outro
+        // componente ou meio de um fio), um trecho novo mantém a ligação.
+        const anda = q => movem.some(m => mesmoPonto(m, q)) || fiosSel.some(s => noFio(q, s));
+        const fiosParados = base.filter(f => !fios.has(f.id) && !anda({ x: f.x1, y: f.y1 }) && !anda({ x: f.x2, y: f.y2 }));
+        const termsParados = estado.comps.filter(c => !comps.has(c.id)).flatMap(c => terminais(c));
+        movem.forEach(m => {
+            if (pontes.some(q => mesmoPonto(q, m))) return;
+            if (termsParados.some(t => mesmoPonto(t, m)) || fiosParados.some(f => noFio(m, f))) pontes.push(m);
+        });
+        ui.arrasto = {
+            tipo: 'grupo', x0: p.x, y0: p.y, dx: 0, dy: 0, reduzirA, base, movem, fiosSel, pontes,
+            origem: estado.comps.filter(c => comps.has(c.id)).map(c => ({ c, x: c.x, y: c.y }))
+        };
+    }
+
+    function moverGrupo(a, dx, dy) {
+        a.origem.forEach(o => { o.c.x = o.x + dx; o.c.y = o.y + dy; });
+        const anda = p => ({ x: p.x + dx, y: p.y + dy });
+        estado.fios = reposicionarFios(a.base, (p, f) => {
+            if (ui.selecao.fios.has(f.id)) return anda(p);
+            if (a.movem.some(m => mesmoPonto(m, p)) || a.fiosSel.some(s => noFio(p, s))) return anda(p);
+            return null;
+        });
+        seqTemp = 0;
+        if (dx || dy) a.pontes.forEach(m => estado.fios.push({ id: idTemp(), x1: m.x, y1: m.y, x2: m.x + dx, y2: m.y + dy, hv: m.hv }));
+    }
+
+    let seqTemp = 0;
+    const idTemp = () => 'tmp' + (seqTemp++);
+    const fixarIdsTemp = () => estado.fios.forEach(f => { if (f.id.startsWith('tmp')) f.id = novoId(); });
+
+    function moverTrecho(a, d) {
+        seqTemp = 0;
+        estado.fios = arrastarTrecho(estado.comps, a.base, a.id, d, idTemp);
+    }
+
+    function moverPonta(a) {
+        estado.fios = a.base.map(b => {
+            if (b.id !== a.id) return { ...b };
+            const f = { ...b, ['x' + a.ponta]: ui.cursor.x, ['y' + a.ponta]: ui.cursor.y };
+            f.hv = manterDirecao(b, a.ponta === 1);
+            return f;
+        });
+    }
+
+    function retanguloCaixa(a) {
+        const x = Math.min(a.x0, a.x1), y = Math.min(a.y0, a.y1);
+        return { x, y, w: Math.abs(a.x1 - a.x0), h: Math.abs(a.y1 - a.y0) };
+    }
+
+    /** Seleciona o que ficou inteiramente dentro do retângulo. */
+    function aplicarCaixa(a) {
+        const r = retanguloCaixa(a);
+        const dentro = (x, y) => x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h;
+        if (!a.somar) limparSelecao();
+        estado.comps.forEach(c => {
+            const b = caixaComp(c);
+            if (dentro(b.x, b.y) && dentro(b.x + b.w, b.y + b.h)) ui.selecao.comps.add(c.id);
+        });
+        estado.fios.forEach(f => {
+            if (segmentos(f).every(s => dentro(s.x1, s.y1) && dentro(s.x2, s.y2))) ui.selecao.fios.add(f.id);
+        });
+    }
+
+    function alternarNaSelecao(tipo, id) {
+        const conj = ui.selecao[tipo === 'comp' ? 'comps' : 'fios'];
+        if (conj.has(id)) conj.delete(id);
+        else conj.add(id);
     }
 
     function alternarFio() {
@@ -515,7 +824,7 @@
         estado.comps = [];
         estado.fios = [];
         cancelar();
-        ui.selecao = null;
+        limparSelecao();
         fecharProps();
         mudou();
     }
@@ -524,7 +833,7 @@
         estado.comps = [];
         estado.fios = [];
         cancelar();
-        ui.selecao = null;
+        limparSelecao();
         fecharProps();
         clearTimeout(timerSync);
         timerSync = null;
@@ -622,8 +931,14 @@
         pt.x = e.clientX;
         pt.y = e.clientY;
         const p = pt.matrixTransform(svg.getScreenCTM().inverse());
-        ui.cursor = { x: snap(p.x), y: snap(p.y) };
+        const a = ui.arrasto;
+        const alvo = ligando() ? ima(p, a && a.tipo === 'ponta' ? a.id : null) : null;
+        ui.cursor = alvo || { x: snap(p.x), y: snap(p.y) };
         return p;
+    }
+
+    function capturar(e) {
+        svg.setPointerCapture(e.pointerId);
     }
 
     function aoPressionar(e) {
@@ -633,34 +948,59 @@
         if (ui.modo === 'posicionar') { posicionar(ui.cursor); return; }
         if (ui.modo === 'fio') { cliqueFio(ui.cursor); return; }
 
+        const alvoPonta = e.target.closest('[data-ponta]');
+        if (alvoPonta) {
+            ui.arrasto = { tipo: 'ponta', id: alvoPonta.dataset.fio, ponta: Number(alvoPonta.dataset.ponta), base: copiarFios(), moveu: false };
+            atualizarCursor(e);
+            capturar(e);
+            return;
+        }
         const alvoTerm = e.target.closest('[data-term]');
-        if (alvoTerm) {
+        if (alvoTerm && !e.shiftKey) {
             const t = terminais(acharComp(alvoTerm.dataset.comp)).find(k => k.nome === alvoTerm.dataset.term);
-            ui.fioInicio = { x: t.x, y: t.y };
+            comecarFio({ x: t.x, y: t.y });
             ui.arrasto = { tipo: 'fio-terminal', inicio: ui.fioInicio };
-            svg.setPointerCapture(e.pointerId);
+            capturar(e);
             render();
             return;
         }
         const alvoComp = e.target.closest('[data-comp]');
-        if (alvoComp) {
-            const c = acharComp(alvoComp.dataset.comp);
-            const agora = performance.now();
-            if (ui.ultimoToque.id === c.id && agora - ui.ultimoToque.t < 350) {
-                ui.ultimoToque = { id: null, t: 0 };
-                abrirProps(c);
+        const alvoFio = !alvoComp && e.target.closest('[data-fio]');
+        if (alvoComp || alvoFio) {
+            const tipo = alvoComp ? 'comp' : 'fio';
+            const id = alvoComp ? alvoComp.dataset.comp : alvoFio.dataset.fio;
+            if (alvoComp) {
+                const agora = performance.now();
+                if (!e.shiftKey && ui.ultimoToque.id === id && agora - ui.ultimoToque.t < 350) {
+                    ui.ultimoToque = { id: null, t: 0 };
+                    abrirProps(acharComp(id));
+                    return;
+                }
+                ui.ultimoToque = { id, t: agora };
+            }
+            if (e.shiftKey) {
+                alternarNaSelecao(tipo, id);
+                render();
                 return;
             }
-            ui.ultimoToque = { id: c.id, t: agora };
-            ui.selecao = { tipo: 'comp', id: c.id };
-            ui.arrasto = { tipo: 'mover', comp: c, x0: p.x, y0: p.y, cx0: c.x, cy0: c.y, presos: fiosPresos(c), moveu: false };
-            svg.setPointerCapture(e.pointerId);
+            const jaSelecionado = ui.selecao[tipo === 'comp' ? 'comps' : 'fios'].has(id);
+            if (jaSelecionado && tamanhoSel() > 1) {
+                iniciarArrastoGrupo(p, { tipo, id });
+            } else {
+                selecionarSo(tipo, id);
+                const f = alvoFio && acharFio(id);
+                if (f && (horizontal(f) || vertical(f))) {
+                    ui.arrasto = { tipo: 'trecho', id, x0: p.x, y0: p.y, d: 0, ehH: horizontal(f), base: copiarFios() };
+                } else {
+                    iniciarArrastoGrupo(p, null);
+                }
+            }
+            capturar(e);
             render();
             return;
         }
-        const alvoFio = e.target.closest('[data-fio]');
-        ui.selecao = alvoFio ? { tipo: 'fio', id: alvoFio.dataset.fio } : null;
-        render();
+        ui.arrasto = { tipo: 'caixa', x0: p.x, y0: p.y, x1: p.x, y1: p.y, somar: e.shiftKey };
+        capturar(e);
     }
 
     function aoMover(e) {
@@ -669,21 +1009,46 @@
         if (ui.modo === 'selecionar' && !a) return;
         const antes = { ...ui.cursor, naPlaca: ui.cursorNaPlaca };
         const p = atualizarCursor(e);
-        if (a && a.tipo === 'mover') {
-            const nx = snap(a.cx0 + (p.x - a.x0));
-            const ny = snap(a.cy0 + (p.y - a.y0));
-            if (nx !== a.comp.x || ny !== a.comp.y) {
-                a.comp.x = nx;
-                a.comp.y = ny;
+        if (a && a.tipo === 'grupo') {
+            const dx = snap(p.x - a.x0), dy = snap(p.y - a.y0);
+            if (dx !== a.dx || dy !== a.dy) {
+                a.dx = dx;
+                a.dy = dy;
                 a.moveu = true;
-                arrastarPresos(a.comp, a.presos);
+                moverGrupo(a, dx, dy);
                 render();
             }
             return;
         }
-        if (antes.x !== ui.cursor.x || antes.y !== ui.cursor.y || antes.naPlaca !== ui.cursorNaPlaca) {
-            renderSobreposicao();
+        if (a && a.tipo === 'trecho') {
+            const d = snap(a.ehH ? p.y - a.y0 : p.x - a.x0);
+            if (d !== a.d) {
+                a.d = d;
+                a.moveu = true;
+                moverTrecho(a, d);
+                render();
+            }
+            return;
         }
+        if (a && a.tipo === 'caixa') {
+            a.x1 = p.x;
+            a.y1 = p.y;
+            renderSobreposicao();
+            return;
+        }
+        const mexeu = antes.x !== ui.cursor.x || antes.y !== ui.cursor.y;
+        if (a && a.tipo === 'ponta') {
+            if (mexeu) {
+                a.moveu = true;
+                moverPonta(a);
+                render();
+            }
+            return;
+        }
+        if (ui.fioInicio && ui.fioHv === null && !mesmoPonto(ui.cursor, ui.fioInicio)) {
+            ui.fioHv = Math.abs(ui.cursor.x - ui.fioInicio.x) >= Math.abs(ui.cursor.y - ui.fioInicio.y);
+        }
+        if (mexeu || antes.naPlaca !== ui.cursorNaPlaca) renderSobreposicao();
     }
 
     function aoSoltar(e) {
@@ -696,19 +1061,39 @@
         const a = ui.arrasto;
         ui.arrasto = null;
         if (!a) return;
-        if (a.tipo === 'mover') {
+        if (a.tipo === 'grupo') {
+            if (a.moveu) { fixarIdsTemp(); mudou(); }
+            else if (a.reduzirA) { selecionarSo(a.reduzirA.tipo, a.reduzirA.id); render(); }
+            return;
+        }
+        if (a.tipo === 'trecho') {
+            if (a.moveu) { fixarIdsTemp(); mudou(); }
+            return;
+        }
+        if (a.tipo === 'ponta') {
             if (a.moveu) mudou();
+            else render();
+            return;
+        }
+        if (a.tipo === 'caixa') {
+            const r = retanguloCaixa(a);
+            if (r.w < 4 && r.h < 4) {
+                if (!a.somar) limparSelecao();
+            } else {
+                aplicarCaixa(a);
+            }
+            render();
             return;
         }
         if (a.tipo === 'fio-terminal') {
             const fim = ui.cursor;
             ui.voltarAoSelecionar = true;
-            if (fim.x === a.inicio.x && fim.y === a.inicio.y) {
+            if (mesmoPonto(fim, a.inicio)) {
                 ui.modo = 'fio';
                 render();
                 return;
             }
-            terminarTrecho(a.inicio, fim);
+            terminarTrecho(a.inicio, fim, false);
         }
     }
 
@@ -718,14 +1103,26 @@
     }
 
     function aoTeclar(e) {
-        if (!placaVisivel() || e.ctrlKey || e.metaKey || e.altKey) return;
+        if (!placaVisivel() || e.altKey) return;
         if (e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable="true"]')) return;
         const k = e.key;
+        if (e.ctrlKey || e.metaKey) {
+            if ((k === 'a' || k === 'A') && ui.modo === 'selecionar' && !ui.arrasto) {
+                e.preventDefault();
+                selecionarTudo();
+            }
+            return;
+        }
         if (k === 'Escape') {
-            if (ui.modo === 'fio' && ui.fioInicio && !ui.voltarAoSelecionar) ui.fioInicio = null;
-            else cancelar();
+            if (ui.modo === 'fio' && ui.fioInicio && !ui.voltarAoSelecionar) comecarFio(null);
+            else if (ui.modo !== 'selecionar' || ui.fioInicio) cancelar();
+            else limparSelecao();
             fecharProps();
             render();
+        } else if (k === ' ' && ui.fioInicio) {
+            e.preventDefault();
+            ui.fioInverter = !ui.fioInverter;
+            renderSobreposicao();
         } else if (k === 'r' || k === 'R') {
             e.preventDefault();
             girarAtual();
@@ -755,7 +1152,7 @@
                 if (e.button !== 0) return;
                 e.preventDefault();
                 cancelar();
-                ui.selecao = null;
+                limparSelecao();
                 fecharProps();
                 ui.modo = 'posicionar';
                 ui.fantasma = { tipo, rot: 0 };
@@ -792,8 +1189,7 @@
         idCounter = 1;
         estado.comps.forEach(c => {
             if (c.tipo === 'GND') return;
-            const nos = nosPorComp.get(c.id);
-            add(c.tipo, c.nome, [nos.A, nos.B], ehFonte(c.tipo) ? c.valorDc : c.valor);
+            add(c.tipo, c.nome, nosNetlist(c, nosPorComp.get(c.id)), ehFonte(c.tipo) ? c.valorDc : c.valor);
             const li = lista.lastElementChild;
             li.dataset.placaId = c.id;
             if (ehFonte(c.tipo)) {
@@ -819,8 +1215,8 @@
     function assinaturaPlaca() {
         const { nosPorComp } = extrairNos(estado.comps, estado.fios);
         return JSON.stringify(estado.comps.filter(c => c.tipo !== 'GND').map(c => {
-            const n = nosPorComp.get(c.id);
-            return [c.tipo, c.nome, String(n.A), String(n.B), '', ''];
+            const [a, b] = nosNetlist(c, nosPorComp.get(c.id));
+            return [c.tipo, c.nome, String(a), String(b), '', ''];
         }));
     }
 
@@ -886,8 +1282,8 @@
             const d = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
             if (!d || d.versao !== VERSAO || !Array.isArray(d.comps) || !Array.isArray(d.fios)) return false;
             estado.comps = d.comps;
-            estado.fios = d.fios;
             estado.seq = d.seq || 1;
+            estado.fios = normalizarFios(d.fios, novoId);
             return estado.comps.length > 0;
         } catch (e) {
             return false;
