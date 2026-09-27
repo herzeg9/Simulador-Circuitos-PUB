@@ -2302,11 +2302,13 @@ async function calcular() {
         // Superposição: a API pode omitir a chave, enviar null ou [] — ainda assim mostramos o bloco 2 com passos ou avisos locais.
         if (Array.isArray(dados.Superposicao) && dados.Superposicao.length > 0) {
             let html = `<div class="card card-superposicao"><h3 class="section-title">3. Superposição</h3><div class="super-container">`;
+            const deslocSuper = deslocFaseConvencao();
             dados.Superposicao.forEach(passo => {
                 html += `<div class="super-card"><div class="didactic-text">Fonte Ativa: <strong>${passo.FonteAtiva}</strong></div>`;
                 passo.ResultadosParciais.forEach((res, idx) => {
                      let no = dados.NosLista[idx];
-                     html += `<div class="formula" style="font-size:1em;">\` v_${no} = ${res} \`</div>`;
+                     const f = formatarResultadoEng(res, 'V', deslocSuper);
+                     html += `<div class="formula" style="font-size:1em;">\` v_${no} = ${f.valor} " ${f.unidade}" \`</div>`;
                 });
                 html += `</div>`;
             });
@@ -4787,6 +4789,8 @@ if (typeof module !== 'undefined' && module.exports) {
         buildEsquematicoFromTopologia,
         auditarEsquematico,
         organizarEquacoesMNA,
-        formatarEquacaoMNA
+        formatarEquacaoMNA,
+        parsePolar,
+        formatarResultadoEng
     };
 }

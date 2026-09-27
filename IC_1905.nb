@@ -10,10 +10,10 @@
 NotebookFileLineBreakTest
 NotebookFileLineBreakTest
 NotebookDataPosition[       154,          7]
-NotebookDataLength[     44643,        998]
-NotebookOptionsPosition[     44136,        980]
-NotebookOutlinePosition[     44554,        997]
-CellTagsIndexPosition[     44511,        994]
+NotebookDataLength[     44790,       1003]
+NotebookOptionsPosition[     44283,        985]
+NotebookOutlinePosition[     44701,       1002]
+CellTagsIndexPosition[     44658,        999]
 WindowFrame->Normal*)
 
 (* Beginning of Notebook Content *)
@@ -48,7 +48,8 @@ Cell[BoxData[
      RowBox[{"ToExpression", "[", "val", "]"}]}], ";"}], "\n", 
    RowBox[{
     RowBox[{
-     RowBox[{"parseValue", "[", "val_", "]"}], ":=", "val"}], ";"}], "\n", "\[IndentingNewLine]", 
+     RowBox[{"parseValue", "[", "val_", "]"}], ":=", "val"}], ";"}], 
+   "\[IndentingNewLine]", "\n", 
    RowBox[{
     RowBox[{
      RowBox[{"cleanTeX", "[", "expr_", "]"}], ":=", 
@@ -63,7 +64,55 @@ Cell[BoxData[
          RowBox[{"\"\<\\\\text{v}\>\"", "->", "\"\<v\>\""}], ",", 
          RowBox[{"\"\<\\\\text{\>\"", "->", "\"\<\>\""}], ",", 
          RowBox[{"\"\<}\>\"", "->", "\"\<\>\""}]}], "}"}]}], "]"}]}], ";"}], 
-   "\n", "\[IndentingNewLine]", 
+   "\[IndentingNewLine]", "\n", 
+   RowBox[{
+    RowBox[{
+     RowBox[{"fmtNum", "[", "x_", "]"}], ":=", 
+     RowBox[{"Module", "[", 
+      RowBox[{
+       RowBox[{"{", 
+        RowBox[{
+         RowBox[{"v", "=", 
+          RowBox[{"N", "[", "x", "]"}]}], ",", "e", ",", "m", ",", "s"}], "}"}], ",", 
+       RowBox[{"If", "[", 
+        RowBox[{
+         RowBox[{
+          RowBox[{"Abs", "[", "v", "]"}], "<", 
+          RowBox[{"10", "^", 
+           RowBox[{"-", "12"}]}]}], ",", "\"\<0\>\"", ",", 
+         RowBox[{
+          RowBox[{"e", "=", 
+           RowBox[{"Floor", "[", 
+            RowBox[{"Log10", "[", 
+             RowBox[{"Abs", "[", "v", "]"}], "]"}], "]"}]}], ";", "\[IndentingNewLine]", 
+          RowBox[{"m", "=", 
+           RowBox[{"Round", "[", 
+            RowBox[{
+             RowBox[{"Abs", "[", "v", "]"}], "*", 
+             RowBox[{"10", "^", 
+              RowBox[{"(", 
+               RowBox[{"5", "-", "e"}], ")"}]}]}], "]"}]}], ";", "\[IndentingNewLine]", 
+          RowBox[{"If", "[", 
+           RowBox[{
+            RowBox[{"m", ">=", 
+             RowBox[{"10", "^", "6"}]}], ",", 
+            RowBox[{
+             RowBox[{"m", "=", 
+              RowBox[{"Round", "[", 
+               RowBox[{"m", "/", "10"}], "]"}]}], ";", 
+             RowBox[{"e", "=", 
+              RowBox[{"e", "+", "1"}]}]}]}], "]"}], ";", "\[IndentingNewLine]", 
+          RowBox[{"s", "=", 
+           RowBox[{"IntegerString", "[", "m", "]"}]}], ";", "\[IndentingNewLine]", 
+          RowBox[{
+           RowBox[{"If", "[", 
+            RowBox[{
+             RowBox[{"v", "<", "0"}], ",", "\"\<-\>\"", ",", "\"\<\>\""}], "]"}], "<>", 
+           RowBox[{"StringTake", "[", 
+            RowBox[{"s", ",", "1"}], "]"}], "<>", "\"\<.\>\"", "<>", 
+           RowBox[{"StringDrop", "[", 
+            RowBox[{"s", ",", "1"}], "]"}], "<>", "\"\<e\>\"", "<>", 
+           RowBox[{"ToString", "[", "e", "]"}]}]}]}], "]"}]}], "]"}]}], ";"}], "\[IndentingNewLine]", "\n", 
    RowBox[{
     RowBox[{
      RowBox[{"formatResult", "[", 
@@ -82,29 +131,22 @@ Cell[BoxData[
            RowBox[{
             RowBox[{"Abs", "[", "num", "]"}], "<", 
             RowBox[{"10", "^", 
-             RowBox[{"-", "8"}]}]}], ",", "\"\<0\>\"", ",", 
+             RowBox[{"-", "12"}]}]}], ",", "\"\<0\>\"", ",", 
            RowBox[{
             RowBox[{"mag", "=", 
-             RowBox[{"Round", "[", 
-              RowBox[{
-               RowBox[{"Abs", "[", "num", "]"}], ",", "0.0001"}], "]"}]}], ";",
-             "\[IndentingNewLine]", 
+             RowBox[{"fmtNum", "[", 
+              RowBox[{"Abs", "[", "num", "]"}], "]"}]}], ";", "\[IndentingNewLine]", 
             RowBox[{"ang", "=", 
              RowBox[{"Round", "[", 
               RowBox[{
                RowBox[{
                 RowBox[{"Arg", "[", "num", "]"}], "/", "Degree"}], ",", 
                "0.01"}], "]"}]}], ";", "\[IndentingNewLine]", 
-            RowBox[{
-             RowBox[{"ToString", "[", "mag", "]"}], "<>", "\"\< \[Angle] \>\"",
-              "<>", 
-             RowBox[{"ToString", "[", "ang", "]"}], 
-             "<>", "\"\<\[Degree]\>\""}]}]}], "]"}], ",", 
-         RowBox[{"ToString", "[", 
-          RowBox[{"Round", "[", 
-           RowBox[{
-            RowBox[{"Chop", "[", "num", "]"}], ",", "0.0001"}], "]"}], 
-          "]"}]}], "]"}]}], "]"}]}], ";"}], "\n", "\[IndentingNewLine]", 
+            RowBox[{"mag", "<>", "\"\< \[Angle] \>\"", "<>", 
+             RowBox[{"ToString", "[", "ang", "]"}], "<>", "\"\<\[Degree]\>\""}]}]}], "]"}], ",", 
+         RowBox[{"fmtNum", "[", 
+          RowBox[{"Re", "[", 
+           RowBox[{"Chop", "[", "num", "]"}], "]"}], "]"}]}], "]"}]}], "]"}]}], ";"}], "\[IndentingNewLine]", "\n", 
    RowBox[{
     RowBox[{
      RowBox[{"processCircuit", "[", "payloadStr_String", "]"}], ":=", 
@@ -947,7 +989,7 @@ resson\[AHat]ncia perigosa ou curto.\>\""}], "|>"}], "]"}]}], "]"}]}],
           "]"}]}], ";", "\[IndentingNewLine]", 
         RowBox[{"ExportString", "[", 
          RowBox[{"result", ",", "\"\<JSON\>\""}], "]"}]}]}], "]"}]}], ";"}], 
-   "\n", "\[IndentingNewLine]", 
+   "\[IndentingNewLine]", "\n", 
    RowBox[{
     RowBox[{"apiEndpoint", "=", 
      RowBox[{"APIFunction", "[", 
@@ -958,24 +1000,28 @@ resson\[AHat]ncia perigosa ou curto.\>\""}], "|>"}], "]"}]}], "]"}]}],
         RowBox[{"processCircuit", "[", "#netlist", "]"}], "&"}], 
        ",", "\"\<String\>\""}], "]"}]}], ";"}], "\n", 
    RowBox[{"CloudDeploy", "[", 
-    RowBox[{"apiEndpoint", ",", "\"\<simulador-circuitos-api\>\"", ",", 
+    RowBox[{"apiEndpoint", ",", "\"\<simulador-circuitos-api-v2\>\"", ",", 
      RowBox[{"Permissions", "->", "\"\<Public\>\""}]}], "]"}]}]}]], "Input",
- CellChangeTimes->{{3.9882149216530056`*^9, 3.9882149216530056`*^9}},
- CellLabel->"In[1]:=",ExpressionUUID->"f2ac070a-5817-5d46-baf8-38fed2f5bd30"],
+ CellChangeTimes->{{3.9882149216530056`*^9, 3.9882149216530056`*^9}, {
+  3.995049302021908*^9, 3.995049303421919*^9}},
+ CellLabel->"In[17]:=",ExpressionUUID->"f2ac070a-5817-5d46-baf8-38fed2f5bd30"],
 
 Cell[BoxData[
  InterpretationBox[
   RowBox[{"CloudObject", "[", 
    TemplateBox[{
-    "\"https://www.wolframcloud.com/obj/c09a47c0-edcb-4587-a30c-8655de54b92d\"\
-", "https://www.wolframcloud.com/obj/c09a47c0-edcb-4587-a30c-8655de54b92d"},
+    "\"https://www.wolframcloud.com/obj/herzeghenrique/simulador-circuitos-\
+api-v2\"", 
+     "https://www.wolframcloud.com/obj/herzeghenrique/simulador-circuitos-api-\
+v2"},
     "HyperlinkURL"], "]"}],
   CloudObject[
-  "https://www.wolframcloud.com/obj/c09a47c0-edcb-4587-a30c-8655de54b92d"],
+  "https://www.wolframcloud.com/obj/herzeghenrique/simulador-circuitos-api-\
+v2"],
   SelectWithContents->True]], "Output",
  CellChangeTimes->{3.9882149278457623`*^9, 3.9884612147469063`*^9, 
-  3.988463003047655*^9},
- CellLabel->"Out[7]=",ExpressionUUID->"c2d73a38-96e6-eb49-a636-f06c371f5c44"]
+  3.988463003047655*^9, 3.9950493068625298`*^9},
+ CellLabel->"Out[23]=",ExpressionUUID->"500e6617-75ef-2945-8525-e3b81e1b7d3a"]
 }, Open  ]]
 },
 WindowSize->{1428, 765.75},
@@ -997,8 +1043,8 @@ CellTagsIndex->{}
 (*NotebookFileOutline
 Notebook[{
 Cell[CellGroupData[{
-Cell[576, 22, 42973, 941, 2677, "Input",ExpressionUUID->"f2ac070a-5817-5d46-baf8-38fed2f5bd30"],
-Cell[43552, 965, 568, 12, 33, "Output",ExpressionUUID->"c2d73a38-96e6-eb49-a636-f06c371f5c44"]
+Cell[576, 22, 43070, 943, 2677, "Input",ExpressionUUID->"f2ac070a-5817-5d46-baf8-38fed2f5bd30"],
+Cell[43649, 967, 618, 15, 33, "Output",ExpressionUUID->"500e6617-75ef-2945-8525-e3b81e1b7d3a"]
 }, Open  ]]
 }
 ]
