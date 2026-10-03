@@ -252,6 +252,20 @@ function _mostrarToastRegime(regime) {
 }
 
 /**
+ * Mostra o toast com o modo DC/AC atualmente selecionado.
+ * O texto é definido no carregamento do exemplo; sem isto, o toggle
+ * deixa o status preso no regime em que o preset foi carregado.
+ */
+function _mostrarToastModoAtual() {
+    const modo = getModoSimulacao();
+    const freqEl = document.getElementById('inputFrequenciaAc');
+    _mostrarToastRegime({
+        modo,
+        frequencia: freqEl ? freqEl.value : undefined
+    });
+}
+
+/**
  * Remove todos os componentes da lista e reseta o contador de IDs.
  * @returns {void}
  */
@@ -4739,7 +4753,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 toggleAc.checked = true;
             }
         } catch (e) { /* ignore */ }
-        toggleAc.addEventListener('change', sincronizarModoSimulacao);
+        toggleAc.addEventListener('change', () => {
+            sincronizarModoSimulacao();
+            _mostrarToastModoAtual();
+        });
         sincronizarModoSimulacao();
     }
 
