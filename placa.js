@@ -429,18 +429,38 @@
             c.valorDc = padrao;
             c.modulo = padrao;
             c.fase = '0';
+            c.amplitude = padrao;
+            c.laplaceTipo = 'degrau';
+            c.laplaceAlpha = '1';
         } else {
             c.valor = padrao;
         }
+        if (tipo === 'Capacitor' || tipo === 'Inductor') c.condicaoInicial = '';
         if (peca.alvo) c.alvo = '';
         return c;
     }
 
+    function formaLaplace(c) {
+        const tipoL = c.laplaceTipo || 'degrau';
+        if (tipoL === 'impulso') return 'δ(t)';
+        if (tipoL === 'exponencial') {
+            const alpha = String(c.laplaceAlpha || '').trim() || 'α';
+            return `e^{−${alpha}t}`;
+        }
+        return 'u(t)';
+    }
+
     function valorExibido(c) {
         if (!ehFonte(c.tipo)) return c.valor;
-        if (getModoSimulacao() === 'AC') {
+        const modo = (typeof getModoSimulacao === 'function') ? getModoSimulacao() : 'DC';
+        if (modo === 'AC') {
             const f = String(c.fase || '0').trim();
             return f && f !== '0' ? `${c.modulo}∠${f}°` : c.modulo;
+        }
+        if (modo === 'S') {
+            const amp = String(c.amplitude || c.valorDc || '').trim();
+            const forma = formaLaplace(c);
+            return amp ? `${amp} ${forma}` : forma;
         }
         return c.valorDc;
     }
@@ -967,20 +987,38 @@
         return `<label class="${cls}"><span>${rotulo}</span><input type="text" name="${chave}" value="${escapeAttr(valor)}" autocomplete="off" spellcheck="false"></label>`;
     }
 
+    function campoSelect(rotulo, chave, valor, opcoes) {
+        const opts = opcoes.map(([v, label]) =>
+            `<option value="${escapeAttr(v)}"${v === valor ? ' selected' : ''}>${label}</option>`
+        ).join('');
+        return `<label class="placa-props-campo placa-props-campo--largo"><span>${rotulo}</span><select name="${chave}">${opts}</select></label>`;
+    }
+
     function abrirProps(c) {
         if (c.tipo === 'GND') return;
         const box = $('placaProps');
-        const ac = getModoSimulacao() === 'AC';
+        const modo = (typeof getModoSimulacao === 'function') ? getModoSimulacao() : 'DC';
+        const ac = modo === 'AC';
+        const sdom = modo === 'S';
         const peca = PECAS[c.tipo];
         const dependente = !!(peca.quatro || peca.alvo);
         let campos, nota;
         if (ehFonte(c.tipo)) {
-            campos = ac
-                ? campoProp('Módulo', 'modulo', c.modulo) + campoProp('Fase (°)', 'fase', c.fase)
-                : campoProp('Valor', 'valorDc', c.valorDc);
-            nota = ac
-                ? 'Modo AC. O módulo também aceita a forma a+jb.'
-                : 'Modo DC. Módulo e fase são editados no modo AC.';
+            if (ac) {
+                campos = campoProp('Módulo', 'modulo', c.modulo) + campoProp('Fase (°)', 'fase', c.fase);
+                nota = 'Modo AC. O módulo também aceita a forma a+jb.';
+            } else if (sdom) {
+                campos = campoSelect('Forma', 'laplaceTipo', c.laplaceTipo || 'degrau', [
+                    ['degrau', 'Degrau A·u(t)'],
+                    ['impulso', 'Impulso A·δ(t)'],
+                    ['exponencial', 'Exponencial A·e^{−αt}']
+                ]) + campoProp('Amplitude', 'amplitude', c.amplitude || c.valorDc)
+                    + campoProp('α', 'laplaceAlpha', c.laplaceAlpha == null ? '1' : c.laplaceAlpha);
+                nota = 'Modo s. Degrau vira A/s, impulso vira A e exponencial vira A/(s+α), só no cálculo. O valor DC fica guardado.';
+            } else {
+                campos = campoProp('Valor', 'valorDc', c.valorDc);
+                nota = 'Modo DC. Módulo e fase são editados no modo AC.';
+            }
         } else if (dependente) {
             campos = campoProp(peca.rotuloValor, 'valor', c.valor, true);
             if (peca.alvo) {
@@ -991,6 +1029,12 @@
                 campos += `<label class="placa-props-campo"><span>Alvo</span><input type="text" name="alvo" value="${escapeAttr(c.alvo || '')}" list="placaListaAlvo" autocomplete="off" spellcheck="false" placeholder="ex.: R1"></label><datalist id="placaListaAlvo">${opcoes}</datalist>`;
             }
             nota = peca.nota;
+        } else if (sdom && (c.tipo === 'Capacitor' || c.tipo === 'Inductor')) {
+            const rotuloIc = c.tipo === 'Capacitor' ? 'v(0)' : 'i(0)';
+            campos = campoProp('Valor', 'valor', c.valor) + campoProp(rotuloIc, 'condicaoInicial', c.condicaoInicial || '');
+            nota = c.tipo === 'Capacitor'
+                ? 'O símbolo continua C. No cálculo em s a tensão é i/(sC) + v(0)/s. Pode deixar v(0) vazio enquanto monta; a resolução exige um número (use 0 se descarregado).'
+                : 'O símbolo continua L. No cálculo em s a tensão é (sL)·i − L·i(0). Pode deixar i(0) vazio enquanto monta; a resolução exige um número (use 0 se sem corrente).';
         } else {
             campos = campoProp('Valor', 'valor', c.valor);
             nota = 'Sufixos: k, M, m, u, n, p (M = mega, m = mili).';
@@ -1037,11 +1081,25 @@
         if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(nome)) return 'O nome deve começar com letra e usar apenas letras, números ou _.';
         if (estado.comps.some(k => k !== c && k.nome && k.nome.toLowerCase() === nome.toLowerCase())) return `Já existe um componente chamado ${nome}.`;
         const novos = {};
-        for (const chave of ['valor', 'valorDc', 'modulo', 'fase']) {
+        for (const chave of ['valor', 'valorDc', 'modulo', 'fase', 'amplitude']) {
             if (!dados.has(chave)) continue;
             const v = String(dados.get(chave)).trim();
             if (!v) return 'Preencha todos os valores.';
             novos[chave] = v;
+        }
+        if (dados.has('laplaceTipo')) {
+            const t = String(dados.get('laplaceTipo') || 'degrau');
+            novos.laplaceTipo = (t === 'impulso' || t === 'exponencial') ? t : 'degrau';
+        }
+        if (dados.has('laplaceAlpha')) {
+            const a = String(dados.get('laplaceAlpha') || '').trim();
+            if ((novos.laplaceTipo || c.laplaceTipo) === 'exponencial' && !a) {
+                return 'Informe α da exponencial e^{−αt}.';
+            }
+            novos.laplaceAlpha = a || '1';
+        }
+        if (dados.has('condicaoInicial')) {
+            novos.condicaoInicial = String(dados.get('condicaoInicial') || '').trim();
         }
         if (dados.has('alvo')) {
             const alvo = String(dados.get('alvo') || '').trim();
@@ -1338,7 +1396,18 @@
                 li.querySelector('.val-input-dc').value = c.valorDc;
                 li.querySelector('.val-input-mod').value = c.modulo;
                 li.querySelector('.val-input-fase').value = c.fase;
+                const amp = li.querySelector('.val-input-amp');
+                const alpha = li.querySelector('.val-input-alpha');
+                const sel = li.querySelector('.val-input-laplace');
+                if (amp) amp.value = c.amplitude || c.valorDc || '';
+                if (alpha && c.laplaceAlpha != null) alpha.value = c.laplaceAlpha;
+                if (sel && c.laplaceTipo) sel.value = c.laplaceTipo;
             }
+            if (c.tipo === 'Capacitor' || c.tipo === 'Inductor') {
+                const ic = li.querySelector('.val-input-ic');
+                if (ic) ic.value = c.condicaoInicial != null ? c.condicaoInicial : '';
+            }
+            if (typeof ligarCamposDominioS === 'function') ligarCamposDominioS(li);
         });
         $('placaDessinc').hidden = true;
         atualizarVazia();
@@ -1373,6 +1442,10 @@
         else if (alvo.classList.contains('val-input-dc')) c.valorDc = v;
         else if (alvo.classList.contains('val-input-mod')) c.modulo = v;
         else if (alvo.classList.contains('val-input-fase')) c.fase = v;
+        else if (alvo.classList.contains('val-input-amp')) c.amplitude = v;
+        else if (alvo.classList.contains('val-input-alpha')) c.laplaceAlpha = v;
+        else if (alvo.classList.contains('val-input-laplace')) c.laplaceTipo = alvo.value || 'degrau';
+        else if (alvo.classList.contains('val-input-ic')) c.condicaoInicial = v;
         else if (alvo.classList.contains('val-input')) c.valor = v;
         else if (alvo.classList.contains('alvo-comp')) c.alvo = v;
         else return;
@@ -1393,7 +1466,7 @@
         };
         new MutationObserver(verificar).observe(lista, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-removing'] });
         lista.addEventListener('input', e => { copiarDaLista(e.target); verificar(); });
-        lista.addEventListener('change', verificar);
+        lista.addEventListener('change', e => { copiarDaLista(e.target); verificar(); });
     }
 
     function resolver() {
@@ -1483,6 +1556,12 @@
         render();
     }
 
-    window.Placa = { limpar, sincronizarLista };
+    function aoMudarModo() {
+        if (!svg) return;
+        fecharProps();
+        render();
+    }
+
+    window.Placa = { limpar, sincronizarLista, aoMudarModo };
     document.addEventListener('DOMContentLoaded', iniciar);
 })();
