@@ -2629,6 +2629,7 @@ body.dark-mode .card-placa .section-title { color: #76d7c4; }
     stroke-dasharray: 3 3;
     pointer-events: none;
 }
+.placa-controle { pointer-events: none; }
 .placa-controle-label {
     font-family: 'Segoe UI', Roboto, sans-serif;
     font-size: 11px;

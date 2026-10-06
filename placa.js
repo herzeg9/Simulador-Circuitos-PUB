@@ -493,7 +493,7 @@
         const texto = `${valorExibido(c)}·${letra}_${ctrl.nome}`;
         const vertical = c.rot === 90 || c.rot === 270;
         const y = vertical ? c.y + MEIO + 8 : c.y + 36;
-        return `<text class="placa-controle-label" x="${c.x}" y="${y}" text-anchor="middle" dominant-baseline="hanging"><title>${escapeXml(c.nome)} ← ${escapeXml(ctrl.nome)}</title>${escapeXml(texto)}</text>`;
+        return `<g class="placa-controle"><title>${escapeXml(c.nome)} ← ${escapeXml(ctrl.nome)}</title><text class="placa-controle-label" x="${c.x}" y="${y}" text-anchor="middle" dominant-baseline="hanging">${escapeXml(texto)}</text></g>`;
     }
 
     function desenhoGnd(x, y) {
