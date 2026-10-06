@@ -2493,8 +2493,9 @@ body.dark-mode {
 .card-placa { border-left: 5px solid #16a085; padding: 18px 20px; }
 
 /* Nós de R/L/C/V/I vêm sempre da placa. Fontes dependentes colocadas na placa
-   também: os números ficam escondidos, mas o Alvo de H/F continua editável.
-   Itens acrescentados só pela lista (sem data-placa-id) e o trafo seguem com os campos. */
+   também: os números ficam escondidos e o Alvo de H/F é só leitura (o controle
+   é escolhido na placa). Itens acrescentados só pela lista (sem data-placa-id)
+   e o trafo seguem com os campos editáveis. */
 .comp-item:is(.type-Resistor, .type-Capacitor, .type-Inductor, .type-VoltageSource, .type-CurrentSource) .nodes-group,
 #btnRenumerarNos { display: none; }
 .comp-item[data-placa-id]:is(.type-VCVS, .type-VCCS) .nodes-group { display: none; }
@@ -2568,8 +2569,7 @@ body.dark-mode .card-placa .section-title { color: #76d7c4; }
     box-shadow: 0 0 0 2px var(--placa-destaque) inset;
 }
 .placa-icone { width: 46px; height: 24px; display: block; pointer-events: none; }
-.placa-icone--quatro { width: 38px; height: 38px; }
-.placa-icone .esq-label--name, .placa-icone .esq-label--val, .placa-icone .esq-label--ctrl, .placa-icone .placa-rotulo-term { display: none; }
+.placa-icone .esq-label--name, .placa-icone .esq-label--val, .placa-icone .esq-label--ctrl { display: none; }
 
 .placa-ferr {
     padding: 7px 12px;
@@ -2604,8 +2604,10 @@ body.dark-mode .card-placa .section-title { color: #76d7c4; }
     user-select: none;
     cursor: default;
 }
-.placa-svg--fio { cursor: crosshair; }
+.placa-svg--fio, .placa-svg--escolher { cursor: crosshair; }
 .placa-svg--posicionar { cursor: copy; }
+.placa-svg--escolher .placa-comp.is-candidato { cursor: pointer; }
+.placa-svg--escolher .placa-term { pointer-events: none; }
 .placa-sobreposicao { pointer-events: none; }
 .placa-ponto { fill: var(--placa-ponto); }
 
@@ -2618,8 +2620,26 @@ body.dark-mode .card-placa .section-title { color: #76d7c4; }
     stroke-width: 1.5;
     stroke-dasharray: 5 3;
 }
+.placa-comp.is-origem .placa-sel { stroke: var(--esq-ctrl, #9b59b6); }
+.placa-comp.is-candidato .placa-hit { fill: rgba(155, 89, 182, 0.1); }
+.placa-marca {
+    fill: none;
+    stroke: var(--esq-ctrl, #9b59b6);
+    stroke-width: 1.25;
+    stroke-dasharray: 3 3;
+    pointer-events: none;
+}
+.placa-controle-label {
+    font-family: 'Segoe UI', Roboto, sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    fill: var(--esq-ctrl, #9b59b6);
+    paint-order: stroke;
+    stroke: var(--esq-bg);
+    stroke-width: 3px;
+    pointer-events: none;
+}
 .placa-perna { stroke: var(--esq-wire); stroke-width: 2; stroke-linecap: round; }
-.placa-perna--ctrl { stroke: var(--esq-ctrl, #9b59b6); }
 .placa-gnd { stroke: var(--esq-gnd); stroke-width: 2.5; stroke-linecap: round; }
 
 .placa-term {
@@ -2630,19 +2650,7 @@ body.dark-mode .card-placa .section-title { color: #76d7c4; }
     pointer-events: all;
 }
 .placa-comp:hover .placa-term { stroke: var(--placa-destaque); }
-.placa-term--ctrl { stroke: var(--esq-ctrl, #9b59b6); }
 .placa-term.is-solto { stroke: var(--placa-erro); fill: rgba(231, 76, 60, 0.18); }
-.placa-rotulo-term {
-    font-family: 'Segoe UI', Roboto, sans-serif;
-    font-size: 9px;
-    font-weight: 700;
-    fill: var(--text-secondary);
-    paint-order: stroke;
-    stroke: var(--esq-bg);
-    stroke-width: 3px;
-    pointer-events: none;
-}
-.placa-rotulo-term--ctrl { fill: var(--esq-ctrl, #9b59b6); }
 .placa-svg--posicionar .placa-term, .placa-svg--fio .placa-term { pointer-events: none; }
 
 .placa-fio { cursor: pointer; }
@@ -2734,7 +2742,37 @@ body.dark-mode .card-placa .section-title { color: #76d7c4; }
     color: var(--text-primary);
     font-family: 'Consolas', 'Monaco', monospace;
 }
+.placa-props-controle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 6px 0;
+    font-size: 0.85em;
+}
+.placa-props-controle span { flex: 0 0 84px; color: var(--text-secondary); }
+.placa-props-controle strong { flex: 1; min-width: 0; font-family: 'Consolas', 'Monaco', monospace; }
+.placa-props-escolher {
+    padding: 4px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--tab-border);
+    background: var(--esq-bg);
+    color: var(--text-primary);
+    cursor: pointer;
+    font-weight: 600;
+}
+.placa-props-escolher:hover { border-color: var(--esq-ctrl, #9b59b6); }
 .placa-props-nota { margin: 6px 0; font-size: 0.75em; color: var(--text-secondary); }
+.placa-escolha {
+    margin: 0 0 8px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: rgba(155, 89, 182, 0.12);
+    border: 1px solid rgba(155, 89, 182, 0.45);
+    color: var(--text-primary);
+    font-size: 0.9em;
+    font-weight: 600;
+}
+.comp-item[data-placa-id] input.alvo-comp { cursor: default; }
 .placa-props-erro { margin: 6px 0; font-size: 0.8em; color: var(--placa-erro); font-weight: 600; }
 .placa-props-botoes { display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px; }
 .placa-props-botoes button {

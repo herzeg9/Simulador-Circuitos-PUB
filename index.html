@@ -8,7 +8,7 @@
     <script>MathJax = {loader: {load: ['input/asciimath', 'output/chtml']}, asciimath: {delimiters: [['`','`']]}};</script>
     <script type="text/javascript" id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/startup.js"></script>
 
-    <link rel="stylesheet" href="styles.css?v=20261006-dep">
+    <link rel="stylesheet" href="styles.css?v=20261006-ctrl">
 </head>
 <body>
 
@@ -296,10 +296,10 @@
                         </div>
                         <div class="placa-pecas placa-pecas--dep" aria-label="Fontes dependentes">
                             <span class="placa-dep-rotulo">Dependentes</span>
-                            <button type="button" class="placa-peca" data-tipo="VCVS" title="VCVS (E): tensão controlada por tensão. Quatro terminais — Out+, Out−, Ctrl+ e Ctrl−.">E</button>
-                            <button type="button" class="placa-peca" data-tipo="VCCS" title="VCCS (G): corrente controlada por tensão. Quatro terminais — Out+, Out−, Ctrl+ e Ctrl−.">G</button>
-                            <button type="button" class="placa-peca" data-tipo="CCVS" title="CCVS (H): tensão controlada por corrente. Dois terminais de saída; no painel, informe o Alvo.">H</button>
-                            <button type="button" class="placa-peca" data-tipo="CCCS" title="CCCS (F): corrente controlada por corrente. Dois terminais de saída; no painel, informe o Alvo.">F</button>
+                            <button type="button" class="placa-peca" data-tipo="VCVS" title="VCVS (E): tensão controlada pela tensão de outro componente. Dois terminais de saída; depois clique no componente de controle.">E</button>
+                            <button type="button" class="placa-peca" data-tipo="VCCS" title="VCCS (G): corrente controlada pela tensão de outro componente. Dois terminais de saída; depois clique no componente de controle.">G</button>
+                            <button type="button" class="placa-peca" data-tipo="CCVS" title="CCVS (H): tensão controlada pela corrente de outro componente. Dois terminais de saída; depois clique no componente de controle.">H</button>
+                            <button type="button" class="placa-peca" data-tipo="CCCS" title="CCCS (F): corrente controlada pela corrente de outro componente. Dois terminais de saída; depois clique no componente de controle.">F</button>
                         </div>
                         <div class="placa-ferrs">
                             <button type="button" class="placa-ferr" data-acao="fio" title="Desenhar fios (W). Também dá para arrastar direto de um terminal.">Fio</button>
@@ -316,13 +316,14 @@
                         </div>
                     </div>
                     <div id="placaErros" class="placa-erros" role="alert" hidden></div>
+                    <div id="placaEscolha" class="placa-escolha" role="status" hidden></div>
                     <div class="placa-wrap" id="placaWrap">
                         <div id="placaVazia" class="placa-vazia">
                             <p><strong>Arraste componentes da barra acima para a placa.</strong></p>
                             <p>Ligue os terminais com fios: arraste a partir de um terminal ou use a ferramenta <em>Fio</em>. Coloque pelo menos um terra (GND).</p>
                             <p>Arraste um fio para ajeitar o traçado; arraste as pontas de um fio selecionado para religá-lo. Clique e arraste na área vazia para selecionar vários itens.</p>
-                            <p>Duplo clique edita nome e valor &middot; <kbd>R</kbd> gira &middot; <kbd>Espaço</kbd> inverte a dobra do fio &middot; <kbd>Ctrl</kbd>+<kbd>A</kbd> seleciona tudo &middot; <kbd>Del</kbd> apaga &middot; <kbd>Esc</kbd> cancela.</p>
-                            <p>Fontes dependentes: <strong>E</strong> e <strong>G</strong> têm quatro terminais (Out+, Out&minus;, Ctrl+, Ctrl&minus;). <strong>H</strong> e <strong>F</strong> têm só a saída; a corrente de referência vai no campo <strong>Alvo</strong>.</p>
+                            <p>Duplo clique edita nome e valor &middot; <kbd>Enter</kbd> abre as propriedades &middot; <kbd>R</kbd> gira &middot; <kbd>Espaço</kbd> inverte a dobra do fio &middot; <kbd>Ctrl</kbd>+<kbd>A</kbd> seleciona tudo &middot; <kbd>Del</kbd> apaga &middot; <kbd>Esc</kbd> cancela.</p>
+                            <p>Fontes dependentes (<strong>E</strong>, <strong>G</strong>, <strong>H</strong>, <strong>F</strong>) têm só os dois terminais de saída. Depois de colocar a fonte, clique no componente de controle. Duplo clique na fonte troca o controle.</p>
                             <p id="placaVaziaLista" class="placa-vazia-nota" hidden>O circuito que está na lista à esquerda não aparece aqui: por enquanto a placa só envia circuitos para a lista, não o contrário.</p>
                         </div>
                         <div id="placaProps" class="placa-props" hidden></div>
@@ -413,6 +414,6 @@
     </dialog>
 
     <script src="script.js?v=20260926-seta"></script>
-    <script src="placa.js?v=20261006-dep"></script>
+    <script src="placa.js?v=20261006-ctrl"></script>
 </body>
 </html>

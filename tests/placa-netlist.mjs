@@ -165,32 +165,41 @@ console.log('Arrastar trecho: fios perpendiculares esticam, terminais ganham pon
     verificar('conectividade mantida com pontes', netlist(comps, normalizarFios(subiu, novoId)) === netlist(comps, direto));
 }
 
-console.log('VCVS/VCCS: quatro terminais e netlist [out+, out−, ctrl+, ctrl−]');
+console.log('VCVS/VCCS: dois terminais; a tensão de controle vem do componente escolhido');
 {
     const e0 = { id: 'e', tipo: 'VCVS', nome: 'E1', x: 200, y: 200, rot: 0, valor: '3' };
     const ts = terminais(e0);
     const porNome = nome => ts.find(t => t.nome === nome);
-    verificar('rot 0: Out+ esquerda, Out− direita, Ctrl+ cima, Ctrl− baixo',
-        porNome('A').x === 160 && porNome('A').y === 200
+    verificar('rot 0: só Out+ à esquerda e Out− à direita',
+        ts.length === 2
+        && porNome('A').x === 160 && porNome('A').y === 200
         && porNome('B').x === 240 && porNome('B').y === 200
-        && porNome('C').x === 200 && porNome('C').y === 160
-        && porNome('D').x === 200 && porNome('D').y === 240,
+        && !porNome('C') && !porNome('D'),
         JSON.stringify(ts));
     const t90 = terminais({ ...e0, rot: 90 });
     const p90 = nome => t90.find(t => t.nome === nome);
-    verificar('rot 90 gira os quatro juntos',
-        p90('A').x === 200 && p90('A').y === 160 && p90('C').x === 240 && p90('C').y === 200,
-        JSON.stringify(t90));
-    verificar('netlist VCVS [2,0,1,0]', JSON.stringify(nosNetlist(e0, { A: 2, B: 0, C: 1, D: 0 })) === '[2,0,1,0]');
-    const g = { id: 'g1', tipo: 'VCCS', nome: 'G1', x: 0, y: 0, rot: 0, valor: '0.01' };
-    verificar('netlist VCCS na mesma ordem', JSON.stringify(nosNetlist(g, { A: 2, B: 0, C: 1, D: 0 })) === '[2,0,1,0]');
+    verificar('rot 90 leva Out+ para cima', p90('A').x === 200 && p90('A').y === 160 && t90.length === 2, JSON.stringify(t90));
+    const rCtrl = R('r', 'R1', 0, 0);
+    const mapa = new Map([['e', { A: 2, B: 0 }], ['r', { A: 1, B: 0 }]]);
+    e0.controleId = 'r';
+    verificar('netlist VCVS [2,0,1,0] a partir do resistor',
+        JSON.stringify(nosNetlist(e0, mapa.get('e'), [e0, rCtrl], mapa)) === '[2,0,1,0]');
+    const g = { id: 'g1', tipo: 'VCCS', nome: 'G1', x: 0, y: 0, rot: 0, valor: '0.01', controleId: 'r' };
+    mapa.set('g1', { A: 2, B: 0 });
+    verificar('netlist VCCS na mesma ordem',
+        JSON.stringify(nosNetlist(g, mapa.get('g1'), [g, rCtrl], mapa)) === '[2,0,1,0]');
+    const iSrc = { id: 'i', tipo: 'CurrentSource', nome: 'I1', x: 0, y: 0, rot: 0 };
+    mapa.set('i', { A: 0, B: 1 });
+    e0.controleId = 'i';
+    verificar('controle numa fonte de corrente usa a polaridade da corrente [B, A]',
+        JSON.stringify(nosNetlist(e0, mapa.get('e'), [e0, iSrc], mapa)) === '[2,0,1,0]');
 }
 
 console.log('Amplificador VCVS na placa casa com o preset amp');
 {
     const Vsrc = V('v', 'V_In', 120, 200);
     const r1 = R('r1', 'R1', 220, 160);
-    const e = { id: 'e', tipo: 'VCVS', nome: 'E_Amp', x: 400, y: 160, rot: 0, valor: '3' };
+    const e = { id: 'e', tipo: 'VCVS', nome: 'E_Amp', x: 400, y: 160, rot: 0, valor: '3', controleId: 'r1' };
     const carga = R('rc', 'R_Carga', 540, 200, 90);
     const comps = [Vsrc, r1, e, carga, GND('g', 120, 240)];
     const fios = [
@@ -202,40 +211,45 @@ console.log('Amplificador VCVS na placa casa com o preset amp');
         fio('d3', 540, 80, 540, 160),
         fio('e', 440, 160, 440, 240),
         fio('f', 440, 240, 120, 240),
-        fio('h', 400, 200, 400, 240),
-        fio('i', 400, 240, 120, 240),
-        fio('j', 540, 240, 120, 240),
-        fio('k', 400, 120, 180, 120),
-        fio('l', 180, 120, 180, 160)
+        fio('j', 540, 240, 120, 240)
     ];
     const res = extrairNos(comps, fios);
-    const net = (id, comp) => nosNetlist(comp, nos(res, id));
+    const net = (id, comp) => nosNetlist(comp, nos(res, id), comps, res.nosPorComp);
     verificar('V_In = [1, 0]', JSON.stringify(net('v', Vsrc)) === '[1,0]', JSON.stringify(nos(res, 'v')));
     verificar('R1 = [1, 0]', JSON.stringify(net('r1', r1)) === '[1,0]', JSON.stringify(nos(res, 'r1')));
     verificar('E_Amp = [2, 0, 1, 0]', JSON.stringify(net('e', e)) === '[2,0,1,0]', JSON.stringify(nos(res, 'e')));
     verificar('R_Carga = [2, 0]', JSON.stringify(net('rc', carga)) === '[2,0]', JSON.stringify(nos(res, 'rc')));
     verificar('VCVS ligado sem erro', diagnosticar(comps, res).erros.length === 0, JSON.stringify(diagnosticar(comps, res)));
+    e.controleId = null;
+    verificar('VCVS sem controle é erro', diagnosticar(comps, res).erros.some(m => m.includes('sem componente de controle')));
+    e.controleId = 'e';
+    verificar('VCVS não controla a si mesma', diagnosticar(comps, res).erros.some(m => m.includes('si mesma')));
+    e.controleId = 'g';
+    verificar('GND não serve de controle', diagnosticar(comps, res).erros.some(m => m.includes('terra')));
 }
 
-console.log('CCVS/CCCS: só a saída na netlist; Alvo vazio ou inexistente é erro');
+console.log('CCVS/CCCS: só a saída na netlist; controle ausente, próprio ou GND é erro');
 {
-    const h = { id: 'h', tipo: 'CCVS', nome: 'H1', x: 0, y: 0, rot: 0, valor: '2', alvo: 'R1' };
+    const h = { id: 'h', tipo: 'CCVS', nome: 'H1', x: 0, y: 0, rot: 0, valor: '2', controleId: 'r' };
     verificar('netlist CCVS [out+, out−]', JSON.stringify(nosNetlist(h, { A: 2, B: 0 })) === '[2,0]');
     verificar('CCVS tem dois terminais', terminais(h).length === 2);
 
-    const f = { id: 'f', tipo: 'CCCS', nome: 'F1', x: 100, y: 100, rot: 0, valor: '100', alvo: '' };
+    const f = { id: 'f', tipo: 'CCCS', nome: 'F1', x: 100, y: 100, rot: 0, valor: '100', controleId: null };
     const r = R('r', 'R_Base', 300, 100);
-    const comps = [f, r, GND('g', 140, 100)];
+    const gnd = GND('g', 140, 100);
+    const comps = [f, r, gnd];
     const res = extrairNos(comps, []);
-    verificar('CCCS sem Alvo é erro', diagnosticar(comps, res).erros.some(m => m.includes('Alvo')));
-    f.alvo = 'R9';
-    verificar('Alvo inexistente é erro', diagnosticar(comps, res).erros.some(m => m.includes('R9') && m.includes('não existe')));
-    f.alvo = 'F1';
-    verificar('Alvo em si mesmo não conta', diagnosticar(comps, res).erros.some(m => m.includes('não existe')));
-    f.alvo = 'R_Base';
-    verificar('Alvo R_Base aceito', !diagnosticar(comps, res).erros.some(m => m.includes('Alvo') || m.includes('não existe')));
+    verificar('CCCS sem controle é erro', diagnosticar(comps, res).erros.some(m => m.includes('sem componente de controle')));
+    f.controleId = 'sumiu';
+    verificar('controle apagado é erro', diagnosticar(comps, res).erros.some(m => m.includes('sem componente de controle')));
+    f.controleId = 'f';
+    verificar('não controla a si mesma', diagnosticar(comps, res).erros.some(m => m.includes('si mesma')));
+    f.controleId = 'g';
+    verificar('GND recusado', diagnosticar(comps, res).erros.some(m => m.includes('não serve de controle')));
+    f.controleId = 'r';
+    verificar('controle R_Base aceito', !diagnosticar(comps, res).erros.some(m => m.startsWith('F1')));
 
-    const f90 = { id: 'f2', tipo: 'CCCS', nome: 'F_BJT', x: 400, y: 200, rot: 90, valor: '100', alvo: 'R_Base' };
+    const f90 = { id: 'f2', tipo: 'CCCS', nome: 'F_BJT', x: 400, y: 200, rot: 90, valor: '100', controleId: 'base' };
     const col = R('col', 'R_Col', 480, 200, 90);
     const base = R('base', 'R_Base', 200, 160);
     const ib = { id: 'i', tipo: 'CurrentSource', nome: 'I_Base', x: 120, y: 200, rot: 270, valorDc: '1m', modulo: '1m', fase: '0' };
@@ -249,11 +263,12 @@ console.log('CCVS/CCCS: só a saída na netlist; Alvo vazio ou inexistente é er
         fio('t6', 480, 240, 120, 240)
     ];
     const r2 = extrairNos(circuito, fios);
-    verificar('F_BJT = [2, 0]', JSON.stringify(nosNetlist(f90, nos(r2, 'f2'))) === '[2,0]', JSON.stringify(nos(r2, 'f2')));
-    verificar('R_Col = [2, 0]', JSON.stringify(nosNetlist(col, nos(r2, 'col'))) === '[2,0]', JSON.stringify(nos(r2, 'col')));
-    verificar('R_Base = [1, 0]', JSON.stringify(nosNetlist(base, nos(r2, 'base'))) === '[1,0]', JSON.stringify(nos(r2, 'base')));
-    verificar('I_Base = [1, 0]', JSON.stringify(nosNetlist(ib, nos(r2, 'i'))) === '[1,0]', JSON.stringify(nos(r2, 'i')));
-    verificar('CCCS com Alvo sem erro de Alvo', !diagnosticar(circuito, r2).erros.some(m => m.includes('Alvo') || m.includes('não existe')), JSON.stringify(diagnosticar(circuito, r2)));
+    const net2 = (id, comp) => nosNetlist(comp, nos(r2, id), circuito, r2.nosPorComp);
+    verificar('F_BJT = [2, 0]', JSON.stringify(net2('f2', f90)) === '[2,0]', JSON.stringify(nos(r2, 'f2')));
+    verificar('R_Col = [2, 0]', JSON.stringify(net2('col', col)) === '[2,0]', JSON.stringify(nos(r2, 'col')));
+    verificar('R_Base = [1, 0]', JSON.stringify(net2('base', base)) === '[1,0]', JSON.stringify(nos(r2, 'base')));
+    verificar('I_Base = [1, 0]', JSON.stringify(net2('i', ib)) === '[1,0]', JSON.stringify(nos(r2, 'i')));
+    verificar('CCCS com controle sem erro de controle', !diagnosticar(circuito, r2).erros.some(m => m.includes('controle') || m.includes('terra')), JSON.stringify(diagnosticar(circuito, r2)));
 }
 
 console.log('Mover componente: fio continua saindo da ponta parada na direção original');
