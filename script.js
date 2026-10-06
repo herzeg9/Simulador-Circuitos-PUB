@@ -854,7 +854,8 @@ function gerarJSON() {
             else ampRaw = nomeComp(item);
             if (alphaRaw) alphaRaw = aplicarSufixosValor(alphaRaw.replace(/\s+/g, ''));
             compObj["Valor"] = ampRaw;
-            compObj["Laplace"] = { "Tipo": tipoL, "Amplitude": ampRaw, "Alpha": alphaRaw };
+            const tipoApi = { degrau: 'step', impulso: 'impulse', exponencial: 'exponential' }[tipoL] || 'step';
+            compObj["Laplace"] = { "Tipo": tipoApi, "Amplitude": ampRaw, "Alpha": alphaRaw };
         } else if (modo === 'AC' && fonteIndep) {
             const modIn = item.querySelector('.val-input-mod');
             const faseIn = item.querySelector('.val-input-fase');
@@ -896,7 +897,12 @@ function gerarJSON() {
         if (modo === 'S' && (tipo === 'Capacitor' || tipo === 'Inductor')) {
             const icEl = item.querySelector('.val-input-ic');
             const icRaw = icEl ? icEl.value.trim().replace(/\s+/g, '') : '';
-            compObj["CondicaoInicial"] = icRaw ? aplicarSufixosValor(icRaw) : '';
+            const icEnvio = icRaw ? aplicarSufixosValor(icRaw) : '';
+            /* v0 / i0 são o contrato com o notebook da V25 estendida.
+               CondicaoInicial permanece como alias, lido pelo mesmo notebook. */
+            if (tipo === 'Capacitor') compObj["v0"] = icEnvio;
+            else compObj["i0"] = icEnvio;
+            compObj["CondicaoInicial"] = icEnvio;
         }
 
         if (tipo === 'CCVS' || tipo === 'CCCS') {

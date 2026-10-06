@@ -33,9 +33,9 @@ def main() -> None:
     definicoes = (ROOT / "simulador-circuitos-api-v2.wl").read_text(encoding="utf-8")
     testes = (ROOT / "testes-locais.wl").read_text(encoding="utf-8")
     deploy = (ROOT / "cloud-deploy.wl").read_text(encoding="utf-8")
-    intro = """Laboratório Virtual de Circuitos — API MNA completa (DC, AC e domínio s)
+    intro = """Laboratório Virtual de Circuitos — API MNA (V25 do Henrique + domínio s)
 
-Este notebook substitui IC_1905.nb. Não é um patch: a primeira célula de código é o programa inteiro.
+A primeira célula de código é o programa inteiro. DC e AC são a célula que está no ar (V25). O modo S foi acrescentado ao lado: capacitor i/(s C)+v0/s, indutor (s L) i - L i0. Esta célula não publica.
 
 Como publicar
 1. Abra este arquivo no Wolfram (File → Open, ou arraste o .nb).

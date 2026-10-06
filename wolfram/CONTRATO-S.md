@@ -1,6 +1,8 @@
 # Contrato do modo s (Laplace) — site e notebook
 
-Arquivo para publicar: `wolfram/simulador-circuitos-api-v2.nb` (programa completo, gerado a partir de `simulador-circuitos-api-v2.wl`). O notebook antigo `IC_1905.nb` fica no repositório só como histórico. O CloudDeploy continua no **mesmo** objeto:
+A base é o notebook que está no ar, a V25 (cópia em `wolfram/origem-v25-henrique.nb`). DC e AC dessa célula foram mantidos: C aberto e L em curto no DC, `1/(I*omega*C)` e `I*omega*L` no AC, `cleanTeX` nas equações, superposição só em circuito resistivo com mais de uma fonte. O modo S foi acrescentado ao lado.
+
+Arquivo para publicar: `wolfram/simulador-circuitos-api-v2.nb` (programa completo, gerado a partir de `simulador-circuitos-api-v2.wl`). O CloudDeploy continua no **mesmo** objeto:
 
 `https://www.wolframcloud.com/obj/herzeghenrique/simulador-circuitos-api-v2`
 
@@ -12,12 +14,13 @@ Enquanto esse objeto não for republicado, o site aceita o modo s na interface, 
 - No modo S, capacitor e indutor **continuam** com `Tipo` `"Capacitor"` e `"Inductor"`. A troca de impedância acontece só dentro de `processCircuit`:
   - capacitor: `v(n1) − v(n2) = i/(s C) + v(0)/s` (impedância `1/(sC)` em série com fonte `v(0)/s`)
   - indutor: `v(n1) − v(n2) = (s L) i − L i(0)` (impedância `sL` em série com fonte `−L i(0)`)
-- `v(0)` e `i(0)` vêm do campo `CondicaoInicial`. Zero é válido. Campo ausente ou vazio é erro.
+- `v(0)` vem de `v0` no capacitor e `i(0)` vem de `i0` no indutor. `CondicaoInicial` continua aceito como alias dos dois. Zero é válido. Campo ausente ou vazio é erro.
 - Fonte independente no modo S usa `Laplace`:
-  - `degrau` (também `step`): `A/s`
-  - `impulso` (também `impulse`, `delta`): `A`
-  - `exponencial` (também `exp`): `A/(s+α)`, com α de `e^{−α t}`
+  - `step` (também `degrau`): `A/s`
+  - `impulse` (também `impulso`, `delta`): `A`
+  - `exponential` (também `exponencial`, `exp`): `A/(s+α)`, com α de `e^{−α t}`
   - sem `Laplace`, a amplitude é `Valor` e a forma é degrau
+- Em DC e AC a resposta é a da V25 (`Equacoes` via `cleanTeX`, sem chave `Modo`). No modo S, `Equacoes` vai em InputForm e `EquacoesTeX` em TeXForm, porque o `cleanTeX` apaga `}` e quebraria frações.
 - A resposta do modo S traz expressões simbólicas (`Expressao`, `ExpressaoTeX`) e, quando a inversa fecha, amostras de `y(t)` para o gráfico.
 - No modo S o notebook recusa, com as mesmas frases do site:
   - capacitor sem `v(0)`, indutor sem `i(0)`
@@ -35,7 +38,7 @@ Enquanto esse objeto não for republicado, o site aceita o modo s na interface, 
       "Tipo": "VoltageSource",
       "Nos": [1, 0],
       "Valor": "10",
-      "Laplace": { "Tipo": "degrau", "Amplitude": "10", "Alpha": "0" }
+      "Laplace": { "Tipo": "step", "Amplitude": "10", "Alpha": "0" }
     },
     {
       "Componente": "R1",
@@ -48,6 +51,7 @@ Enquanto esse objeto não for republicado, o site aceita o modo s na interface, 
       "Tipo": "Capacitor",
       "Nos": [2, 0],
       "Valor": "0.0001",
+      "v0": "0",
       "CondicaoInicial": "0"
     },
     {
@@ -55,6 +59,7 @@ Enquanto esse objeto não for republicado, o site aceita o modo s na interface, 
       "Tipo": "Inductor",
       "Nos": [2, 3],
       "Valor": "0.1",
+      "i0": "0.02",
       "CondicaoInicial": "0.02"
     },
     {
@@ -72,7 +77,7 @@ Enquanto esse objeto não for republicado, o site aceita o modo s na interface, 
 
 `E`/`G` (VCVS/VCCS) não usam `Alvo`: a referência são os nós 3 e 4, `Nos = [out+, out−, ctrl+, ctrl−]`.
 
-Formas de fonte aceitas em `Laplace.Tipo`: `degrau`, `impulso`, `exponencial` (e os aliases em inglês acima).
+Formas de fonte aceitas em `Laplace.Tipo`: `step`, `impulse`, `exponential` (e os aliases `degrau`, `impulso`, `exponencial`). O site manda o nome em inglês.
 
 ## Resposta no modo S
 

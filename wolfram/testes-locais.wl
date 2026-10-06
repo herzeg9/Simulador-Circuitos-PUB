@@ -39,9 +39,9 @@ payloadS = ExportString[<|
   "Config" -> <|"Modo" -> "S", "Frequencia" -> 60|>,
   "Netlist" -> {
     <|"Componente" -> "V1", "Tipo" -> "VoltageSource", "Valor" -> "10", "Nos" -> {1, 0},
-      "Laplace" -> <|"Tipo" -> "degrau", "Amplitude" -> "10", "Alpha" -> "0"|>|>,
+      "Laplace" -> <|"Tipo" -> "step", "Amplitude" -> "10", "Alpha" -> "0"|>|>,
     <|"Componente" -> "R1", "Tipo" -> "Resistor", "Valor" -> "1", "Nos" -> {1, 2}|>,
-    <|"Componente" -> "C1", "Tipo" -> "Capacitor", "Valor" -> "1", "Nos" -> {2, 0}, "CondicaoInicial" -> "0"|>
+    <|"Componente" -> "C1", "Tipo" -> "Capacitor", "Valor" -> "1", "Nos" -> {2, 0}, "v0" -> "0"|>
   }
 |>, "JSON"];
 
