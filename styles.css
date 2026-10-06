@@ -2492,10 +2492,14 @@ body.dark-mode {
 
 .card-placa { border-left: 5px solid #16a085; padding: 18px 20px; }
 
-/* Os nós de componentes de dois terminais vêm da placa; trafo e fontes
-   dependentes ainda não estão na placa e continuam com os campos. */
+/* Nós de R/L/C/V/I vêm sempre da placa. Fontes dependentes colocadas na placa
+   também: os números ficam escondidos, mas o Alvo de H/F continua editável.
+   Itens acrescentados só pela lista (sem data-placa-id) e o trafo seguem com os campos. */
 .comp-item:is(.type-Resistor, .type-Capacitor, .type-Inductor, .type-VoltageSource, .type-CurrentSource) .nodes-group,
 #btnRenumerarNos { display: none; }
+.comp-item[data-placa-id]:is(.type-VCVS, .type-VCCS) .nodes-group { display: none; }
+.comp-item[data-placa-id]:is(.type-CCVS, .type-CCCS) .nodes-group > span,
+.comp-item[data-placa-id]:is(.type-CCVS, .type-CCCS) .nodes-group input[type="number"] { display: none; }
 .card-placa .section-title { color: #138d75; margin: 0; }
 body.dark-mode .card-placa .section-title { color: #76d7c4; }
 
@@ -2527,6 +2531,18 @@ body.dark-mode .card-placa .section-title { color: #76d7c4; }
     margin-bottom: 10px;
 }
 .placa-pecas, .placa-ferrs { display: flex; flex-wrap: wrap; gap: 6px; }
+.placa-pecas--dep {
+    align-items: center;
+    padding-left: 8px;
+    border-left: 2px solid var(--esq-ctrl, #9b59b6);
+}
+.placa-dep-rotulo {
+    font-size: 0.72em;
+    font-weight: 700;
+    line-height: 1.15;
+    max-width: 5.4em;
+    color: var(--esq-ctrl, #9b59b6);
+}
 
 .placa-peca {
     display: flex;
@@ -2552,7 +2568,8 @@ body.dark-mode .card-placa .section-title { color: #76d7c4; }
     box-shadow: 0 0 0 2px var(--placa-destaque) inset;
 }
 .placa-icone { width: 46px; height: 24px; display: block; pointer-events: none; }
-.placa-icone .esq-label--name, .placa-icone .esq-label--val { display: none; }
+.placa-icone--quatro { width: 38px; height: 38px; }
+.placa-icone .esq-label--name, .placa-icone .esq-label--val, .placa-icone .esq-label--ctrl, .placa-icone .placa-rotulo-term { display: none; }
 
 .placa-ferr {
     padding: 7px 12px;
@@ -2602,6 +2619,7 @@ body.dark-mode .card-placa .section-title { color: #76d7c4; }
     stroke-dasharray: 5 3;
 }
 .placa-perna { stroke: var(--esq-wire); stroke-width: 2; stroke-linecap: round; }
+.placa-perna--ctrl { stroke: var(--esq-ctrl, #9b59b6); }
 .placa-gnd { stroke: var(--esq-gnd); stroke-width: 2.5; stroke-linecap: round; }
 
 .placa-term {
@@ -2612,7 +2630,19 @@ body.dark-mode .card-placa .section-title { color: #76d7c4; }
     pointer-events: all;
 }
 .placa-comp:hover .placa-term { stroke: var(--placa-destaque); }
+.placa-term--ctrl { stroke: var(--esq-ctrl, #9b59b6); }
 .placa-term.is-solto { stroke: var(--placa-erro); fill: rgba(231, 76, 60, 0.18); }
+.placa-rotulo-term {
+    font-family: 'Segoe UI', Roboto, sans-serif;
+    font-size: 9px;
+    font-weight: 700;
+    fill: var(--text-secondary);
+    paint-order: stroke;
+    stroke: var(--esq-bg);
+    stroke-width: 3px;
+    pointer-events: none;
+}
+.placa-rotulo-term--ctrl { fill: var(--esq-ctrl, #9b59b6); }
 .placa-svg--posicionar .placa-term, .placa-svg--fio .placa-term { pointer-events: none; }
 
 .placa-fio { cursor: pointer; }
@@ -2689,9 +2719,11 @@ body.dark-mode .card-placa .section-title { color: #76d7c4; }
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
     padding: 12px;
 }
+.placa-props.is-larga { width: 300px; }
 .placa-props-titulo { font-weight: 700; margin-bottom: 8px; color: var(--placa-destaque); }
 .placa-props-campo { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 0.85em; }
 .placa-props-campo span { flex: 0 0 62px; color: var(--text-secondary); }
+.placa-props-campo--largo span { flex-basis: 84px; }
 .placa-props-campo input {
     flex: 1;
     min-width: 0;

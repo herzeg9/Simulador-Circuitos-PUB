@@ -8,7 +8,7 @@ import path from 'path';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
-const { extrairNos, juncoes, diagnosticar, normalizarFios, reposicionarFios, arrastarTrecho, segmentos, nosNetlist } = require(path.join(__dirname, '..', 'placa.js'));
+const { extrairNos, juncoes, diagnosticar, normalizarFios, reposicionarFios, arrastarTrecho, segmentos, nosNetlist, terminais } = require(path.join(__dirname, '..', 'placa.js'));
 
 let falhas = 0;
 function verificar(nome, cond, detalhe = '') {
@@ -163,6 +163,97 @@ console.log('Arrastar trecho: fios perpendiculares esticam, terminais ganham pon
     const subiu = arrastarTrecho(comps, direto, 'x', -40, novoId);
     verificar('trecho preso a terminais ganha duas pontes', subiu.length === 3);
     verificar('conectividade mantida com pontes', netlist(comps, normalizarFios(subiu, novoId)) === netlist(comps, direto));
+}
+
+console.log('VCVS/VCCS: quatro terminais e netlist [out+, out−, ctrl+, ctrl−]');
+{
+    const e0 = { id: 'e', tipo: 'VCVS', nome: 'E1', x: 200, y: 200, rot: 0, valor: '3' };
+    const ts = terminais(e0);
+    const porNome = nome => ts.find(t => t.nome === nome);
+    verificar('rot 0: Out+ esquerda, Out− direita, Ctrl+ cima, Ctrl− baixo',
+        porNome('A').x === 160 && porNome('A').y === 200
+        && porNome('B').x === 240 && porNome('B').y === 200
+        && porNome('C').x === 200 && porNome('C').y === 160
+        && porNome('D').x === 200 && porNome('D').y === 240,
+        JSON.stringify(ts));
+    const t90 = terminais({ ...e0, rot: 90 });
+    const p90 = nome => t90.find(t => t.nome === nome);
+    verificar('rot 90 gira os quatro juntos',
+        p90('A').x === 200 && p90('A').y === 160 && p90('C').x === 240 && p90('C').y === 200,
+        JSON.stringify(t90));
+    verificar('netlist VCVS [2,0,1,0]', JSON.stringify(nosNetlist(e0, { A: 2, B: 0, C: 1, D: 0 })) === '[2,0,1,0]');
+    const g = { id: 'g1', tipo: 'VCCS', nome: 'G1', x: 0, y: 0, rot: 0, valor: '0.01' };
+    verificar('netlist VCCS na mesma ordem', JSON.stringify(nosNetlist(g, { A: 2, B: 0, C: 1, D: 0 })) === '[2,0,1,0]');
+}
+
+console.log('Amplificador VCVS na placa casa com o preset amp');
+{
+    const Vsrc = V('v', 'V_In', 120, 200);
+    const r1 = R('r1', 'R1', 220, 160);
+    const e = { id: 'e', tipo: 'VCVS', nome: 'E_Amp', x: 400, y: 160, rot: 0, valor: '3' };
+    const carga = R('rc', 'R_Carga', 540, 200, 90);
+    const comps = [Vsrc, r1, e, carga, GND('g', 120, 240)];
+    const fios = [
+        fio('a', 120, 160, 180, 160),
+        fio('b', 260, 160, 260, 240),
+        fio('c', 260, 240, 120, 240),
+        fio('d1', 360, 160, 360, 80),
+        fio('d2', 360, 80, 540, 80),
+        fio('d3', 540, 80, 540, 160),
+        fio('e', 440, 160, 440, 240),
+        fio('f', 440, 240, 120, 240),
+        fio('h', 400, 200, 400, 240),
+        fio('i', 400, 240, 120, 240),
+        fio('j', 540, 240, 120, 240),
+        fio('k', 400, 120, 180, 120),
+        fio('l', 180, 120, 180, 160)
+    ];
+    const res = extrairNos(comps, fios);
+    const net = (id, comp) => nosNetlist(comp, nos(res, id));
+    verificar('V_In = [1, 0]', JSON.stringify(net('v', Vsrc)) === '[1,0]', JSON.stringify(nos(res, 'v')));
+    verificar('R1 = [1, 0]', JSON.stringify(net('r1', r1)) === '[1,0]', JSON.stringify(nos(res, 'r1')));
+    verificar('E_Amp = [2, 0, 1, 0]', JSON.stringify(net('e', e)) === '[2,0,1,0]', JSON.stringify(nos(res, 'e')));
+    verificar('R_Carga = [2, 0]', JSON.stringify(net('rc', carga)) === '[2,0]', JSON.stringify(nos(res, 'rc')));
+    verificar('VCVS ligado sem erro', diagnosticar(comps, res).erros.length === 0, JSON.stringify(diagnosticar(comps, res)));
+}
+
+console.log('CCVS/CCCS: só a saída na netlist; Alvo vazio ou inexistente é erro');
+{
+    const h = { id: 'h', tipo: 'CCVS', nome: 'H1', x: 0, y: 0, rot: 0, valor: '2', alvo: 'R1' };
+    verificar('netlist CCVS [out+, out−]', JSON.stringify(nosNetlist(h, { A: 2, B: 0 })) === '[2,0]');
+    verificar('CCVS tem dois terminais', terminais(h).length === 2);
+
+    const f = { id: 'f', tipo: 'CCCS', nome: 'F1', x: 100, y: 100, rot: 0, valor: '100', alvo: '' };
+    const r = R('r', 'R_Base', 300, 100);
+    const comps = [f, r, GND('g', 140, 100)];
+    const res = extrairNos(comps, []);
+    verificar('CCCS sem Alvo é erro', diagnosticar(comps, res).erros.some(m => m.includes('Alvo')));
+    f.alvo = 'R9';
+    verificar('Alvo inexistente é erro', diagnosticar(comps, res).erros.some(m => m.includes('R9') && m.includes('não existe')));
+    f.alvo = 'F1';
+    verificar('Alvo em si mesmo não conta', diagnosticar(comps, res).erros.some(m => m.includes('não existe')));
+    f.alvo = 'R_Base';
+    verificar('Alvo R_Base aceito', !diagnosticar(comps, res).erros.some(m => m.includes('Alvo') || m.includes('não existe')));
+
+    const f90 = { id: 'f2', tipo: 'CCCS', nome: 'F_BJT', x: 400, y: 200, rot: 90, valor: '100', alvo: 'R_Base' };
+    const col = R('col', 'R_Col', 480, 200, 90);
+    const base = R('base', 'R_Base', 200, 160);
+    const ib = { id: 'i', tipo: 'CurrentSource', nome: 'I_Base', x: 120, y: 200, rot: 270, valorDc: '1m', modulo: '1m', fase: '0' };
+    const circuito = [ib, base, f90, col, GND('gnd', 120, 240)];
+    const fios = [
+        fio('t1', 120, 160, 160, 160),
+        fio('t2', 240, 160, 240, 240),
+        fio('t3', 240, 240, 120, 240),
+        fio('t4', 400, 160, 480, 160),
+        fio('t5', 400, 240, 120, 240),
+        fio('t6', 480, 240, 120, 240)
+    ];
+    const r2 = extrairNos(circuito, fios);
+    verificar('F_BJT = [2, 0]', JSON.stringify(nosNetlist(f90, nos(r2, 'f2'))) === '[2,0]', JSON.stringify(nos(r2, 'f2')));
+    verificar('R_Col = [2, 0]', JSON.stringify(nosNetlist(col, nos(r2, 'col'))) === '[2,0]', JSON.stringify(nos(r2, 'col')));
+    verificar('R_Base = [1, 0]', JSON.stringify(nosNetlist(base, nos(r2, 'base'))) === '[1,0]', JSON.stringify(nos(r2, 'base')));
+    verificar('I_Base = [1, 0]', JSON.stringify(nosNetlist(ib, nos(r2, 'i'))) === '[1,0]', JSON.stringify(nos(r2, 'i')));
+    verificar('CCCS com Alvo sem erro de Alvo', !diagnosticar(circuito, r2).erros.some(m => m.includes('Alvo') || m.includes('não existe')), JSON.stringify(diagnosticar(circuito, r2)));
 }
 
 console.log('Mover componente: fio continua saindo da ponta parada na direção original');

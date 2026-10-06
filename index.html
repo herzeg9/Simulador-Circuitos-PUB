@@ -8,7 +8,7 @@
     <script>MathJax = {loader: {load: ['input/asciimath', 'output/chtml']}, asciimath: {delimiters: [['`','`']]}};</script>
     <script type="text/javascript" id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/startup.js"></script>
 
-    <link rel="stylesheet" href="styles.css?v=20260926-placa4">
+    <link rel="stylesheet" href="styles.css?v=20261006-dep">
 </head>
 <body>
 
@@ -294,6 +294,13 @@
                             <button type="button" class="placa-peca" data-tipo="CurrentSource" title="Fonte de corrente: arraste para a placa">I</button>
                             <button type="button" class="placa-peca" data-tipo="GND" title="Terra (GND): nó 0, referência das tensões">GND</button>
                         </div>
+                        <div class="placa-pecas placa-pecas--dep" aria-label="Fontes dependentes">
+                            <span class="placa-dep-rotulo">Dependentes</span>
+                            <button type="button" class="placa-peca" data-tipo="VCVS" title="VCVS (E): tensão controlada por tensão. Quatro terminais — Out+, Out−, Ctrl+ e Ctrl−.">E</button>
+                            <button type="button" class="placa-peca" data-tipo="VCCS" title="VCCS (G): corrente controlada por tensão. Quatro terminais — Out+, Out−, Ctrl+ e Ctrl−.">G</button>
+                            <button type="button" class="placa-peca" data-tipo="CCVS" title="CCVS (H): tensão controlada por corrente. Dois terminais de saída; no painel, informe o Alvo.">H</button>
+                            <button type="button" class="placa-peca" data-tipo="CCCS" title="CCCS (F): corrente controlada por corrente. Dois terminais de saída; no painel, informe o Alvo.">F</button>
+                        </div>
                         <div class="placa-ferrs">
                             <button type="button" class="placa-ferr" data-acao="fio" title="Desenhar fios (W). Também dá para arrastar direto de um terminal.">Fio</button>
                             <button type="button" class="placa-ferr" data-acao="girar" title="Girar 90° (R)">Girar</button>
@@ -315,6 +322,7 @@
                             <p>Ligue os terminais com fios: arraste a partir de um terminal ou use a ferramenta <em>Fio</em>. Coloque pelo menos um terra (GND).</p>
                             <p>Arraste um fio para ajeitar o traçado; arraste as pontas de um fio selecionado para religá-lo. Clique e arraste na área vazia para selecionar vários itens.</p>
                             <p>Duplo clique edita nome e valor &middot; <kbd>R</kbd> gira &middot; <kbd>Espaço</kbd> inverte a dobra do fio &middot; <kbd>Ctrl</kbd>+<kbd>A</kbd> seleciona tudo &middot; <kbd>Del</kbd> apaga &middot; <kbd>Esc</kbd> cancela.</p>
+                            <p>Fontes dependentes: <strong>E</strong> e <strong>G</strong> têm quatro terminais (Out+, Out&minus;, Ctrl+, Ctrl&minus;). <strong>H</strong> e <strong>F</strong> têm só a saída; a corrente de referência vai no campo <strong>Alvo</strong>.</p>
                             <p id="placaVaziaLista" class="placa-vazia-nota" hidden>O circuito que está na lista à esquerda não aparece aqui: por enquanto a placa só envia circuitos para a lista, não o contrário.</p>
                         </div>
                         <div id="placaProps" class="placa-props" hidden></div>
@@ -405,6 +413,6 @@
     </dialog>
 
     <script src="script.js?v=20260926-seta"></script>
-    <script src="placa.js?v=20260926-seta"></script>
+    <script src="placa.js?v=20261006-dep"></script>
 </body>
 </html>
