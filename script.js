@@ -2506,10 +2506,10 @@ function renderResolucaoDominioS(dados, listaComp, container) {
             <div class="card card-sdominio">
                 <h3 class="section-title">2. Modelo em s</h3>
                 <p>O símbolo na placa e na lista continua C ou L. No sistema, o capacitor entra como <code>1/(sC)</code> em série com <code>v(0)/s</code>, e o indutor como <code>sL</code> em série com <code>−L·i(0)</code>.</p>
-                <table class="s-modelo-table">
+                <div class="s-passo-tabela-scroll"><table class="s-modelo-table">
                     <thead><tr><th>Comp.</th><th>Tipo</th><th>Impedância</th><th>Fonte série</th><th>Condição inicial</th></tr></thead>
                     <tbody>${rows}</tbody>
-                </table>
+                </table></div>
             </div>`);
     }
 
