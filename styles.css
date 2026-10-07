@@ -293,6 +293,33 @@ body.dark-mode .sim-config-s__title { color: #d7bde2; }
 .s-carac-meta li, .s-carac-lista li { margin: 2px 0; }
 .s-carac-subtitulo { margin: 10px 0 4px; font-weight: 700; font-size: 0.9em; }
 .s-polo-meta { font-size: 0.82em; color: var(--text-secondary); }
+.card-passos { max-width: 100%; min-width: 0; }
+.s-passo { border-top: 1px solid var(--border-color); padding: 4px 0; }
+.s-passo summary { cursor: pointer; font-weight: 700; padding: 6px 0; }
+.s-passo-corpo p { margin: 6px 0; line-height: 1.45; }
+.s-passo-tex-scroll {
+    overflow-x: auto;
+    max-width: 100%;
+    -webkit-overflow-scrolling: touch;
+}
+.s-passo-tex-scroll .formula { max-width: 100%; }
+.s-passo-tex-scroll mjx-container[display="true"] {
+    display: inline-block;
+    text-align: initial;
+}
+.s-passo-tabela { width: 100%; border-collapse: collapse; font-size: 0.92em; margin: 8px 0 4px; }
+.s-passo-tabela th, .s-passo-tabela td {
+    text-align: left;
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--border-color);
+    vertical-align: top;
+}
+.s-passo-valores { margin: 6px 0 8px; padding-left: 1.2em; }
+.s-passo-link { color: #6c3483; }
+.s-confere { font-weight: 700; }
+.s-confere--ok { color: #1e8449; }
+.s-confere--nao { color: #c0392b; }
+.resultado-linha { scroll-margin-top: 16px; }
 .card-ondas .section-title { color: #1f618d; }
 body.dark-mode .card-ondas .section-title { color: #85c1e9; }
 .onda-subtitulo {

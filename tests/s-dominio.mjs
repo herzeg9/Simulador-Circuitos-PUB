@@ -21,7 +21,9 @@ const {
     setaDeAparaB,
     positivoNoLadoA,
     htmlCaracteristicaDominioS,
-    htmlResultadosDominioS
+    htmlResultadosDominioS,
+    htmlPassosDominioS,
+    idResultadoS
 } = require(path.join(__dirname, '..', 'sdominio.js'));
 
 let falhas = 0;
@@ -196,6 +198,39 @@ console.log('Resposta s simbólica');
         }]
     });
     verificar('coeficientes numéricos mesmo na forma simbólica', num.includes('(coeficientes aproximados)') && num.includes('sem gráfico') && !num.includes('<path'));
+    verificar('sem Passos não há seção', htmlPassosDominioS(exemplo.Passos) === '' && htmlPassosDominioS(null) === '' && htmlPassosDominioS({}) === '');
+}
+
+console.log('Passos da MNA');
+{
+    const exemplo = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'exemplo-resposta-s-v7-passos.json'), 'utf8'));
+    const html = htmlPassosDominioS(exemplo.Passos);
+    const res = htmlResultadosDominioS(exemplo);
+    verificar('título da resolução', html.includes('Resolução passo a passo (MNA)'));
+    verificar('nove passos', (html.match(/<details class="s-passo"/g) || []).length === 9);
+    verificar('texto quebrado em parágrafos', html.includes('Convenção do site') && html.includes('F1 (CCCS'));
+    verificar('TeX em display math', html.includes('\\[ \\begin{pmatrix}'));
+    verificar('matriz num scroll horizontal', html.includes('class="s-passo-tex-scroll"') && html.includes('\\begin{pmatrix}'));
+    verificar('incógnitas', html.includes('Incógnitas:') && html.includes('E1') && html.includes('I_L1'));
+    verificar('valores do passo 4', html.includes('G1 = 93/10') && html.includes('β1 = -1'));
+    verificar('tabela de raízes', html.includes('Multiplicidade') && html.includes('Na origem') && html.includes('>sim<') && html.includes('-31/10'));
+    verificar('ligação aponta para o resultado', html.includes('href="#resultado-s-no-1"') && html.includes('href="#resultado-s-corrente-l1"') && idResultadoS('Nó 1') === 'resultado-s-no-1');
+    verificar('resultado tem a âncora', res.includes('id="resultado-s-no-1"') && res.includes('id="resultado-s-corrente-l1"'));
+    verificar('conferência ok', html.includes('>✓</span>'));
+    const marcas = htmlPassosDominioS([{
+        Titulo: '8. Volta para o tempo',
+        Texto: 'linha um\nlinha dois',
+        TeX: [],
+        Conferencia: [
+            { Incognita: 'E1', Local: 'Nó 1', Tempo: '0', ConfereComResultados: true },
+            { Incognita: 'E2', Local: 'Nó 2', Tempo: '1', ConfereComResultados: false },
+            { Incognita: 'E3', Local: 'Nó 3', Tempo: '2', ConfereComResultados: null }
+        ]
+    }]);
+    verificar('marcas de conferência', marcas.includes('>✓</span>') && marcas.includes('✗</span>') && marcas.includes('>—</span>'));
+    verificar('dois parágrafos', (marcas.match(/<p>/g) || []).length === 2);
+    const indisponivel = htmlPassosDominioS({ Indisponivel: 'A matriz não foi fatorada.' });
+    verificar('motivo quando indisponível', indisponivel.includes('A matriz não foi fatorada.') && !indisponivel.includes('<details'));
 }
 
 console.log('Notebook completo');

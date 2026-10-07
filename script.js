@@ -2523,6 +2523,11 @@ function renderResolucaoDominioS(dados, listaComp, container) {
             `<div class="card card-aviso"><h3 class="section-title">Aviso</h3><p>${escapeXml(dados.Aviso)}</p></div>`);
     }
 
+    if (typeof htmlPassosDominioS === 'function') {
+        const passos = htmlPassosDominioS(dados.Passos);
+        if (passos) container.insertAdjacentHTML('beforeend', passos);
+    }
+
     if (typeof htmlResultadosDominioS === 'function') {
         const bloco = htmlResultadosDominioS(dados);
         if (bloco) container.insertAdjacentHTML('beforeend', bloco);

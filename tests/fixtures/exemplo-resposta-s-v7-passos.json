@@ -1,0 +1,415 @@
+{
+ "Modo": "S",
+ "Equacoes": [
+  "i[\"C1\"] + i[\"F1\"] + i[\"L1\"] + i[\"R1\"] == 0",
+  "-i[\"C1\"] + i[\"C2\"] == 0",
+  "i[\"F1\"] == -i[\"L1\"]",
+  "v[1] == -7*i0 + 7*s*i[\"L1\"]",
+  "v[1] == (10*i[\"R1\"])/93",
+  "v[1] - v[2] == v10/s + i[\"C1\"]/(6*s)",
+  "v[2] == v20/s + i[\"C2\"]/(6*s)"
+ ],
+ "EquacoesTeX": [
+  "i(\\text{C1})+i(\\text{F1})+i(\\text{L1})+i(\\text{R1})=0",
+  "i(\\text{C2})-i(\\text{C1})=0",
+  "i(\\text{F1})=-i(\\text{L1})",
+  "v(1)=7 s i(\\text{L1})-7 i_{0}",
+  "v(1)=\\frac{10 i(\\text{R1})}{93}",
+  "v(1)-v(2)=\\frac{i(\\text{C1})}{6 s}+\\frac{v_{10}}{s}",
+  "v(2)=\\frac{i(\\text{C2})}{6 s}+\\frac{v_{20}}{s}"
+ ],
+ "Superposicao": [],
+ "Substituicoes": [
+  {
+   "Componente": "L1",
+   "Tipo": "Inductor",
+   "Impedancia": "s*L",
+   "FonteSerie": "-L*i(0)",
+   "CondicaoInicial": "i0"
+  },
+  {
+   "Componente": "C1",
+   "Tipo": "Capacitor",
+   "Impedancia": "1/(s*C)",
+   "FonteSerie": "v(0)/s",
+   "CondicaoInicial": "v10"
+  },
+  {
+   "Componente": "C2",
+   "Tipo": "Capacitor",
+   "Impedancia": "1/(s*C)",
+   "FonteSerie": "v(0)/s",
+   "CondicaoInicial": "v20"
+  }
+ ],
+ "Resultados": [
+  {
+   "Local": "Nó 1",
+   "ValorNumerico": "(10*(v10 + v20))/(31 + 10*s)",
+   "Expressao": "(10*(v10 + v20))/(31 + 10*s)",
+   "ExpressaoTeX": "\\frac{10 (v_{10}+v_{20})}{10 s+31}",
+   "Unidade": "V",
+   "Rotulo": "V_1(s)",
+   "RotuloTeX": "V_{1}(s)",
+   "Simbolos": [
+    "v10",
+    "v20"
+   ],
+   "Tempo": {
+    "Rotulo": "v_1(t)",
+    "RotuloTeX": "v_{1}(t)",
+    "Expressao": "(v10 + v20)/E^((31*t)/10)",
+    "ExpressaoTeX": "e^{-31 t/10} (v_{10}+v_{20})",
+    "Forma": "simbolica",
+    "FormaCoeficientes": "exata",
+    "Simbolos": [
+     "v10",
+     "v20"
+    ],
+    "Nota": "Gráfico indisponível: há parâmetros simbólicos.",
+    "Amostras": []
+   }
+  },
+  {
+   "Local": "Nó 2",
+   "ValorNumerico": "(-31*v10 + (31 + 20*s)*v20)/(2*s*(31 + 10*s))",
+   "Expressao": "(-31*v10 + (31 + 20*s)*v20)/(2*s*(31 + 10*s))",
+   "ExpressaoTeX": "\\frac{(20 s+31) v_{20}-31 v_{10}}{2 s (10 s+31)}",
+   "Unidade": "V",
+   "Rotulo": "V_2(s)",
+   "RotuloTeX": "V_{2}(s)",
+   "Simbolos": [
+    "v10",
+    "v20"
+   ],
+   "Tempo": {
+    "Rotulo": "v_2(t)",
+    "RotuloTeX": "v_{2}(t)",
+    "Expressao": "(-v10 + v20)/2 + (v10 + v20)/(2*E^((31*t)/10))",
+    "ExpressaoTeX": "\\frac{1}{2} e^{-31 t/10} (v_{10}+v_{20})+\\frac{v_{20}-v_{10}}{2}",
+    "Forma": "simbolica",
+    "FormaCoeficientes": "exata",
+    "Simbolos": [
+     "v10",
+     "v20"
+    ],
+    "Nota": "Gráfico indisponível: há parâmetros simbólicos.",
+    "Amostras": []
+   }
+  },
+  {
+   "Local": "Corrente F1",
+   "ValorNumerico": "(-7*(31 + 10*s)*i0 - 10*(v10 + v20))/(7*s*(31 + 10*s))",
+   "Expressao": "(-7*(31 + 10*s)*i0 - 10*(v10 + v20))/(7*s*(31 + 10*s))",
+   "ExpressaoTeX": "\\frac{-7 (10 s+31) i_{0}-10 (v_{10}+v_{20})}{7 s (10 s+31)}",
+   "Unidade": "A",
+   "Rotulo": "I_F1(s)",
+   "RotuloTeX": "I_{F1}(s)",
+   "Simbolos": [
+    "i0",
+    "v10",
+    "v20"
+   ],
+   "Tempo": {
+    "Rotulo": "i_F1(t)",
+    "RotuloTeX": "i_{F1}(t)",
+    "Expressao": "-i0 + (10*(-1 + E^((-31*t)/10))*(v10 + v20))/217",
+    "ExpressaoTeX": "\\frac{10}{217} \\left(e^{-31 t/10}-1\\right) (v_{10}+v_{20})-i_{0}",
+    "Forma": "simbolica",
+    "FormaCoeficientes": "exata",
+    "Simbolos": [
+     "i0",
+     "v10",
+     "v20"
+    ],
+    "Nota": "Gráfico indisponível: há parâmetros simbólicos.",
+    "Amostras": []
+   }
+  },
+  {
+   "Local": "Corrente L1",
+   "ValorNumerico": "(7*(31 + 10*s)*i0 + 10*(v10 + v20))/(7*s*(31 + 10*s))",
+   "Expressao": "(7*(31 + 10*s)*i0 + 10*(v10 + v20))/(7*s*(31 + 10*s))",
+   "ExpressaoTeX": "\\frac{7 (10 s+31) i_{0}+10 (v_{10}+v_{20})}{7 s (10 s+31)}",
+   "Unidade": "A",
+   "Rotulo": "I_L1(s)",
+   "RotuloTeX": "I_{L1}(s)",
+   "Simbolos": [
+    "i0",
+    "v10",
+    "v20"
+   ],
+   "Tempo": {
+    "Rotulo": "i_L1(t)",
+    "RotuloTeX": "i_{L1}(t)",
+    "Expressao": "i0 + (10*(1 - E^((-31*t)/10))*(v10 + v20))/217",
+    "ExpressaoTeX": "\\frac{10}{217} \\left(1-e^{-31 t/10}\\right) (v_{10}+v_{20})+i_{0}",
+    "Forma": "simbolica",
+    "FormaCoeficientes": "exata",
+    "Simbolos": [
+     "i0",
+     "v10",
+     "v20"
+    ],
+    "Nota": "Gráfico indisponível: há parâmetros simbólicos.",
+    "Amostras": []
+   }
+  },
+  {
+   "Local": "Corrente R1",
+   "ValorNumerico": "(93*(v10 + v20))/(31 + 10*s)",
+   "Expressao": "(93*(v10 + v20))/(31 + 10*s)",
+   "ExpressaoTeX": "\\frac{93 (v_{10}+v_{20})}{10 s+31}",
+   "Unidade": "A",
+   "Rotulo": "I_R1(s)",
+   "RotuloTeX": "I_{R1}(s)",
+   "Simbolos": [
+    "v10",
+    "v20"
+   ],
+   "Tempo": {
+    "Rotulo": "i_R1(t)",
+    "RotuloTeX": "i_{R1}(t)",
+    "Expressao": "(93*(v10 + v20))/(10*E^((31*t)/10))",
+    "ExpressaoTeX": "\\frac{93}{10} e^{-31 t/10} (v_{10}+v_{20})",
+    "Forma": "simbolica",
+    "FormaCoeficientes": "exata",
+    "Simbolos": [
+     "v10",
+     "v20"
+    ],
+    "Nota": "Gráfico indisponível: há parâmetros simbólicos.",
+    "Amostras": []
+   }
+  },
+  {
+   "Local": "Corrente C1",
+   "ValorNumerico": "(-93*(v10 + v20))/(31 + 10*s)",
+   "Expressao": "(-93*(v10 + v20))/(31 + 10*s)",
+   "ExpressaoTeX": "-\\frac{93 (v_{10}+v_{20})}{10 s+31}",
+   "Unidade": "A",
+   "Rotulo": "I_C1(s)",
+   "RotuloTeX": "I_{C1}(s)",
+   "Simbolos": [
+    "v10",
+    "v20"
+   ],
+   "Tempo": {
+    "Rotulo": "i_C1(t)",
+    "RotuloTeX": "i_{C1}(t)",
+    "Expressao": "(-93*(v10 + v20))/(10*E^((31*t)/10))",
+    "ExpressaoTeX": "-\\frac{93}{10} e^{-31 t/10} (v_{10}+v_{20})",
+    "Forma": "simbolica",
+    "FormaCoeficientes": "exata",
+    "Simbolos": [
+     "v10",
+     "v20"
+    ],
+    "Nota": "Gráfico indisponível: há parâmetros simbólicos.",
+    "Amostras": []
+   }
+  },
+  {
+   "Local": "Corrente C2",
+   "ValorNumerico": "(-93*(v10 + v20))/(31 + 10*s)",
+   "Expressao": "(-93*(v10 + v20))/(31 + 10*s)",
+   "ExpressaoTeX": "-\\frac{93 (v_{10}+v_{20})}{10 s+31}",
+   "Unidade": "A",
+   "Rotulo": "I_C2(s)",
+   "RotuloTeX": "I_{C2}(s)",
+   "Simbolos": [
+    "v10",
+    "v20"
+   ],
+   "Tempo": {
+    "Rotulo": "i_C2(t)",
+    "RotuloTeX": "i_{C2}(t)",
+    "Expressao": "(-93*(v10 + v20))/(10*E^((31*t)/10))",
+    "ExpressaoTeX": "-\\frac{93}{10} e^{-31 t/10} (v_{10}+v_{20})",
+    "Forma": "simbolica",
+    "FormaCoeficientes": "exata",
+    "Simbolos": [
+     "v10",
+     "v20"
+    ],
+    "Nota": "Gráfico indisponível: há parâmetros simbólicos.",
+    "Amostras": []
+   }
+  }
+ ],
+ "Caracteristica": {
+  "Determinante": "31 + 10*s",
+  "DeterminanteTeX": "10 s+31",
+  "DeterminanteMonico": "31/10 + s",
+  "DeterminanteMonicoTeX": "s+\\frac{31}{10}",
+  "PolosNaOrigemRemovidos": 2,
+  "Ordem": 1,
+  "Polos": [
+   {
+    "Valor": "-31/10",
+    "ValorTeX": "-\\frac{31}{10}",
+    "Re": -3.1,
+    "Im": 0,
+    "Multiplicidade": 1
+   }
+  ],
+  "ConstantesDeTempo": [
+   {
+    "Polo": "-31/10",
+    "Valor": "10/31",
+    "ValorTeX": "\\frac{10}{31}",
+    "ValorNumerico": 0.3226
+   }
+  ],
+  "Estavel": true
+ },
+ "Simbolos": [
+  "i0",
+  "v10",
+  "v20"
+ ],
+ "NotaSimbolica": "Gráfico indisponível: há parâmetros simbólicos.",
+ "NosLista": [
+  1,
+  2
+ ],
+ "Aviso": "Escopo inicial do modo s: uma fonte independente e dois ou três componentes R, L ou C. O sistema foi resolvido mesmo assim.",
+ "Passos": [
+  {
+   "Titulo": "0. Convenção de sinais",
+   "Texto": "Convenção do site: em cada componente a corrente positiva vai de Nos[1] para Nos[2] por dentro do componente (sai do nó Nos[1]). Para fontes dependentes de corrente (CCCS/VCCS), Valor positivo = corrente de Nos[1] para Nos[2] por dentro da fonte. Nas LCKs abaixo cada termo é a corrente que SAI do nó; a corrente do capacitor é sC(Ea − Eb) − C·v(0^-) e a do indutor é a incógnita I_L (com Ea − Eb = sL·I_L − L·i(0^-)).\nF1 (CCCS, Nos {1, 0}, Valor = -1, controle = corrente em L1): entra na LCK do nó 1 como +β1·(controle), ou seja, com Valor = -1 a fonte INJETA |Valor|·(controle) no nó 1. No desenho com a seta apontando para o nó 1 (a·i entrando no nó), isso corresponde a a = −β1 = 1.",
+   "TeX": []
+  },
+  {
+   "Titulo": "1. Incógnitas",
+   "Texto": "Tensões de nó (terra = nó 0) e as correntes extras da MNA: correntes dos indutores e das fontes de tensão (independentes e controladas, VCVS/CCVS). Correntes de controle de CCVS/CCCS são escritas em função dessas incógnitas (F1 usa a corrente de L1).",
+   "TeX": [
+    "x = \\begin{pmatrix}E_{1} \\\\ E_{2} \\\\ I_{L1}\\end{pmatrix}"
+   ],
+   "Incognitas": [
+    "E1",
+    "E2",
+    "I_L1"
+   ]
+  },
+  {
+   "Titulo": "2. Equação de cada incógnita (por extenso)",
+   "Texto": "Uma LCK por nó e uma equação de ramo para cada corrente extra. Parâmetros simbólicos: G = 1/R, C, L, ganhos e condições iniciais.",
+   "TeX": [
+    "\\text{LCK no nó 1 (correntes saindo do nó):}\\quad \\beta_{1} I_{L1} + I_{L1} + G_{1} E_{1} + C_{1} s (E_{1}-E_{2})-C_{1} v_{C1}(0^-) = 0",
+    "\\text{LCK no nó 2 (correntes saindo do nó):}\\quad C_{1} v_{C1}(0^-)-C_{1} s (E_{1}-E_{2}) + C_{2} s E_{2}-C_{2} v_{C2}(0^-) = 0",
+    "\\text{Ramo do indutor L1:}\\quad E_{1} -L_{1} s I_{L1} = -L_{1} i_{L1}(0^-)"
+   ]
+  },
+  {
+   "Titulo": "3. Reorganizada por incógnita",
+   "Texto": "Termos agrupados por incógnita; o que não multiplica incógnita (condições iniciais e fontes) vai para o lado direito.",
+   "TeX": [
+    "E_{1}\\left(G_{1}+C_{1} s\\right) + E_{2}\\left(-C_{1} s\\right) + I_{L1}\\left(\\beta_{1}+1\\right) = C_{1} v_{C1}(0^-)",
+    "E_{1}\\left(-C_{1} s\\right) + E_{2}\\left(s (C_{1}+C_{2})\\right) = C_{2} v_{C2}(0^-)-C_{1} v_{C1}(0^-)",
+    "E_{1} + I_{L1}\\left(-L_{1} s\\right) = -L_{1} i_{L1}(0^-)"
+   ]
+  },
+  {
+   "Titulo": "4. Forma matricial M(s)·x = b",
+   "Texto": "Simbólica e depois com os valores do circuito.",
+   "TeX": [
+    "\\begin{pmatrix}G_{1}+C_{1} s & -C_{1} s & \\beta_{1}+1 \\\\ -C_{1} s & s (C_{1}+C_{2}) & 0 \\\\ 1 & 0 & -L_{1} s\\end{pmatrix}\\begin{pmatrix}E_{1} \\\\ E_{2} \\\\ I_{L1}\\end{pmatrix} = \\begin{pmatrix}C_{1} v_{C1}(0^-) \\\\ C_{2} v_{C2}(0^-)-C_{1} v_{C1}(0^-) \\\\ -L_{1} i_{L1}(0^-)\\end{pmatrix}",
+    "\\begin{pmatrix}\\frac{3}{10} (20 s+31) & -6 s & 0 \\\\ -6 s & 12 s & 0 \\\\ 1 & 0 & -7 s\\end{pmatrix}\\begin{pmatrix}E_{1} \\\\ E_{2} \\\\ I_{L1}\\end{pmatrix} = \\begin{pmatrix}6 v_{10} \\\\ -6 (v_{10}-v_{20}) \\\\ -7 i_{0}\\end{pmatrix}"
+   ],
+   "Valores": [
+    "β1 = -1",
+    "L1 = 7",
+    "G1 = 93/10",
+    "C1 = 6",
+    "C2 = 6"
+   ]
+  },
+  {
+   "Titulo": "5. Determinante de M(s)",
+   "Texto": "det M(s) fatorado, simbólico e numérico. Também com os componentes de mesmo valor igualados (C1 = C, C2 = C), como numa conta à mão.",
+   "TeX": [
+    "\\det M(s) = -s \\left(\\beta_{1} C_{1}+\\beta_{1} C_{2}+L_{1} G_{1} C_{1} s+L_{1} G_{1} C_{2} s+L_{1} C_{1} C_{2} s^2+C_{1}+C_{2}\\right)",
+    "\\det M(s) = -C s \\left(2 \\beta_{1}+2 L_{1} G_{1} s+L_{1} C s^2+2\\right)",
+    "\\det M(s) = -\\frac{126}{5} s^2 (10 s+31)"
+   ]
+  },
+  {
+   "Titulo": "6. Frequências próprias (raízes de det M)",
+   "Texto": "s = 0 (multiplicidade 2) — raiz na origem: é polo de E2, I_L1.\ns = -31/10 (multiplicidade 1): é polo de E1, E2, I_L1.\nAtenção: as raízes em s = 0 (multiplicidade 2) devem ser lidas com cuidado. Nesta formulação os capacitores entram como admitâncias sC; um nó ligado só por capacitores, ou uma fonte controlada que anula a corrente de um indutor, deixa um fator s em det M(s). Esse s = 0 é uma raiz da equação característica da MNA, mas não é necessariamente um modo que aparece na resposta: só conta como frequência própria efetiva se continuar como polo depois da simplificação (veja acima). Além disso, polos s = 0 de E(s) podem vir da própria fonte degrau (1/s), e não do circuito.",
+   "TeX": [
+    "\\det M(s) = 0 \\;\\Rightarrow\\; s = 0\\ (\\times 2),\\quad s = -\\frac{31}{10}"
+   ],
+   "Raizes": [
+    {
+     "Valor": "0",
+     "Multiplicidade": 2,
+     "NaOrigem": true
+    },
+    {
+     "Valor": "-31/10",
+     "Multiplicidade": 1,
+     "NaOrigem": false
+    }
+   ]
+  },
+  {
+   "Titulo": "7. Solução",
+   "Texto": "x = M(s)^{-1} b. As respostas no tempo de cada incógnita estão em Resultados (mesmo Local).",
+   "TeX": [
+    "E_{1}(s) = \\frac{10 (v_{10}+v_{20})}{10 s+31}",
+    "E_{2}(s) = \\frac{20 s v_{20}-31 v_{10}+31 v_{20}}{2 s (10 s+31)}",
+    "I_{L1}(s) = \\frac{70 s i_{0}+217 i_{0}+10 v_{10}+10 v_{20}}{7 s (10 s+31)}"
+   ],
+   "Ligacao": [
+    {
+     "Incognita": "E1",
+     "Local": "Nó 1",
+     "Rotulo": "V_1(s)"
+    },
+    {
+     "Incognita": "E2",
+     "Local": "Nó 2",
+     "Rotulo": "V_2(s)"
+    },
+    {
+     "Incognita": "I_L1",
+     "Local": "Corrente L1",
+     "Rotulo": "I_L1(s)"
+    }
+   ]
+  },
+  {
+   "Titulo": "8. Volta para o tempo",
+   "Texto": "Para cada incógnita: frações parciais de X(s) (resíduos em cada polo; polos repetidos geram termos t^k e^{pt}/k!, pares complexos viram e^{σt}(cos ωt, sen ωt) e uma parte própria polinomial vira impulsos δ(t)), depois a transformada inversa para t ≥ 0. Coeficientes com 4 algarismos quando os polos não são racionais.\nConferência com as respostas no tempo de Resultados: E1 confere; E2 confere; I_L1 confere.",
+   "TeX": [
+    "E_{1}(s) = \\frac{v_{10}+v_{20}}{s + \\frac{31}{10}}",
+    "e_{1}(t) = e^{-31 t/10} (v_{10}+v_{20}),\\quad t \\ge 0",
+    "E_{2}(s) = \\frac{\\frac{v_{20}-v_{10}}{2}}{s} + \\frac{\\frac{v_{10}+v_{20}}{2}}{s + \\frac{31}{10}}",
+    "e_{2}(t) = \\frac{1}{2} e^{-31 t/10} (v_{10}+v_{20})+\\frac{v_{20}-v_{10}}{2},\\quad t \\ge 0",
+    "I_{L1}(s) = \\frac{\\frac{1}{217} (217 i_{0}+10 v_{10}+10 v_{20})}{s} + \\frac{-\\frac{10}{217} (v_{10}+v_{20})}{s + \\frac{31}{10}}",
+    "i_{L1}(t) = \\frac{1}{217} (217 i_{0}+10 v_{10}+10 v_{20})-\\frac{10}{217} e^{-31 t/10} (v_{10}+v_{20}),\\quad t \\ge 0"
+   ],
+   "Conferencia": [
+    {
+     "Incognita": "E1",
+     "Local": "Nó 1",
+     "Tempo": "(v10 + v20)/E^((31*t)/10)",
+     "ConfereComResultados": true
+    },
+    {
+     "Incognita": "E2",
+     "Local": "Nó 2",
+     "Tempo": "(-v10 + v20)/2 + (v10 + v20)/(2*E^((31*t)/10))",
+     "ConfereComResultados": true
+    },
+    {
+     "Incognita": "I_L1",
+     "Local": "Corrente L1",
+     "Tempo": "(-10*(v10 + v20))/(217*E^((31*t)/10)) + (217*i0 + 10*v10 + 10*v20)/217",
+     "ConfereComResultados": true
+    }
+   ]
+  }
+ ]
+}
