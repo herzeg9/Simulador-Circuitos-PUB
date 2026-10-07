@@ -550,10 +550,10 @@ function buildFonteIndepValorHtml(tipo, val) {
             <option value="exponencial">Exponencial</option>
         </select>
         <span class="label-val">Amplitude</span>
-        <span class="val-input-wrapper"><input type="text" class="val-input val-input-amp" value="${escapeAttr(v)}" data-tipo="${tipo}"></span>
+        <span class="val-input-wrapper"><input type="text" class="val-input val-input-amp" value="${escapeAttr(v)}" data-tipo="${tipo}" placeholder="número ou nome (ex.: v10)" autocomplete="off"></span>
         <span class="src-alpha">
             <span class="label-val">α</span>
-            <span class="val-input-wrapper"><input type="text" class="val-input val-input-alpha" value="1" data-tipo="${tipo}"></span>
+            <span class="val-input-wrapper"><input type="text" class="val-input val-input-alpha" value="1" data-tipo="${tipo}" placeholder="número ou nome (ex.: v10)" autocomplete="off"></span>
         </span>
     </span>`;
 }
@@ -562,7 +562,7 @@ function htmlCondicaoInicial(rotulo) {
     return `
     <span class="src-ic">
         <span class="label-val">${rotulo}</span>
-        <span class="val-input-wrapper"><input type="text" class="val-input val-input-ic" value="" placeholder="0" inputmode="decimal" autocomplete="off"></span>
+        <span class="val-input-wrapper"><input type="text" class="val-input val-input-ic" value="" placeholder="número ou nome (ex.: v10)" autocomplete="off"></span>
     </span>`;
 }
 
@@ -849,10 +849,16 @@ function gerarJSON() {
             const alphaIn = item.querySelector('.val-input-alpha');
             let ampRaw = (ampIn && ampIn.value.trim()) ? ampIn.value.trim() : '';
             const tipoL = (tipoIn && tipoIn.value) ? tipoIn.value : 'degrau';
-            let alphaRaw = (alphaIn && alphaIn.value.trim()) ? alphaIn.value.trim() : '0';
-            if (ampRaw) ampRaw = aplicarSufixosValor(ampRaw.replace(/\s+/g, ''));
-            else ampRaw = nomeComp(item);
-            if (alphaRaw) alphaRaw = aplicarSufixosValor(alphaRaw.replace(/\s+/g, ''));
+            let alphaRaw = (alphaIn && alphaIn.value.trim()) ? alphaIn.value.trim() : '';
+            const normS = (bruto) => {
+                if (typeof valorParametroS !== 'function') {
+                    return bruto ? aplicarSufixosValor(bruto.replace(/\s+/g, '')) : bruto;
+                }
+                const n = valorParametroS(bruto);
+                return n.ok ? n.valor : bruto.replace(/\s+/g, '');
+            };
+            ampRaw = normS(ampRaw);
+            alphaRaw = normS(alphaRaw);
             compObj["Valor"] = ampRaw;
             const tipoApi = { degrau: 'step', impulso: 'impulse', exponencial: 'exponential' }[tipoL] || 'step';
             compObj["Laplace"] = { "Tipo": tipoApi, "Amplitude": ampRaw, "Alpha": alphaRaw };
@@ -897,7 +903,8 @@ function gerarJSON() {
         if (modo === 'S' && (tipo === 'Capacitor' || tipo === 'Inductor')) {
             const icEl = item.querySelector('.val-input-ic');
             const icRaw = icEl ? icEl.value.trim().replace(/\s+/g, '') : '';
-            const icEnvio = icRaw ? aplicarSufixosValor(icRaw) : '';
+            const icNorm = (typeof valorParametroS === 'function') ? valorParametroS(icRaw) : null;
+            const icEnvio = icNorm && icNorm.ok ? icNorm.valor : (icRaw ? aplicarSufixosValor(icRaw) : '');
             /* v0 / i0 são o contrato com o notebook da V25 estendida.
                CondicaoInicial permanece como alias, lido pelo mesmo notebook. */
             if (tipo === 'Capacitor') compObj["v0"] = icEnvio;
@@ -948,16 +955,25 @@ function mensagensValidacaoDominioS(itens) {
         Tipo: item.dataset.tipo,
         Nos: lerNosItem(item),
         CondicaoInicial: item.querySelector('.val-input-ic')?.value ?? '',
-        Alvo: item.querySelector('.alvo-comp')?.value ?? ''
+        Alvo: item.querySelector('.alvo-comp')?.value ?? '',
+        Laplace: (item.dataset.tipo === 'VoltageSource' || item.dataset.tipo === 'CurrentSource')
+            ? {
+                Tipo: item.querySelector('.val-input-laplace')?.value || 'degrau',
+                Amplitude: item.querySelector('.val-input-amp')?.value ?? '',
+                Alpha: item.querySelector('.val-input-alpha')?.value ?? ''
+            }
+            : undefined
     }));
     const erros = validarNetlistDominioS(lista);
     itens.forEach(item => {
-        item.querySelectorAll('.val-input-ic, .alvo-comp, .no-c, .no-d').forEach(el => el.classList.remove('error'));
+        item.querySelectorAll('.val-input-ic, .val-input-amp, .val-input-alpha, .alvo-comp, .no-c, .no-d').forEach(el => el.classList.remove('error'));
     });
     erros.forEach(e => {
         const item = lista.find(c => c.Componente === e.nome);
         if (!item) return;
         if (e.campo === 'ic') item._el.querySelector('.val-input-ic')?.classList.add('error');
+        if (e.campo === 'amp') item._el.querySelector('.val-input-amp')?.classList.add('error');
+        if (e.campo === 'alpha') item._el.querySelector('.val-input-alpha')?.classList.add('error');
         if (e.campo === 'alvo') item._el.querySelector('.alvo-comp')?.classList.add('error');
         if (e.campo === 'ctrl') {
             item._el.querySelector('.no-c')?.classList.add('error');
@@ -1014,6 +1030,27 @@ function validarAntesEnvio() {
 
     if (getModoSimulacao() === 'S') {
         erros.push(...mensagensValidacaoDominioS(itensArr));
+    } else if (typeof valorNumericoDcAc === 'function') {
+        itensArr.forEach(item => {
+            const tipo = item.dataset.tipo;
+            if (!tipo || tipo === 'Transformer' || tipo === 'GND') return;
+            const fonteIndep = tipo === 'VoltageSource' || tipo === 'CurrentSource';
+            const campos = fonteIndep
+                ? (modoAc
+                    ? [['Módulo', item.querySelector('.val-input-mod'), true], ['Fase', item.querySelector('.val-input-fase'), false]]
+                    : [['Valor', item.querySelector('.val-input-dc'), false]])
+                : [['Valor', item.querySelector('.val-input'), false]];
+            campos.forEach(([rotulo, input, retangular]) => {
+                if (!input) return;
+                const valor = input.value.trim();
+                if (!valor) return;
+                const ok = valorNumericoDcAc(valor) || (retangular && _parseRetangular(valor));
+                if (ok) return;
+                const nomeC = item.querySelector('.nome-comp')?.value || 'Componente';
+                erros.push(`${nomeC}: em ${modoAc ? 'AC' : 'DC'} o campo ${rotulo} precisa ser numérico.`);
+                input.classList.add('error');
+            });
+        });
     }
 
     return {
@@ -4648,10 +4685,10 @@ const _TOOLTIPS = {
     'val-input-dc': 'Valor DC. Aceita sufixos k/M/m/u/n/p.',
     'val-input-mod': 'Módulo (amplitude) da fonte AC. Aceita sufixos k/M/m/u/n/p. Aceita também forma retangular: "3+4j" (matemática) ou "3+j4" (engenharia) — o campo Fase é calculado automaticamente.',
     'val-input-fase': 'Fase em graus. Pode ser negativa (ex: -30). Ignorada se o Módulo for digitado em forma retangular "a+bj" / "a+jb".',
-    'val-input-ic': 'Condição inicial no modo s. Capacitor: v(0). Indutor: i(0). Digite 0 se o componente começa em repouso. Campo vazio bloqueia o envio.',
-    'val-input-amp': 'Amplitude A da fonte no modo s. Degrau A·u(t) → A/s, impulso A·δ(t) → A, exponencial A·e^{−αt} → A/(s+α).',
+    'val-input-ic': 'Condição inicial no modo s. Capacitor: v(0). Indutor: i(0). Número ou nome (ex.: v10, i0, 2*v10). Campo vazio bloqueia o envio.',
+    'val-input-amp': 'Amplitude A da fonte no modo s. Número ou nome (ex.: v10). Degrau A·u(t) → A/s, impulso A·δ(t) → A, exponencial A·e^{−αt} → A/(s+α).',
     'val-input-laplace': 'Forma da fonte no modo s: degrau, impulso ou exponencial.',
-    'val-input-alpha': 'Decaimento α de e^{−αt}. Só entra na conta quando a forma é exponencial.',
+    'val-input-alpha': 'Decaimento α de e^{−αt}. Número ou nome (ex.: alpha). Só entra na conta quando a forma é exponencial.',
     'nome-comp': 'Nome do componente. Deve ser único.',
     'alvo-comp': 'Nome do componente cuja corrente serve de referência. Deve existir na lista. No modo s, Alvo vazio ou inexistente bloqueia o envio.'
 };

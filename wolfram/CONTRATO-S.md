@@ -14,7 +14,7 @@ Enquanto esse objeto não for republicado, o site aceita o modo s na interface, 
 - No modo S, capacitor e indutor **continuam** com `Tipo` `"Capacitor"` e `"Inductor"`. A troca de impedância acontece só dentro de `processCircuit`:
   - capacitor: `v(n1) − v(n2) = i/(s C) + v(0)/s` (impedância `1/(sC)` em série com fonte `v(0)/s`)
   - indutor: `v(n1) − v(n2) = (s L) i − L i(0)` (impedância `sL` em série com fonte `−L i(0)`)
-- `v(0)` vem de `v0` no capacitor e `i(0)` vem de `i0` no indutor. `CondicaoInicial` continua aceito como alias dos dois. Zero é válido. Campo ausente ou vazio é erro.
+- `v(0)` vem de `v0` no capacitor e `i(0)` vem de `i0` no indutor. `CondicaoInicial` continua aceito como alias dos dois. Zero é válido. Campo ausente ou vazio é erro. No modo S, `v0`, `i0`, `Laplace.Amplitude` e `Laplace.Alpha` podem ser um número, um nome (letra seguida de letras, dígitos ou `_`) ou uma expressão com `+ - * / ( ) ^`. Quando há símbolo, a resposta traz `Simbolos`, `NotaSimbolica` e, em cada `Tempo`, `Forma: "simbolica"` com `Amostras` vazias.
 - Fonte independente no modo S usa `Laplace`:
   - `step` (também `degrau`): `A/s`
   - `impulse` (também `impulso`, `delta`): `A`

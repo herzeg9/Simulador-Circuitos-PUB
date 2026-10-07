@@ -1,0 +1,277 @@
+{
+	"Modo":"S",
+	"Equacoes":[
+		"i[\"C1\"] + i[\"F1\"] + i[\"L1\"] + i[\"R1\"] == 0",
+		"-i[\"C1\"] + i[\"C2\"] == 0",
+		"i[\"F1\"] == -i[\"L1\"]",
+		"v[1] == -7*i0 + 7*s*i[\"L1\"]",
+		"v[1] == i[\"R1\"]\/10",
+		"v[1] - v[2] == v10\/s + i[\"C1\"]\/(6*s)",
+		"v[2] == v20\/s + i[\"C2\"]\/(6*s)"
+	],
+	"EquacoesTeX":[
+		"i(\\text{C1})+i(\\text{F1})+i(\\text{L1})+i(\\text{R1})=0",
+		"i(\\text{C2})-i(\\text{C1})=0",
+		"i(\\text{F1})=-i(\\text{L1})",
+		"v(1)=7 s i(\\text{L1})-7 i_{0}",
+		"v(1)=\\frac{i(\\text{R1})}{10}",
+		"v(1)-v(2)=\\frac{i(\\text{C1})}{6 s}+\\frac{v_{10}}{s}",
+		"v(2)=\\frac{i(\\text{C2})}{6 s}+\\frac{v_{20}}{s}"
+	],
+	"Superposicao":[],
+	"Substituicoes":[
+		{
+			"Componente":"L1",
+			"Tipo":"Inductor",
+			"Impedancia":"s*L",
+			"FonteSerie":"-L*i(0)",
+			"CondicaoInicial":"i0"
+		},
+		{
+			"Componente":"C1",
+			"Tipo":"Capacitor",
+			"Impedancia":"1\/(s*C)",
+			"FonteSerie":"v(0)\/s",
+			"CondicaoInicial":"v10"
+		},
+		{
+			"Componente":"C2",
+			"Tipo":"Capacitor",
+			"Impedancia":"1\/(s*C)",
+			"FonteSerie":"v(0)\/s",
+			"CondicaoInicial":"v20"
+		}
+	],
+	"Resultados":[
+		{
+			"Local":"Nó 1",
+			"ValorNumerico":"(3*(v10 + v20))\/(10 + 3*s)",
+			"Expressao":"(3*(v10 + v20))\/(10 + 3*s)",
+			"ExpressaoTeX":"\\frac{3 (v_{10}+v_{20})}{3 s+10}",
+			"Unidade":"V",
+			"Rotulo":"V_1(s)",
+			"RotuloTeX":"V_{1}(s)",
+			"Simbolos":[
+				"v10",
+				"v20"
+			],
+			"Tempo":{
+				"Rotulo":"v_1(t)",
+				"RotuloTeX":"v_{1}(t)",
+				"Expressao":"(v10 + v20)\/E^((10*t)\/3)",
+				"ExpressaoTeX":"e^{-10 t\/3} (v_{10}+v_{20})",
+				"Forma":"simbolica",
+				"FormaCoeficientes":"exata",
+				"Simbolos":[
+					"v10",
+					"v20"
+				],
+				"Nota":"Gráfico indisponível: há parâmetros simbólicos.",
+				"Amostras":[]
+			}
+		},
+		{
+			"Local":"Nó 2",
+			"ValorNumerico":"(-5*v10 + (5 + 3*s)*v20)\/(s*(10 + 3*s))",
+			"Expressao":"(-5*v10 + (5 + 3*s)*v20)\/(s*(10 + 3*s))",
+			"ExpressaoTeX":"\\frac{(3 s+5) v_{20}-5 v_{10}}{s (3 s+10)}",
+			"Unidade":"V",
+			"Rotulo":"V_2(s)",
+			"RotuloTeX":"V_{2}(s)",
+			"Simbolos":[
+				"v10",
+				"v20"
+			],
+			"Tempo":{
+				"Rotulo":"v_2(t)",
+				"RotuloTeX":"v_{2}(t)",
+				"Expressao":"(-v10 + v20)\/2 + (v10 + v20)\/(2*E^((10*t)\/3))",
+				"ExpressaoTeX":"\\frac{1}{2} e^{-10 t\/3} (v_{10}+v_{20})+\\frac{v_{20}-v_{10}}{2}",
+				"Forma":"simbolica",
+				"FormaCoeficientes":"exata",
+				"Simbolos":[
+					"v10",
+					"v20"
+				],
+				"Nota":"Gráfico indisponível: há parâmetros simbólicos.",
+				"Amostras":[]
+			}
+		},
+		{
+			"Local":"Corrente F1",
+			"ValorNumerico":"(-7*(10 + 3*s)*i0 - 3*(v10 + v20))\/(7*s*(10 + 3*s))",
+			"Expressao":"(-7*(10 + 3*s)*i0 - 3*(v10 + v20))\/(7*s*(10 + 3*s))",
+			"ExpressaoTeX":"\\frac{-7 (3 s+10) i_{0}-3 (v_{10}+v_{20})}{7 s (3 s+10)}",
+			"Unidade":"A",
+			"Rotulo":"I_F1(s)",
+			"RotuloTeX":"I_{F1}(s)",
+			"Simbolos":[
+				"i0",
+				"v10",
+				"v20"
+			],
+			"Tempo":{
+				"Rotulo":"i_F1(t)",
+				"RotuloTeX":"i_{F1}(t)",
+				"Expressao":"-i0 + (3*(-1 + E^((-10*t)\/3))*(v10 + v20))\/70",
+				"ExpressaoTeX":"\\frac{3}{70} \\left(e^{-10 t\/3}-1\\right) (v_{10}+v_{20})-i_{0}",
+				"Forma":"simbolica",
+				"FormaCoeficientes":"exata",
+				"Simbolos":[
+					"i0",
+					"v10",
+					"v20"
+				],
+				"Nota":"Gráfico indisponível: há parâmetros simbólicos.",
+				"Amostras":[]
+			}
+		},
+		{
+			"Local":"Corrente L1",
+			"ValorNumerico":"(7*(10 + 3*s)*i0 + 3*(v10 + v20))\/(7*s*(10 + 3*s))",
+			"Expressao":"(7*(10 + 3*s)*i0 + 3*(v10 + v20))\/(7*s*(10 + 3*s))",
+			"ExpressaoTeX":"\\frac{7 (3 s+10) i_{0}+3 (v_{10}+v_{20})}{7 s (3 s+10)}",
+			"Unidade":"A",
+			"Rotulo":"I_L1(s)",
+			"RotuloTeX":"I_{L1}(s)",
+			"Simbolos":[
+				"i0",
+				"v10",
+				"v20"
+			],
+			"Tempo":{
+				"Rotulo":"i_L1(t)",
+				"RotuloTeX":"i_{L1}(t)",
+				"Expressao":"i0 + (3*(1 - E^((-10*t)\/3))*(v10 + v20))\/70",
+				"ExpressaoTeX":"\\frac{3}{70} \\left(1-e^{-10 t\/3}\\right) (v_{10}+v_{20})+i_{0}",
+				"Forma":"simbolica",
+				"FormaCoeficientes":"exata",
+				"Simbolos":[
+					"i0",
+					"v10",
+					"v20"
+				],
+				"Nota":"Gráfico indisponível: há parâmetros simbólicos.",
+				"Amostras":[]
+			}
+		},
+		{
+			"Local":"Corrente R1",
+			"ValorNumerico":"(30*(v10 + v20))\/(10 + 3*s)",
+			"Expressao":"(30*(v10 + v20))\/(10 + 3*s)",
+			"ExpressaoTeX":"\\frac{30 (v_{10}+v_{20})}{3 s+10}",
+			"Unidade":"A",
+			"Rotulo":"I_R1(s)",
+			"RotuloTeX":"I_{R1}(s)",
+			"Simbolos":[
+				"v10",
+				"v20"
+			],
+			"Tempo":{
+				"Rotulo":"i_R1(t)",
+				"RotuloTeX":"i_{R1}(t)",
+				"Expressao":"(10*(v10 + v20))\/E^((10*t)\/3)",
+				"ExpressaoTeX":"10 e^{-10 t\/3} (v_{10}+v_{20})",
+				"Forma":"simbolica",
+				"FormaCoeficientes":"exata",
+				"Simbolos":[
+					"v10",
+					"v20"
+				],
+				"Nota":"Gráfico indisponível: há parâmetros simbólicos.",
+				"Amostras":[]
+			}
+		},
+		{
+			"Local":"Corrente C1",
+			"ValorNumerico":"(-30*(v10 + v20))\/(10 + 3*s)",
+			"Expressao":"(-30*(v10 + v20))\/(10 + 3*s)",
+			"ExpressaoTeX":"-\\frac{30 (v_{10}+v_{20})}{3 s+10}",
+			"Unidade":"A",
+			"Rotulo":"I_C1(s)",
+			"RotuloTeX":"I_{C1}(s)",
+			"Simbolos":[
+				"v10",
+				"v20"
+			],
+			"Tempo":{
+				"Rotulo":"i_C1(t)",
+				"RotuloTeX":"i_{C1}(t)",
+				"Expressao":"(-10*(v10 + v20))\/E^((10*t)\/3)",
+				"ExpressaoTeX":"-10 e^{-10 t\/3} (v_{10}+v_{20})",
+				"Forma":"simbolica",
+				"FormaCoeficientes":"exata",
+				"Simbolos":[
+					"v10",
+					"v20"
+				],
+				"Nota":"Gráfico indisponível: há parâmetros simbólicos.",
+				"Amostras":[]
+			}
+		},
+		{
+			"Local":"Corrente C2",
+			"ValorNumerico":"(-30*(v10 + v20))\/(10 + 3*s)",
+			"Expressao":"(-30*(v10 + v20))\/(10 + 3*s)",
+			"ExpressaoTeX":"-\\frac{30 (v_{10}+v_{20})}{3 s+10}",
+			"Unidade":"A",
+			"Rotulo":"I_C2(s)",
+			"RotuloTeX":"I_{C2}(s)",
+			"Simbolos":[
+				"v10",
+				"v20"
+			],
+			"Tempo":{
+				"Rotulo":"i_C2(t)",
+				"RotuloTeX":"i_{C2}(t)",
+				"Expressao":"(-10*(v10 + v20))\/E^((10*t)\/3)",
+				"ExpressaoTeX":"-10 e^{-10 t\/3} (v_{10}+v_{20})",
+				"Forma":"simbolica",
+				"FormaCoeficientes":"exata",
+				"Simbolos":[
+					"v10",
+					"v20"
+				],
+				"Nota":"Gráfico indisponível: há parâmetros simbólicos.",
+				"Amostras":[]
+			}
+		}
+	],
+	"Caracteristica":{
+		"Determinante":"10 + 3*s",
+		"DeterminanteTeX":"3 s+10",
+		"DeterminanteMonico":"10\/3 + s",
+		"DeterminanteMonicoTeX":"s+\\frac{10}{3}",
+		"PolosNaOrigemRemovidos":2,
+		"Ordem":1,
+		"Polos":[
+			{
+				"Valor":"-10\/3",
+				"ValorTeX":"-\\frac{10}{3}",
+				"Re":-3.333,
+				"Im":0,
+				"Multiplicidade":1
+			}
+		],
+		"ConstantesDeTempo":[
+			{
+				"Polo":"-10\/3",
+				"Valor":"3\/10",
+				"ValorTeX":"\\frac{3}{10}",
+				"ValorNumerico":0.3
+			}
+		],
+		"Estavel":true
+	},
+	"Simbolos":[
+		"i0",
+		"v10",
+		"v20"
+	],
+	"NotaSimbolica":"Gráfico indisponível: há parâmetros simbólicos.",
+	"NosLista":[
+		1,
+		2
+	],
+	"Aviso":"Escopo inicial do modo s: uma fonte independente e dois ou três componentes R, L ou C. O sistema foi resolvido mesmo assim."
+}
