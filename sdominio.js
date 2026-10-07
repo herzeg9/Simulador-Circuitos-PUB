@@ -358,6 +358,94 @@
         return `<div class="formula">\\[ ${escaparHtml(tex)} \\]</div>`;
     }
 
+    /** Âncora estável do resultado cujo Local a ligação do passo 7 aponta. */
+    function idResultadoS(local) {
+        const slug = String(local ?? '')
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '');
+        return 'resultado-s-' + (slug || 'item');
+    }
+
+    function marcaConferencia(v) {
+        if (v === true) return '<span class="s-confere s-confere--ok" title="Confere com os resultados">✓</span>';
+        if (v === false) return '<span class="s-confere s-confere--nao" title="Não confere com os resultados">✗</span>';
+        return '<span class="s-confere s-confere--na" title="Sem conferência">—</span>';
+    }
+
+    /**
+     * Resolução passo a passo. Sem o campo, string vazia.
+     * Lista de passos, ou {Indisponivel: motivo}.
+     */
+    function htmlPassosDominioS(passos) {
+        if (passos == null) return '';
+        if (!Array.isArray(passos)) {
+            if (typeof passos === 'object' && passos.Indisponivel) {
+                return `<div class="card card-sdominio card-passos">
+                    <h3 class="section-title">Resolução passo a passo (MNA)</h3>
+                    <p class="s-nota-simbolica">${escaparHtml(passos.Indisponivel)}</p>
+                </div>`;
+            }
+            return '';
+        }
+        if (!passos.length) return '';
+
+        let html = `<div class="card card-sdominio card-passos"><h3 class="section-title">Resolução passo a passo (MNA)</h3>`;
+        passos.forEach((passo, i) => {
+            if (!passo || typeof passo !== 'object') return;
+            const titulo = passo.Titulo || `Passo ${i}`;
+            html += `<details class="s-passo" open><summary>${escaparHtml(titulo)}</summary><div class="s-passo-corpo">`;
+            String(passo.Texto || '').split('\n').forEach(linha => {
+                const t = linha.trim();
+                if (t) html += `<p>${escaparHtml(t)}</p>`;
+            });
+            (Array.isArray(passo.TeX) ? passo.TeX : []).forEach(tex => {
+                if (tex == null || String(tex).trim() === '') return;
+                const bloco = formulaTex(tex);
+                html += /pmatrix|bmatrix|\\begin\{matrix\}/.test(String(tex))
+                    ? `<div class="s-passo-tex-scroll">${bloco}</div>`
+                    : bloco;
+            });
+            if (Array.isArray(passo.Incognitas) && passo.Incognitas.length) {
+                html += `<p class="s-passo-extra"><strong>Incógnitas:</strong> ${passo.Incognitas.map(n => escaparHtml(n)).join(', ')}</p>`;
+            }
+            if (Array.isArray(passo.Valores) && passo.Valores.length) {
+                html += '<ul class="s-passo-valores">';
+                passo.Valores.forEach(v => { html += `<li><code>${escaparHtml(v)}</code></li>`; });
+                html += '</ul>';
+            }
+            if (Array.isArray(passo.Raizes) && passo.Raizes.length) {
+                html += '<table class="s-passo-tabela"><thead><tr><th>Valor</th><th>Multiplicidade</th><th>Na origem</th></tr></thead><tbody>';
+                passo.Raizes.forEach(r => {
+                    const origem = r && r.NaOrigem === true ? 'sim' : (r && r.NaOrigem === false ? 'não' : '—');
+                    html += `<tr><td><code>${escaparHtml(r && r.Valor)}</code></td><td>${escaparHtml(r && r.Multiplicidade)}</td><td>${origem}</td></tr>`;
+                });
+                html += '</tbody></table>';
+            }
+            if (Array.isArray(passo.Ligacao) && passo.Ligacao.length) {
+                html += '<table class="s-passo-tabela"><thead><tr><th>Incógnita</th><th>Local</th><th>Rótulo</th></tr></thead><tbody>';
+                passo.Ligacao.forEach(l => {
+                    const href = '#' + idResultadoS(l && l.Local);
+                    html += `<tr><td>${escaparHtml(l && l.Incognita)}</td><td><a class="s-passo-link" href="${escaparHtml(href)}">${escaparHtml(l && l.Local)}</a></td><td>${escaparHtml(l && l.Rotulo)}</td></tr>`;
+                });
+                html += '</tbody></table>';
+            }
+            if (Array.isArray(passo.Conferencia) && passo.Conferencia.length) {
+                html += '<table class="s-passo-tabela"><thead><tr><th>Incógnita</th><th>Local</th><th>Tempo</th><th>Confere</th></tr></thead><tbody>';
+                passo.Conferencia.forEach(c => {
+                    const href = '#' + idResultadoS(c && c.Local);
+                    html += `<tr><td>${escaparHtml(c && c.Incognita)}</td><td><a class="s-passo-link" href="${escaparHtml(href)}">${escaparHtml(c && c.Local)}</a></td><td><code>${escaparHtml(c && c.Tempo)}</code></td><td>${marcaConferencia(c && c.ConfereComResultados)}</td></tr>`;
+                });
+                html += '</tbody></table>';
+            }
+            html += '</div></details>';
+        });
+        html += '</div>';
+        return html;
+    }
+
     function fmtMeta(n) {
         const x = Number(n);
         if (!Number.isFinite(x)) return '';
@@ -456,7 +544,8 @@
             const texS = r.ExpressaoTeX || r.Expressao || '';
             const tempo = r.Tempo || null;
             const texT = tempo ? (tempo.ExpressaoTeX || tempo.Expressao || '') : '';
-            html += '<div class="resultado-linha">';
+            const idAttr = r.Local ? ` id="${escaparHtml(idResultadoS(r.Local))}"` : '';
+            html += `<div class="resultado-linha"${idAttr}>`;
             if (r.RotuloTeX && texS) {
                 html += formulaTex(`${r.RotuloTeX} = ${texS}`);
             } else if (texS) {
@@ -510,6 +599,8 @@
         setaDeAparaB,
         positivoNoLadoA,
         htmlCaracteristicaDominioS,
-        htmlResultadosDominioS
+        htmlResultadosDominioS,
+        htmlPassosDominioS,
+        idResultadoS
     };
 });
