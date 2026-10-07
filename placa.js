@@ -28,7 +28,7 @@
             dependente: true,
             porTensao: true,
             rotuloValor: 'Ganho',
-            nota: 'Ganho E: Vout = E · v do componente de controle, com a mesma polaridade da netlist dele. Out+ fica à esquerda na posição inicial.'
+            nota: 'Ganho E: Vout = E · v do componente de controle. Valor positivo: + em Out+ (A) e − em Out− (B), como na equação da API.'
         },
         VCCS: {
             titulo: 'VCCS (G)',
@@ -36,21 +36,21 @@
             dependente: true,
             porTensao: true,
             rotuloValor: 'Transcond.',
-            nota: 'Transcondutância G: Iout = G · v do componente de controle, com a mesma polaridade da netlist dele.'
+            nota: 'Transcondutância G: Iout = G · v do componente de controle. Valor positivo: a seta sai de Out+ (A) e entra em Out− (B).'
         },
         CCVS: {
             titulo: 'CCVS (H)',
             padrao: '2',
             dependente: true,
             rotuloValor: 'Transres.',
-            nota: 'Transresistência H: Vout = H · i do componente de controle. Esse nome vai no campo Alvo da netlist.'
+            nota: 'Transresistência H: Vout = H · i do componente de controle (campo Alvo). Valor positivo: + em Out+ (A) e − em Out− (B).'
         },
         CCCS: {
             titulo: 'CCCS (F)',
             padrao: '2',
             dependente: true,
             rotuloValor: 'Ganho',
-            nota: 'Ganho F: Iout = F · i do componente de controle. Esse nome vai no campo Alvo da netlist.'
+            nota: 'Ganho F: Iout = F · i do componente de controle (campo Alvo). Valor positivo: a seta sai de Out+ (A) e entra em Out− (B).'
         }
     };
 
@@ -489,12 +489,17 @@
     const trocarSeta = s => s.replace(/url\(#esq-arrow-curr\)/g, 'url(#placa-seta)');
 
     function simbolo(c, x, y, orient, aPrimeiro) {
+        const rot = aPrimeiro ? 0 : 180;
+        const positivo = (typeof positivoNoLadoA === 'function') ? positivoNoLadoA(rot) : !!aPrimeiro;
+        const seta = (typeof setaDeAparaB === 'function')
+            ? setaDeAparaB(c.tipo, rot)
+            : ((c.tipo !== 'CurrentSource') === !!aPrimeiro);
         return trocarSeta(drawSimbolo({
             tipo: c.tipo,
             nome: c.nome || '',
             valor: c.nome ? valorExibido(c) : '',
-            _positiveOnA: aPrimeiro,
-            _fromAtoB: !aPrimeiro
+            _positiveOnA: positivo,
+            _fromAtoB: seta
         }, x, y, orient));
     }
 

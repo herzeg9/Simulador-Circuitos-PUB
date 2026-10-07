@@ -21,7 +21,7 @@ Enquanto esse objeto não for republicado, o site aceita o modo s na interface, 
   - `exponential` (também `exponencial`, `exp`): `A/(s+α)`, com α de `e^{−α t}`
   - sem `Laplace`, a amplitude é `Valor` e a forma é degrau
 - Em DC e AC a resposta é a da V25 (`Equacoes` via `cleanTeX`, sem chave `Modo`). No modo S, `Equacoes` vai em InputForm e `EquacoesTeX` em TeXForm, porque o `cleanTeX` apaga `}` e quebraria frações.
-- A resposta do modo S traz expressões simbólicas (`Expressao`, `ExpressaoTeX`) e, quando a inversa fecha, amostras de `y(t)` para o gráfico.
+- A resposta do modo S traz expressões simbólicas (`Expressao`, `ExpressaoTeX`) com `Rotulo`/`RotuloTeX` (por exemplo `V_{1}(s)`). `Tempo` traz o rótulo no tempo, `ExpressaoTeX`, `Forma` (`exata` ou `numerica`), `Impulso`/`ImpulsoTeX` opcional e `Amostras` (janela que pode ir até cerca de 10^4 s). `Caracteristica` opcional traz o determinante da MNA, polos, constantes de tempo, estabilidade e, na ordem 2, ωn, ζ e regime. `Aviso` continua opcional.
 - No modo S o notebook recusa, com as mesmas frases do site:
   - capacitor sem `v(0)`, indutor sem `i(0)`
   - CCVS/CCCS (H/F) sem `Alvo` apontando para outro componente

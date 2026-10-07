@@ -2476,9 +2476,20 @@ function renderResolucaoDominioS(dados, listaComp, container) {
             </div>`);
     }
 
+    if (typeof htmlCaracteristicaDominioS === 'function') {
+        const carac = htmlCaracteristicaDominioS(dados.Caracteristica);
+        if (carac) container.insertAdjacentHTML('beforeend', carac);
+    }
+
     if (dados.Aviso) {
         container.insertAdjacentHTML('beforeend',
             `<div class="card card-aviso"><h3 class="section-title">Aviso</h3><p>${escapeXml(dados.Aviso)}</p></div>`);
+    }
+
+    if (typeof htmlResultadosDominioS === 'function') {
+        const bloco = htmlResultadosDominioS(dados);
+        if (bloco) container.insertAdjacentHTML('beforeend', bloco);
+        return;
     }
 
     if (!Array.isArray(dados.Resultados)) return;
@@ -3294,10 +3305,18 @@ function symCurrentSource(cx, cy, orient, label, valor, fromAtoB) {
     </g>`;
 }
 
-function symDependentSource(tipo, cx, cy, orient, label, valor, alvoCtrl) {
+/**
+ * Convenção da API: corrente positiva sai de A (Out+, Nos[1]) e entra em B (Out−, Nos[2]).
+ * fromAtoB desenha a seta do lado geométrico A para o B. positiveOnA põe o + em A.
+ * Os dois flags já acompanham rotação e espelhamento de quem chama.
+ */
+function symDependentSource(tipo, cx, cy, orient, label, valor, alvoCtrl, fromAtoB, positiveOnA) {
     const half = ESQ.BODY / 2;
     const size = 18;
     const letter = { VCVS: 'E', VCCS: 'G', CCVS: 'H', CCCS: 'F' }[tipo] || '?';
+    const corrente = tipo === 'CCCS' || tipo === 'VCCS';
+    const deA = fromAtoB !== false;
+    const maisEmA = positiveOnA !== false;
     const leadA = orient === 'H'
         ? `<line x1="${cx - half}" y1="${cy}" x2="${cx - size}" y2="${cy}" stroke="var(--esq-wire)" stroke-width="2"/>`
         : `<line x1="${cx}" y1="${cy - half}" x2="${cx}" y2="${cy - size}" stroke="var(--esq-wire)" stroke-width="2"/>`;
@@ -3305,15 +3324,47 @@ function symDependentSource(tipo, cx, cy, orient, label, valor, alvoCtrl) {
         ? `<line x1="${cx + size}" y1="${cy}" x2="${cx + half}" y2="${cy}" stroke="var(--esq-wire)" stroke-width="2"/>`
         : `<line x1="${cx}" y1="${cy + size}" x2="${cx}" y2="${cy + half}" stroke="var(--esq-wire)" stroke-width="2"/>`;
     const diamond = `<polygon points="${cx - size},${cy} ${cx},${cy - size} ${cx + size},${cy} ${cx},${cy + size}" fill="var(--esq-bg)" stroke="var(--esq-stroke)" stroke-width="2"/>`;
-    const lett = `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="700" fill="var(--esq-ctrl)">${letter}</text>`;
+    const alcance = size * 0.42;
+    let marca = '';
+    let lettX = cx;
+    let lettY = cy;
+    if (corrente) {
+        let x1 = cx, y1 = cy, x2 = cx, y2 = cy;
+        if (orient === 'H') {
+            x1 = deA ? cx - alcance : cx + alcance;
+            x2 = deA ? cx + alcance : cx - alcance;
+            lettY = cy - 8;
+        } else {
+            y1 = deA ? cy - alcance : cy + alcance;
+            y2 = deA ? cy + alcance : cy - alcance;
+            lettX = cx + 9;
+        }
+        marca = `<line class="esq-seta-fonte" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--esq-stroke)" stroke-width="2" marker-end="url(#esq-arrow-curr)"/>`;
+    } else {
+        let plus, minus;
+        if (orient === 'H') {
+            plus = maisEmA ? [cx - 8, cy] : [cx + 8, cy];
+            minus = maisEmA ? [cx + 8, cy] : [cx - 8, cy];
+            lettY = cy - 9;
+        } else {
+            plus = maisEmA ? [cx, cy - 8] : [cx, cy + 8];
+            minus = maisEmA ? [cx, cy + 8] : [cx, cy - 8];
+            lettX = cx + 10;
+        }
+        marca = `<text class="esq-polo" x="${plus[0]}" y="${plus[1]}" text-anchor="middle" dominant-baseline="central" font-size="13" font-weight="700" fill="var(--esq-stroke)">+</text><text class="esq-polo" x="${minus[0]}" y="${minus[1]}" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="700" fill="var(--esq-stroke)">−</text>`;
+    }
+    const titulo = corrente
+        ? 'Corrente positiva de A (Out+) para B (Out−)'
+        : 'Polo positivo em A (Out+), negativo em B (Out−)';
+    const lett = `<text class="esq-letra-dep" x="${lettX}" y="${lettY}" text-anchor="middle" dominant-baseline="central" font-size="12" font-weight="700" fill="var(--esq-ctrl)">${letter}</text>`;
     let ctrlText = '';
     if (alvoCtrl) {
         const cx2 = orient === 'H' ? cx : cx + size + 30;
         const cy2 = orient === 'H' ? cy + half + 18 : cy + 14;
         ctrlText = `<text x="${cx2}" y="${cy2}" text-anchor="${orient === 'H' ? 'middle' : 'start'}" dominant-baseline="${orient === 'H' ? 'hanging' : 'central'}" class="esq-label--ctrl">ctrl: ${escapeXml(alvoCtrl)}</text>`;
     }
-    return `<g class="esq-sym">
-        ${leadA}${leadB}${diamond}${lett}
+    return `<g class="esq-sym"><title>${titulo}</title>
+        ${leadA}${leadB}${diamond}${marca}${lett}
         ${textosSymCircle(cx, cy, size, orient, label, valor, '')}
         ${ctrlText}
     </g>`;
@@ -3331,7 +3382,7 @@ function drawSimbolo(comp, cx, cy, orient) {
         const ctrl = (t === 'VCVS' || t === 'VCCS')
             ? (comp.nC != null && comp.nD != null ? `v(${comp.nC},${comp.nD})` : null)
             : (comp.alvo || null);
-        svg = symDependentSource(t, cx, cy, orient, comp.nome, comp.valor, ctrl);
+        svg = symDependentSource(t, cx, cy, orient, comp.nome, comp.valor, ctrl, comp._fromAtoB, comp._positiveOnA);
     }
 
     // FASE 4 (B): tooltip nativo SVG via <title> com a impedância dos passivos.
@@ -5118,6 +5169,7 @@ if (typeof module !== 'undefined' && module.exports) {
         organizarEquacoesMNA,
         formatarEquacaoMNA,
         parsePolar,
-        formatarResultadoEng
+        formatarResultadoEng,
+        drawSimbolo
     };
 }
