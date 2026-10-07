@@ -370,14 +370,185 @@
     }
 
     function marcaConferencia(v) {
-        if (v === true) return '<span class="s-confere s-confere--ok" title="Confere com os resultados">✓</span>';
-        if (v === false) return '<span class="s-confere s-confere--nao" title="Não confere com os resultados">✗</span>';
-        return '<span class="s-confere s-confere--na" title="Sem conferência">—</span>';
+        if (v === true) return '<span class="s-confere s-confere--ok" role="img" aria-label="Confere com os resultados">✓</span>';
+        if (v === false) return '<span class="s-confere s-confere--nao" role="img" aria-label="Não confere com os resultados">✗</span>';
+        return '<span class="s-confere s-confere--na" role="img" aria-label="Sem conferência">—</span>';
+    }
+
+    function escaparAttr(s) {
+        return escaparHtml(s).replace(/"/g, '&quot;');
+    }
+
+    function tituloSemNumero(titulo) {
+        return String(titulo || '').replace(/^\s*\d+\s*[.)]\s*/, '').trim();
+    }
+
+    /** O passo da convenção de sinais não entra na trilha. */
+    function ehPassoConvencao(passo, indice) {
+        const titulo = String((passo && passo.Titulo) || '');
+        const limpo = tituloSemNumero(titulo);
+        if (/^conven[cç][aã]o/i.test(limpo)) return true;
+        return indice === 0 && /conven[cç][aã]o/i.test(titulo);
+    }
+
+    function slugIncognita(nome) {
+        return String(nome || '')
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '');
+    }
+
+    function padroesTexIncognita(nome) {
+        const n = String(nome || '');
+        const formas = [];
+        if (n.includes('_')) {
+            const [a, b] = n.split('_');
+            formas.push(`${a}_{${b}}`, `${a.toLowerCase()}_{${b}}`);
+        } else {
+            const m = n.match(/^([A-Za-z]+)(\d+)$/);
+            if (m) formas.push(`${m[1]}_{${m[2]}}`, `${m[1].toLowerCase()}_{${m[2]}}`);
+            else if (n) formas.push(n);
+        }
+        return [...new Set(formas)];
+    }
+
+    /**
+     * Envolve cada incógnita com \\class do MathJax para o destaque no hover.
+     * @param {string} tex
+     * @param {string[]} nomes
+     */
+    function marcarIncognitasNoTex(tex, nomes) {
+        const mapa = [];
+        (nomes || []).forEach(nome => {
+            const cls = 's-inc s-inc-' + slugIncognita(nome);
+            padroesTexIncognita(nome).forEach(p => mapa.push({ p, cls }));
+        });
+        mapa.sort((a, b) => b.p.length - a.p.length);
+        if (!mapa.length) return String(tex ?? '');
+        const vistos = new Set();
+        const unicos = mapa.filter(m => {
+            if (vistos.has(m.p)) return false;
+            vistos.add(m.p);
+            return true;
+        });
+        const re = new RegExp(unicos.map(m => m.p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'g');
+        const porPadrao = new Map(unicos.map(m => [m.p, m.cls]));
+        return String(tex ?? '').replace(re, (achado) => `\\class{${porPadrao.get(achado)}}{${achado}}`);
+    }
+
+    function incognitasDosPassos(passos) {
+        const nomes = [];
+        const add = (n) => {
+            const nome = String(n || '').trim();
+            if (nome && !nomes.includes(nome)) nomes.push(nome);
+        };
+        (Array.isArray(passos) ? passos : []).forEach(p => {
+            if (!p || typeof p !== 'object') return;
+            (p.Incognitas || []).forEach(add);
+            (p.Ligacao || []).forEach(l => add(l && l.Incognita));
+            (p.Conferencia || []).forEach(c => add(c && c.Incognita));
+        });
+        return nomes;
+    }
+
+    function mapaIncognitas(passos) {
+        const mapa = new Map();
+        const garantir = (nome) => {
+            const bruto = String(nome || '').trim();
+            if (!bruto) return null;
+            const slug = slugIncognita(bruto);
+            if (!mapa.has(slug)) mapa.set(slug, { nome: bruto, no: '', comp: '' });
+            return mapa.get(slug);
+        };
+        const localDe = (item, local) => {
+            const alvo = garantir(item);
+            if (!alvo) return;
+            const loc = String(local || '').trim();
+            const no = loc.match(/^n[oó]\s+(\d+)$/i);
+            if (no) alvo.no = no[1];
+            const corr = loc.match(/^corrente\s+(.+)$/i);
+            if (corr) alvo.comp = corr[1].trim();
+        };
+        (Array.isArray(passos) ? passos : []).forEach(p => {
+            if (!p || typeof p !== 'object') return;
+            (p.Incognitas || []).forEach(garantir);
+            (p.Ligacao || []).forEach(l => localDe(l && l.Incognita, l && l.Local));
+            (p.Conferencia || []).forEach(c => localDe(c && c.Incognita, c && c.Local));
+        });
+        return mapa;
+    }
+
+    function texPareceNumerico(tex) {
+        return !/G_|C_|L_|\\beta|β/.test(String(tex));
+    }
+
+    function texEMatriz(tex) {
+        return /pmatrix|bmatrix|\\begin\{matrix\}/.test(String(tex));
+    }
+
+    function htmlMathPasso(bruto, marcado) {
+        const largo = texEMatriz(bruto);
+        const formula = `<div class="formula">\\[ ${escaparHtml(marcado)} \\]</div>`;
+        const miolo = largo ? `<div class="s-passo-tex-scroll">${formula}</div>` : formula;
+        return `<div class="s-math"><div class="s-math-barra"><button type="button" class="s-copiar" data-tex="${escaparAttr(bruto)}" aria-label="Copiar LaTeX">Copiar LaTeX</button></div>${miolo}</div>`;
+    }
+
+    function htmlFormasTex(lista, nomes) {
+        const itens = (Array.isArray(lista) ? lista : [])
+            .filter(t => t != null && String(t).trim() !== '')
+            .map(t => String(t));
+        if (!itens.length) return '';
+        const grupos = { simbolico: [], numerico: [] };
+        itens.forEach(bruto => {
+            const chave = texPareceNumerico(bruto) ? 'numerico' : 'simbolico';
+            grupos[chave].push(htmlMathPasso(bruto, marcarIncognitasNoTex(bruto, nomes)));
+        });
+        if (grupos.simbolico.length && grupos.numerico.length) {
+            return `<div class="s-forma">
+                <div class="s-forma-botoes" role="group" aria-label="Forma das equações">
+                    <button type="button" class="s-forma-btn" data-forma="simbolico" aria-pressed="true">Simbólico</button>
+                    <button type="button" class="s-forma-btn" data-forma="numerico" aria-pressed="false">Numérico</button>
+                </div>
+                <div data-forma-bloco="simbolico">${grupos.simbolico.join('')}</div>
+                <div data-forma-bloco="numerico" hidden>${grupos.numerico.join('')}</div>
+            </div>`;
+        }
+        return itens.map(bruto => htmlMathPasso(bruto, marcarIncognitasNoTex(bruto, nomes))).join('');
+    }
+
+    function classeRaiz(r) {
+        if (!r || typeof r !== 'object') return 'neutra';
+        if (r.NaOrigem === true || String(r.Valor).trim() === '0') return 'origem';
+        const v = String(r.Valor == null ? '' : r.Valor).trim();
+        if (v.startsWith('-')) return 'estavel';
+        if (/^\d/.test(v)) return 'instavel';
+        return 'neutra';
+    }
+
+    function htmlRaizes(raizes) {
+        if (!Array.isArray(raizes) || !raizes.length) return '';
+        const chips = raizes.map(r => {
+            const cls = classeRaiz(r);
+            const rotulo = cls === 'origem' ? 'na origem' : (cls === 'estavel' ? 'estável' : (cls === 'instavel' ? 'instável' : ''));
+            const mult = r && r.Multiplicidade != null && r.Multiplicidade !== ''
+                ? `<span class="s-raiz-mult" title="Multiplicidade">×${escaparHtml(r.Multiplicidade)}</span>`
+                : '';
+            const tag = rotulo ? `<span class="s-raiz-tag">${rotulo}</span>` : '';
+            return `<li class="s-raiz s-raiz--${cls}"><span class="s-raiz-valor">${escaparHtml(r && r.Valor)}</span>${mult}${tag}</li>`;
+        }).join('');
+        return `<ul class="s-raizes" aria-label="Raízes">${chips}</ul>`;
+    }
+
+    function htmlInfoSinais() {
+        return `<span class="s-info-wrap"><button type="button" class="s-info" aria-describedby="s-info-sinais" aria-label="Convenção de sinais das fontes dependentes">i</button><span class="s-info-pop" id="s-info-sinais" role="tooltip">Valor positivo em CCCS/VCCS: a corrente sai de Nos[1] e entra em Nos[2] por dentro da fonte.</span></span>`;
     }
 
     /**
      * Resolução passo a passo. Sem o campo, string vazia.
      * Lista de passos, ou {Indisponivel: motivo}.
+     * O passo de convenção de sinais (índice 0 ou título Convenção) não aparece.
      */
     function htmlPassosDominioS(passos) {
         if (passos == null) return '';
@@ -390,60 +561,266 @@
             }
             return '';
         }
-        if (!passos.length) return '';
+        const convencao = passos.find((p, i) => p && ehPassoConvencao(p, i));
+        const visiveis = passos.filter((p, i) => p && typeof p === 'object' && !ehPassoConvencao(p, i));
+        if (!visiveis.length) return '';
 
-        let html = `<div class="card card-sdominio card-passos"><h3 class="section-title">Resolução passo a passo (MNA)</h3>`;
-        passos.forEach((passo, i) => {
-            if (!passo || typeof passo !== 'object') return;
-            const titulo = passo.Titulo || `Passo ${i}`;
-            html += `<details class="s-passo" open><summary>${escaparHtml(titulo)}</summary><div class="s-passo-corpo">`;
+        const nomes = incognitasDosPassos(visiveis.length ? passos : visiveis);
+        const mapa = mapaIncognitas(passos);
+        const mapaJson = {};
+        mapa.forEach((v, k) => { mapaJson[k] = { no: v.no, comp: v.comp }; });
+        const notaSinais = convencao && /CCCS|VCCS|CCVS|VCVS|dependente/i.test(String(convencao.Texto || '') + String(convencao.Titulo || ''));
+        let matrizMarcada = false;
+
+        let html = `<div class="card card-sdominio card-passos" data-mapa="${escaparAttr(JSON.stringify(mapaJson))}">
+            <div class="s-passos-cabeca">
+                <h3 class="section-title">Resolução passo a passo (MNA)</h3>
+                <div class="s-passos-acoes" role="group" aria-label="Visibilidade dos passos">
+                    <button type="button" class="s-passos-btn" data-acao="expandir">Expandir tudo</button>
+                    <button type="button" class="s-passos-btn" data-acao="recolher">Recolher tudo</button>
+                </div>
+            </div>
+            <div class="s-passos-nav" role="group" aria-label="Passo a passo">
+                <button type="button" class="s-passos-btn" data-acao="anterior">Anterior</button>
+                <p class="s-passos-ind" aria-live="polite"><span data-status>Passo 1 de ${visiveis.length}</span></p>
+                <button type="button" class="s-passos-btn" data-acao="proximo">Próximo</button>
+            </div>
+            <ol class="s-passos-trilha">`;
+
+        visiveis.forEach((passo, i) => {
+            const n = i + 1;
+            const titulo = tituloSemNumero(passo.Titulo) || `Passo ${n}`;
+            const aberto = true;
+            const idCorpo = `s-passo-corpo-${n}`;
+            const ehMatriz = /matric/i.test(titulo) || (Array.isArray(passo.TeX) && passo.TeX.some(texEMatriz) && Array.isArray(passo.Valores));
+            html += `<li class="s-passo-item"><details class="s-passo" id="s-passo-${n}"${aberto ? ' open' : ''}>
+                <summary aria-expanded="${aberto ? 'true' : 'false'}" aria-controls="${idCorpo}">
+                    <span class="s-passo-badge" aria-hidden="true">${n}</span>
+                    <span class="s-passo-titulo">${escaparHtml(titulo)}</span>
+                </summary>
+                <div class="s-passo-corpo" id="${idCorpo}" role="region">`;
+            if (notaSinais && ehMatriz && !matrizMarcada) {
+                matrizMarcada = true;
+                html += htmlInfoSinais();
+            }
             String(passo.Texto || '').split('\n').forEach(linha => {
                 const t = linha.trim();
                 if (t) html += `<p>${escaparHtml(t)}</p>`;
             });
-            (Array.isArray(passo.TeX) ? passo.TeX : []).forEach(tex => {
-                if (tex == null || String(tex).trim() === '') return;
-                const bloco = formulaTex(tex);
-                html += /pmatrix|bmatrix|\\begin\{matrix\}/.test(String(tex))
-                    ? `<div class="s-passo-tex-scroll">${bloco}</div>`
-                    : bloco;
-            });
+            html += htmlFormasTex(passo.TeX, nomes);
             if (Array.isArray(passo.Incognitas) && passo.Incognitas.length) {
-                html += `<p class="s-passo-extra"><strong>Incógnitas:</strong> ${passo.Incognitas.map(n => escaparHtml(n)).join(', ')}</p>`;
+                const chips = passo.Incognitas.map(nome => {
+                    const info = mapa.get(slugIncognita(nome)) || {};
+                    return `<button type="button" class="s-incognita" data-inc="${escaparAttr(slugIncognita(nome))}" data-no="${escaparAttr(info.no || '')}" data-comp="${escaparAttr(info.comp || '')}">${escaparHtml(nome)}</button>`;
+                }).join('');
+                html += `<p class="s-passo-extra"><strong>Incógnitas:</strong> <span class="s-incognitas">${chips}</span></p>`;
             }
             if (Array.isArray(passo.Valores) && passo.Valores.length) {
                 html += '<ul class="s-passo-valores">';
                 passo.Valores.forEach(v => { html += `<li><code>${escaparHtml(v)}</code></li>`; });
                 html += '</ul>';
             }
-            if (Array.isArray(passo.Raizes) && passo.Raizes.length) {
-                html += '<div class="s-passo-tabela-scroll"><table class="s-passo-tabela"><thead><tr><th>Valor</th><th>Multiplicidade</th><th>Na origem</th></tr></thead><tbody>';
-                passo.Raizes.forEach(r => {
-                    const origem = r && r.NaOrigem === true ? 'sim' : (r && r.NaOrigem === false ? 'não' : '—');
-                    html += `<tr><td><code>${escaparHtml(r && r.Valor)}</code></td><td>${escaparHtml(r && r.Multiplicidade)}</td><td>${origem}</td></tr>`;
-                });
-                html += '</tbody></table></div>';
-            }
+            html += htmlRaizes(passo.Raizes);
             if (Array.isArray(passo.Ligacao) && passo.Ligacao.length) {
-                html += '<div class="s-passo-tabela-scroll"><table class="s-passo-tabela"><thead><tr><th>Incógnita</th><th>Local</th><th>Rótulo</th></tr></thead><tbody>';
+                html += '<ul class="s-ligacoes">';
                 passo.Ligacao.forEach(l => {
                     const href = '#' + idResultadoS(l && l.Local);
-                    html += `<tr><td>${escaparHtml(l && l.Incognita)}</td><td><a class="s-passo-link" href="${escaparHtml(href)}">${escaparHtml(l && l.Local)}</a></td><td>${escaparHtml(l && l.Rotulo)}</td></tr>`;
+                    const info = mapa.get(slugIncognita(l && l.Incognita)) || {};
+                    html += `<li><button type="button" class="s-incognita" data-inc="${escaparAttr(slugIncognita(l && l.Incognita))}" data-no="${escaparAttr(info.no || '')}" data-comp="${escaparAttr(info.comp || '')}">${escaparHtml(l && l.Incognita)}</button> <a class="s-passo-link" href="${escaparAttr(href)}">${escaparHtml(l && l.Local)}</a> <span class="s-ligacao-rotulo">${escaparHtml(l && l.Rotulo)}</span></li>`;
                 });
-                html += '</tbody></table></div>';
+                html += '</ul>';
             }
             if (Array.isArray(passo.Conferencia) && passo.Conferencia.length) {
-                html += '<div class="s-passo-tabela-scroll"><table class="s-passo-tabela"><thead><tr><th>Incógnita</th><th>Local</th><th>Tempo</th><th>Confere</th></tr></thead><tbody>';
+                html += '<ul class="s-conf-lista">';
                 passo.Conferencia.forEach(c => {
-                    const href = '#' + idResultadoS(c && c.Local);
-                    html += `<tr><td>${escaparHtml(c && c.Incognita)}</td><td><a class="s-passo-link" href="${escaparHtml(href)}">${escaparHtml(c && c.Local)}</a></td><td><code>${escaparHtml(c && c.Tempo)}</code></td><td>${marcaConferencia(c && c.ConfereComResultados)}</td></tr>`;
+                    const ancora = idResultadoS(c && c.Local);
+                    const href = '#' + ancora;
+                    const grafico = '#grafico-' + ancora;
+                    html += `<li class="s-conf-item">${marcaConferencia(c && c.ConfereComResultados)}<div class="s-conf-corpo"><div class="s-conf-topo"><strong>${escaparHtml(c && c.Incognita)}</strong> <a class="s-passo-link" href="${escaparAttr(href)}">${escaparHtml(c && c.Local)}</a> <a class="s-passo-jump" href="${escaparAttr(grafico)}" data-fallback="${escaparAttr(href)}">Ver f(t)</a></div><code class="s-conf-tempo">${escaparHtml(c && c.Tempo)}</code></div></li>`;
                 });
-                html += '</tbody></table></div>';
+                html += '</ul>';
             }
-            html += '</div></details>';
+            html += '</div></details></li>';
         });
-        html += '</div>';
+        html += '</ol></div>';
         return html;
+    }
+
+    function statusPassos(card) {
+        const lista = [...card.querySelectorAll('details.s-passo')];
+        const abertos = lista.filter(d => d.open);
+        const el = card.querySelector('[data-status]');
+        if (!el) return;
+        if (abertos.length === 1) el.textContent = `Passo ${lista.indexOf(abertos[0]) + 1} de ${lista.length}`;
+        else if (abertos.length === lista.length) el.textContent = `Todos os ${lista.length} passos`;
+        else if (!abertos.length) el.textContent = 'Nenhum passo aberto';
+        else el.textContent = `${abertos.length} passos abertos`;
+        const ant = card.querySelector('[data-acao="anterior"]');
+        const prox = card.querySelector('[data-acao="proximo"]');
+        const unico = abertos.length === 1 ? lista.indexOf(abertos[0]) : -1;
+        if (ant) ant.disabled = unico === 0;
+        if (prox) prox.disabled = unico === lista.length - 1;
+    }
+
+    function limparDestaqueIncognita() {
+        document.querySelectorAll('.is-hl-incognita').forEach(el => el.classList.remove('is-hl-incognita'));
+    }
+
+    function destacarIncognita(card, slug) {
+        limparDestaqueIncognita();
+        if (!slug) return;
+        document.querySelectorAll('.s-inc-' + slug + ', .s-incognita[data-inc="' + slug + '"]').forEach(el => {
+            el.classList.add('is-hl-incognita');
+        });
+        let info = {};
+        try { info = JSON.parse(card.getAttribute('data-mapa') || '{}')[slug] || {}; } catch (e) { info = {}; }
+        if (info.no) {
+            document.querySelectorAll('.placa-no[data-no="' + CSS.escape(info.no) + '"]').forEach(el => el.classList.add('is-hl-incognita'));
+        }
+        if (info.comp) {
+            document.querySelectorAll('.placa-comp[data-nome="' + CSS.escape(info.comp) + '"]').forEach(el => el.classList.add('is-hl-incognita'));
+        }
+    }
+
+    function typesetBloco(el) {
+        const mj = (typeof window !== 'undefined') ? window.MathJax : null;
+        if (!el || !mj || typeof mj.typesetPromise !== 'function') return Promise.resolve();
+        if (typeof mj.typesetClear === 'function') {
+            try { mj.typesetClear([el]); } catch (e) { /* já limpo */ }
+        }
+        return mj.typesetPromise([el]).catch(() => {});
+    }
+
+    /**
+     * Liga expandir/recolher, anterior/próximo, forma simbólica/numérica,
+     * cópia de LaTeX, destaque da incógnita e o salto para f(t).
+     */
+    function ligarPassosDominioS(raiz) {
+        if (!raiz || typeof raiz.querySelector !== 'function') return;
+        const card = raiz.classList && raiz.classList.contains('card-passos') ? raiz : raiz.querySelector('.card-passos');
+        if (!card || card.dataset.ligado === '1') return;
+        card.dataset.ligado = '1';
+        const itens = () => [...card.querySelectorAll('details.s-passo')];
+        const syncAria = () => {
+            itens().forEach(d => {
+                const s = d.querySelector('summary');
+                if (s) s.setAttribute('aria-expanded', d.open ? 'true' : 'false');
+            });
+            statusPassos(card);
+        };
+        const mover = (delta) => {
+            const lista = itens();
+            if (!lista.length) return;
+            const abertos = lista.filter(d => d.open);
+            let i = abertos.length === 1 ? lista.indexOf(abertos[0]) : (delta > 0 ? -1 : lista.length);
+            const j = Math.min(lista.length - 1, Math.max(0, i + delta));
+            lista.forEach((d, k) => { d.open = k === j; });
+            syncAria();
+            lista[j].scrollIntoView({ behavior: 'smooth', block: 'start' });
+            const sum = lista[j].querySelector('summary');
+            if (sum) sum.focus();
+        };
+        card.addEventListener('toggle', (e) => {
+            if (e.target && e.target.matches && e.target.matches('details.s-passo')) syncAria();
+        }, true);
+        card.addEventListener('click', (e) => {
+            const btn = e.target.closest('button, a');
+            if (!btn || !card.contains(btn)) return;
+            const acao = btn.dataset.acao;
+            if (acao === 'expandir') {
+                itens().forEach(d => { d.open = true; });
+                syncAria();
+            } else if (acao === 'recolher') {
+                itens().forEach(d => { d.open = false; });
+                syncAria();
+            } else if (acao === 'anterior') mover(-1);
+            else if (acao === 'proximo') mover(1);
+            else if (btn.classList.contains('s-copiar')) {
+                const tex = btn.getAttribute('data-tex') || '';
+                const pronto = () => {
+                    const antigo = btn.textContent;
+                    btn.textContent = 'Copiado';
+                    setTimeout(() => { btn.textContent = antigo; }, 1200);
+                };
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(tex).then(pronto).catch(() => { btn.textContent = 'Falhou'; });
+                } else {
+                    const ta = document.createElement('textarea');
+                    ta.value = tex;
+                    ta.setAttribute('readonly', '');
+                    ta.style.position = 'fixed';
+                    ta.style.left = '-9999px';
+                    document.body.appendChild(ta);
+                    ta.select();
+                    try { document.execCommand('copy'); pronto(); } catch (err) { btn.textContent = 'Falhou'; }
+                    ta.remove();
+                }
+            } else if (btn.classList.contains('s-forma-btn')) {
+                const grupo = btn.closest('.s-forma');
+                if (!grupo) return;
+                const modo = btn.dataset.forma;
+                grupo.querySelectorAll('.s-forma-btn').forEach(b => {
+                    b.setAttribute('aria-pressed', b === btn ? 'true' : 'false');
+                });
+                grupo.querySelectorAll('[data-forma-bloco]').forEach(bloco => {
+                    const mostra = bloco.dataset.formaBloco === modo;
+                    bloco.hidden = !mostra;
+                    if (mostra) typesetBloco(bloco);
+                });
+            } else if (btn.classList.contains('s-passo-jump')) {
+                const sel = btn.getAttribute('href');
+                if (sel && document.querySelector(sel)) return;
+                const fb = btn.dataset.fallback;
+                const alvo = fb && document.querySelector(fb);
+                if (alvo) {
+                    e.preventDefault();
+                    alvo.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }
+        });
+        const entrar = (e) => {
+            const el = e.target.closest && e.target.closest('.s-incognita, .s-inc');
+            if (!el || !card.contains(el)) return;
+            const slug = el.dataset.inc || ([...el.classList].find(c => c.startsWith('s-inc-')) || '').slice(6);
+            if (slug) destacarIncognita(card, slug);
+        };
+        const sair = (e) => {
+            const el = e.target.closest && e.target.closest('.s-incognita, .s-inc');
+            if (!el) return;
+            const proximo = e.relatedTarget;
+            if (proximo && el.contains(proximo)) return;
+            limparDestaqueIncognita();
+        };
+        card.addEventListener('pointerover', entrar);
+        card.addEventListener('pointerout', sair);
+        card.addEventListener('focusin', entrar);
+        card.addEventListener('focusout', sair);
+        card.addEventListener('click', () => { card.dataset.tocado = '1'; });
+        syncAria();
+        setTimeout(() => recolherPassosDepoisDoTypeset(), 8000);
+    }
+
+    /** Depois do MathJax medir as fórmulas, deixa só o primeiro passo aberto. */
+    function recolherPassosDepoisDoTypeset() {
+        if (typeof document === 'undefined') return;
+        document.querySelectorAll('.card-passos').forEach(card => {
+            if (card.dataset.revelado === '1') return;
+            card.dataset.revelado = '1';
+            if (card.dataset.tocado === '1') return;
+            const lista = [...card.querySelectorAll('details.s-passo')];
+            if (lista.length < 2) return;
+            lista.forEach((d, i) => { d.open = i === 0; });
+            lista.forEach(d => {
+                const s = d.querySelector('summary');
+                if (s) s.setAttribute('aria-expanded', d.open ? 'true' : 'false');
+            });
+            const el = card.querySelector('[data-status]');
+            if (el) el.textContent = `Passo 1 de ${lista.length}`;
+            const ant = card.querySelector('[data-acao="anterior"]');
+            const prox = card.querySelector('[data-acao="proximo"]');
+            if (ant) ant.disabled = true;
+            if (prox) prox.disabled = false;
+        });
     }
 
     function fmtMeta(n) {
@@ -574,7 +951,10 @@
                     titulo: tempo.Rotulo || r.Rotulo || r.Local || '',
                     unidade: r.Unidade || ''
                 });
-                if (svg) plots += `<div class="s-tempo-item">${svg}</div>`;
+                if (svg) {
+                    const idGraf = r.Local ? ` id="grafico-${escaparHtml(idResultadoS(r.Local))}"` : '';
+                    plots += `<div class="s-tempo-item"${idGraf}>${svg}</div>`;
+                }
             }
         });
         html += '</div>';
@@ -601,6 +981,10 @@
         htmlCaracteristicaDominioS,
         htmlResultadosDominioS,
         htmlPassosDominioS,
-        idResultadoS
+        idResultadoS,
+        ligarPassosDominioS,
+        recolherPassosDepoisDoTypeset,
+        marcarIncognitasNoTex,
+        incognitasDosPassos
     };
 });
