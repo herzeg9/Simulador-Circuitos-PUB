@@ -15,7 +15,11 @@ const {
     expressaoLaplace,
     modeloSerieS,
     respostaEhDominioS,
-    svgAmostrasTemporais
+    svgAmostrasTemporais,
+    setaDeAparaB,
+    positivoNoLadoA,
+    htmlCaracteristicaDominioS,
+    htmlResultadosDominioS
 } = require(path.join(__dirname, '..', 'sdominio.js'));
 
 let falhas = 0;
@@ -92,6 +96,67 @@ console.log('Gráfico');
     const svg = svgAmostrasTemporais([[0, 0], [1, 1], [2, 0.5]], { titulo: 'Nó 1', unidade: 'V' });
     verificar('svg tem a curva', svg.includes('<path') && svg.includes('Nó 1'));
     verificar('amostra curta não desenha', svgAmostrasTemporais([[0, 1]]) === '');
+    const longa = svgAmostrasTemporais([[0, 0], [10000, 1]], { titulo: 'v_1(t)' });
+    verificar('janela longa usa notação compacta', longa.includes('1.00e+4') && longa.includes('v_1(t)'), longa.slice(0, 80));
+}
+
+console.log('Sentido da fonte');
+verificar('CCCS rot 0: A→B para a direita', setaDeAparaB('CCCS', 0) === true);
+verificar('CCCS rot 90: A em cima, seta para baixo', setaDeAparaB('CCCS', 90) === true);
+verificar('CCCS rot 180: seta para a esquerda', setaDeAparaB('CCCS', 180) === false);
+verificar('CCCS rot 270: A embaixo, seta para cima', setaDeAparaB('CCCS', 270) === false);
+verificar('VCCS rot 0 segue A→B', setaDeAparaB('VCCS', 0) === true);
+verificar('fonte de corrente independente rot 0 aponta para A', setaDeAparaB('CurrentSource', 0) === false);
+verificar('fonte de corrente independente rot 90 aponta para cima', setaDeAparaB('CurrentSource', 90) === false);
+verificar('+ no lado A em rot 0 e 90', positivoNoLadoA(0) && positivoNoLadoA(90));
+verificar('+ no lado B em rot 180 e 270', !positivoNoLadoA(180) && !positivoNoLadoA(270));
+
+console.log('Resposta s v3');
+{
+    const exemplo = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'exemplo-resposta-s-v3.json'), 'utf8'));
+    const car = htmlCaracteristicaDominioS(exemplo.Caracteristica);
+    const res = htmlResultadosDominioS(exemplo);
+    const html = car + res;
+    verificar('rótulo V_1(s)', html.includes('V_{1}(s)'));
+    verificar('rótulo v_1(t)', html.includes('v_{1}(t)'));
+    verificar('fração exata de V1', html.includes('\\frac{21 (2 s-1)}{21 s^2+70 s+3}'));
+    verificar('nota de coeficientes aproximados', html.includes('(coeficientes aproximados)'));
+    verificar('não usa o rótulo genérico y(t)', !html.includes('>y(t)<'));
+    verificar('título da equação característica', car.includes('Equação característica e polos'));
+    verificar('explica o determinante da MNA', car.includes('determinante da matriz da análise nodal (MNA)') && car.includes('frequências naturais'));
+    verificar('determinante', car.includes('21 s^2+70 s+3'));
+    verificar('estável e superamortecido', car.includes('Estável') && car.includes('superamortecido'));
+    verificar('omega_n exato', car.includes('\\frac{1}{\\sqrt{7}}'));
+    verificar('zeta exato', car.includes('\\frac{5 \\sqrt{7}}{3}'));
+    verificar('polo e tau', car.includes('s = -0.04342') && car.includes('\\tau = 23.03'));
+    const tFim = exemplo.Resultados[0].Tempo.Amostras.at(-1)[0];
+    verificar('gráfico da janela real', res.includes('v_1(t)') && res.includes('<path') && res.includes(String(Math.round(tFim * 1000) / 1000)));
+    verificar('121 amostras no exemplo', exemplo.Resultados.every(r => r.Tempo.Amostras.length === 121));
+    verificar('sem Caracteristica não há seção', htmlCaracteristicaDominioS(null) === '' && htmlCaracteristicaDominioS(undefined) === '');
+    const instavel = htmlCaracteristicaDominioS({ DeterminanteTeX: 's-1', Ordem: 1, Estavel: false, Polos: [], ConstantesDeTempo: [] });
+    verificar('instável', instavel.includes('Instável') && !instavel.includes('>Estável<'));
+    const impulso = htmlResultadosDominioS({
+        Resultados: [{
+            Local: 'Nó 1',
+            Unidade: 'A',
+            RotuloTeX: 'I_{L1}(s)',
+            ExpressaoTeX: '1',
+            Tempo: {
+                Rotulo: 'i_{L1}(t)',
+                RotuloTeX: 'i_{L1}(t)',
+                ExpressaoTeX: '0',
+                Forma: 'exata',
+                ImpulsoTeX: '\\delta(t)',
+                Amostras: [[0, 1], [1, 0]]
+            }
+        }]
+    });
+    verificar('termo impulsivo', impulso.includes('Termo impulsivo') && impulso.includes('\\delta(t)') && impulso.includes('i_{L1}(t)'));
+    verificar('forma exata sem a nota numérica', !impulso.includes('coeficientes aproximados'));
+    const antigo = htmlResultadosDominioS({
+        Resultados: [{ Local: 'Nó 2', ExpressaoTeX: '10/s', Unidade: 'V', Tempo: { ExpressaoTeX: '10-10 e^{-t}', Amostras: [[0, 0], [1, 6]] } }]
+    });
+    verificar('resposta antiga continua com y(t)', antigo.includes('>y(t)<') && antigo.includes('Nó 2'));
 }
 
 console.log('Notebook completo');

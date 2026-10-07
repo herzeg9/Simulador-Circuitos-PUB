@@ -284,6 +284,15 @@ body.dark-mode .sim-config-s__title { color: #d7bde2; }
 .s-tempo-svg { width: 100%; height: auto; background: transparent; }
 .s-modelo-table { width: 100%; border-collapse: collapse; font-size: 0.92em; }
 .s-modelo-table th, .s-modelo-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border-color); }
+.s-nota-aprox, .s-nota-impulso {
+    margin: 2px 0 8px;
+    font-size: 0.82em;
+    color: var(--text-secondary);
+}
+.s-carac-meta, .s-carac-lista { margin: 8px 0 12px; padding-left: 1.2em; }
+.s-carac-meta li, .s-carac-lista li { margin: 2px 0; }
+.s-carac-subtitulo { margin: 10px 0 4px; font-weight: 700; font-size: 0.9em; }
+.s-polo-meta { font-size: 0.82em; color: var(--text-secondary); }
 .card-ondas .section-title { color: #1f618d; }
 body.dark-mode .card-ondas .section-title { color: #85c1e9; }
 .onda-subtitulo {

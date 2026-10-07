@@ -193,8 +193,12 @@
         const W = 460, H = 220, padL = 52, padR = 16, padT = 28, padB = 32;
         const t0 = pts[0][0];
         const t1 = pts[pts.length - 1][0];
-        let ymin = Math.min(...pts.map(p => p[1]));
-        let ymax = Math.max(...pts.map(p => p[1]));
+        let ymin = pts[0][1];
+        let ymax = pts[0][1];
+        for (let i = 1; i < pts.length; i++) {
+            if (pts[i][1] < ymin) ymin = pts[i][1];
+            if (pts[i][1] > ymax) ymax = pts[i][1];
+        }
         if (ymin === ymax) { ymin -= 1; ymax += 1; }
         const xOf = t => padL + ((t - t0) / (t1 - t0 || 1)) * (W - padL - padR);
         const yOf = v => padT + ((ymax - v) / (ymax - ymin)) * (H - padT - padB);
@@ -215,6 +219,167 @@
         </svg>`;
     }
 
+    /**
+     * true quando o terminal A da placa está à esquerda (rot 0) ou em cima (rot 90).
+     * rot 180: A à direita. rot 270: A embaixo.
+     */
+    function aNoInicioGeometrico(rot) {
+        const r = ((Number(rot) % 360) + 360) % 360;
+        return r === 0 || r === 90;
+    }
+
+    /**
+     * true = desenhar a seta do lado geométrico A (esquerda/cima) para B (direita/baixo).
+     * Corrente positiva sai de Nos[1] e entra em Nos[2].
+     * Na placa só a fonte de corrente independente troca os pinos: Nos = [B, A].
+     * CCCS/VCCS (e o restante) usam Nos = [A, B], então Valor positivo vai de A para B.
+     */
+    function setaDeAparaB(tipo, rot) {
+        const deA = tipo !== 'CurrentSource';
+        return aNoInicioGeometrico(rot) === deA;
+    }
+
+    /** true = polo positivo do lado geométrico A. Fontes de tensão não trocam os pinos. */
+    function positivoNoLadoA(rot) {
+        return aNoInicioGeometrico(rot);
+    }
+
+    function escaparHtml(s) {
+        return String(s ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    }
+
+    function formulaTex(tex) {
+        if (tex == null || String(tex).trim() === '') return '';
+        return `<div class="formula">\\[ ${escaparHtml(tex)} \\]</div>`;
+    }
+
+    function fmtMeta(n) {
+        const x = Number(n);
+        if (!Number.isFinite(x)) return '';
+        if (Math.abs(x) >= 1000 || (Math.abs(x) > 0 && Math.abs(x) < 0.001)) return x.toExponential(3);
+        return String(Math.round(x * 10000) / 10000);
+    }
+
+    /**
+     * Card "Equação característica e polos". String vazia se a API não mandou o objeto.
+     * @param {object|null|undefined} car
+     */
+    function htmlCaracteristicaDominioS(car) {
+        if (!car || typeof car !== 'object') return '';
+        const det = car.DeterminanteTeX || car.Determinante || '';
+        let html = `<div class="card card-sdominio card-caracteristica">
+            <h3 class="section-title">Equação característica e polos</h3>
+            <p>Δ(s) é o determinante da matriz da análise nodal (MNA), e as raízes dele são as frequências naturais.</p>`;
+        if (det) html += formulaTex(`\\Delta(s) = ${det} = 0`);
+        if (car.DeterminanteMonicoTeX || car.DeterminanteMonico) {
+            html += formulaTex(`\\Delta_{\\mathrm{m}}(s) = ${car.DeterminanteMonicoTeX || car.DeterminanteMonico}`);
+        }
+
+        const meta = [];
+        if (car.Ordem != null && car.Ordem !== '') meta.push(`<li>Ordem: ${escaparHtml(car.Ordem)}</li>`);
+        const removidos = Number(car.PolosNaOrigemRemovidos);
+        if (Number.isFinite(removidos) && removidos > 0) {
+            meta.push(`<li>Polos na origem removidos: ${escaparHtml(removidos)}</li>`);
+        }
+        if (car.Estavel === true) meta.push('<li>Estável</li>');
+        else if (car.Estavel === false) meta.push('<li>Instável</li>');
+        if (car.Regime) meta.push(`<li>Regime: ${escaparHtml(car.Regime)}</li>`);
+        if (meta.length) html += `<ul class="s-carac-meta">${meta.join('')}</ul>`;
+
+        const polos = Array.isArray(car.Polos) ? car.Polos : [];
+        if (polos.length) {
+            html += '<p class="s-carac-subtitulo">Polos</p><ul class="s-carac-lista">';
+            polos.forEach(p => {
+                const tex = (p && (p.ValorTeX || p.Valor)) || '';
+                const extra = [];
+                if (p && Number.isFinite(Number(p.Re))) extra.push(`Re = ${fmtMeta(p.Re)}`);
+                if (p && Number.isFinite(Number(p.Im))) extra.push(`Im = ${fmtMeta(p.Im)}`);
+                if (p && Number(p.Multiplicidade) > 1) extra.push(`multiplicidade ${escaparHtml(p.Multiplicidade)}`);
+                html += `<li>${formulaTex(tex ? `s = ${tex}` : '')}${extra.length ? `<span class="s-polo-meta">${escaparHtml(extra.join(' · '))}</span>` : ''}</li>`;
+            });
+            html += '</ul>';
+        }
+
+        const taus = Array.isArray(car.ConstantesDeTempo) ? car.ConstantesDeTempo : [];
+        if (taus.length) {
+            html += '<p class="s-carac-subtitulo">Constantes de tempo</p><ul class="s-carac-lista">';
+            taus.forEach(t => {
+                const tex = (t && (t.ValorTeX || t.Valor)) || '';
+                const polo = t && (t.Polo != null) ? ` <span class="s-polo-meta">(polo ${escaparHtml(t.Polo)})</span>` : '';
+                html += `<li>${formulaTex(tex ? `\\tau = ${tex}` : '')}${polo}</li>`;
+            });
+            html += '</ul>';
+        }
+
+        const par = (nome, obj) => {
+            if (!obj || typeof obj !== 'object') return '';
+            const exato = obj.ExatoTeX || obj.ValorTeX || obj.Valor || '';
+            if (!exato && obj.ValorNumerico == null) return '';
+            const aprox = obj.ValorNumerico != null && obj.ExatoTeX
+                ? ` \\approx ${fmtMeta(obj.ValorNumerico)}`
+                : '';
+            return formulaTex(`${nome} = ${exato}${aprox}`);
+        };
+        if (car.Ordem === 2 || car.FrequenciaNatural || car.Amortecimento) {
+            html += par('\\omega_n', car.FrequenciaNatural);
+            html += par('\\zeta', car.Amortecimento);
+        }
+
+        html += '</div>';
+        return html;
+    }
+
+    /**
+     * Cards 3 e 4 do modo s. Rótulos V_1(s) / v_1(t) quando a API os manda;
+     * respostas antigas continuam com Local e y(t).
+     */
+    function htmlResultadosDominioS(dados) {
+        if (!dados || !Array.isArray(dados.Resultados) || !dados.Resultados.length) return '';
+        let html = `<div class="card card-resultados card-sdominio"><h3 class="section-title">3. Resultados em s</h3>`;
+        let plots = '';
+        dados.Resultados.forEach(r => {
+            if (!r) return;
+            const texS = r.ExpressaoTeX || r.Expressao || '';
+            const tempo = r.Tempo || null;
+            const texT = tempo ? (tempo.ExpressaoTeX || tempo.Expressao || '') : '';
+            html += '<div class="resultado-linha">';
+            if (r.RotuloTeX && texS) {
+                html += formulaTex(`${r.RotuloTeX} = ${texS}`);
+            } else if (texS) {
+                html += `<strong>${escaparHtml(r.Local || '')}:</strong>${formulaTex(texS)}`;
+            } else if (r.ValorNumerico) {
+                html += `<strong>${escaparHtml(r.Local || r.Rotulo || '')}:</strong><div class="numeric-result">${escaparHtml(r.ValorNumerico)}</div>`;
+            }
+            if (tempo && (tempo.RotuloTeX || texT)) {
+                if (tempo.RotuloTeX && texT) html += formulaTex(`${tempo.RotuloTeX} = ${texT}`);
+                else if (texT) html += `<span>y(t)</span>${formulaTex(texT)}`;
+                if (tempo.Forma === 'numerica') {
+                    html += '<p class="s-nota-aprox">(coeficientes aproximados)</p>';
+                }
+                const impulso = tempo.ImpulsoTeX || tempo.Impulso || '';
+                if (impulso) {
+                    html += `<p class="s-nota-impulso">Termo impulsivo</p>${formulaTex(impulso)}`;
+                }
+            }
+            html += '</div>';
+            if (tempo && tempo.Amostras) {
+                const svg = svgAmostrasTemporais(tempo.Amostras, {
+                    titulo: tempo.Rotulo || r.Rotulo || r.Local || '',
+                    unidade: r.Unidade || ''
+                });
+                if (svg) plots += `<div class="s-tempo-item">${svg}</div>`;
+            }
+        });
+        html += '</div>';
+        if (plots) {
+            html += `<div class="card card-sdominio"><h3 class="section-title">4. Resposta no tempo</h3><div class="s-tempo-grid">${plots}</div></div>`;
+        }
+        return html;
+    }
+
     return {
         siglaDependente,
         expandirSufixo,
@@ -223,6 +388,10 @@
         expressaoLaplace,
         modeloSerieS,
         respostaEhDominioS,
-        svgAmostrasTemporais
+        svgAmostrasTemporais,
+        setaDeAparaB,
+        positivoNoLadoA,
+        htmlCaracteristicaDominioS,
+        htmlResultadosDominioS
     };
 });
