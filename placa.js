@@ -25,36 +25,38 @@
         VCVS: {
             titulo: 'VCVS (E)',
             padrao: '2',
-            quatro: true,
+            dependente: true,
+            porTensao: true,
             rotuloValor: 'Ganho',
-            nota: 'Ganho E: Vout = E · Vctrl. Out+ e Out− são a saída; Ctrl+ e Ctrl− medem a tensão de controle. Na posição inicial, Out+ fica à esquerda, Out− à direita, Ctrl+ em cima e Ctrl− embaixo.'
+            nota: 'Ganho E: Vout = E · v do componente de controle, com a mesma polaridade da netlist dele. Out+ fica à esquerda na posição inicial.'
         },
         VCCS: {
             titulo: 'VCCS (G)',
             padrao: '2',
-            quatro: true,
+            dependente: true,
+            porTensao: true,
             rotuloValor: 'Transcond.',
-            nota: 'Transcondutância G: Iout = G · Vctrl. Out+ e Out− são a saída; Ctrl+ e Ctrl− medem a tensão de controle. Na posição inicial, Out+ fica à esquerda, Out− à direita, Ctrl+ em cima e Ctrl− embaixo.'
+            nota: 'Transcondutância G: Iout = G · v do componente de controle, com a mesma polaridade da netlist dele.'
         },
         CCVS: {
             titulo: 'CCVS (H)',
             padrao: '2',
-            alvo: true,
+            dependente: true,
             rotuloValor: 'Transres.',
-            nota: 'Transresistência H: Vout = H · Ialvo. Alvo é o nome exato (maiúsculas e minúsculas) do componente cuja corrente é a referência.'
+            nota: 'Transresistência H: Vout = H · i do componente de controle. Esse nome vai no campo Alvo da netlist.'
         },
         CCCS: {
             titulo: 'CCCS (F)',
             padrao: '2',
-            alvo: true,
+            dependente: true,
             rotuloValor: 'Ganho',
-            nota: 'Ganho F: Iout = F · Ialvo. Alvo é o nome exato (maiúsculas e minúsculas) do componente cuja corrente é a referência.'
+            nota: 'Ganho F: Iout = F · i do componente de controle. Esse nome vai no campo Alvo da netlist.'
         }
     };
 
     const ehFonte = tipo => tipo === 'VoltageSource' || tipo === 'CurrentSource';
-    const quatroTerminais = tipo => !!(PECAS[tipo] && PECAS[tipo].quatro);
-    const controladaPorCorrente = tipo => !!(PECAS[tipo] && PECAS[tipo].alvo);
+    const ehDependente = tipo => !!(PECAS[tipo] && PECAS[tipo].dependente);
+    const controladaPorTensao = tipo => !!(PECAS[tipo] && PECAS[tipo].porTensao);
 
     /* ---------- Geometria e conectividade (sem DOM) ---------- */
 
@@ -67,16 +69,10 @@
         }
     }
 
-    /**
-     * Terminais de um componente. "A" é o + da fonte de tensão e a ponta da seta da fonte de corrente.
-     * VCVS/VCCS: A/B = Out+/Out−, C/D = Ctrl+/Ctrl− (na posição inicial, saída na horizontal e controle na vertical).
-     */
+    /** Terminais de um componente. "A" é o + da fonte de tensão, a ponta da seta da fonte de corrente e o Out+ das fontes dependentes. */
     function terminais(comp) {
         if (comp.tipo === 'GND') return [{ nome: 'A', x: comp.x, y: comp.y }];
-        const offs = quatroTerminais(comp.tipo)
-            ? [['A', -MEIO, 0], ['B', MEIO, 0], ['C', 0, -MEIO], ['D', 0, MEIO]]
-            : [['A', -MEIO, 0], ['B', MEIO, 0]];
-        return offs.map(([nome, dx, dy]) => {
+        return [['A', -MEIO, 0], ['B', MEIO, 0]].map(([nome, dx, dy]) => {
             const [rx, ry] = girar(dx, dy, comp.rot);
             return { nome, x: comp.x + rx, y: comp.y + ry };
         });
@@ -99,14 +95,36 @@
     const noFio = (p, fio) => segmentos(fio).some(s => noSegmento(p, s));
 
     /**
-     * Nós na ordem da netlist. No backend a corrente da fonte independente vai
-     * do 1º para o 2º nó por dentro dela, então a ponta da seta (A) vem por último.
-     * VCVS/VCCS: [out+, out−, ctrl+, ctrl−]. CCVS/CCCS: [out+, out−].
+     * Nós na ordem da netlist do próprio componente (sem a porta de controle).
+     * Na fonte de corrente independente a corrente vai do 1º para o 2º nó por
+     * dentro dela, então a ponta da seta (A) vem por último.
      */
-    function nosNetlist(comp, nos) {
+    function nosProprios(comp, nos) {
+        if (!nos) return [null, null];
         if (comp.tipo === 'CurrentSource') return [nos.B, nos.A];
-        if (quatroTerminais(comp.tipo)) return [nos.A, nos.B, nos.C, nos.D];
         return [nos.A, nos.B];
+    }
+
+    function controladorDe(comp, comps) {
+        if (!comp || !comp.controleId || !comps) return null;
+        return comps.find(k => k.id === comp.controleId) || null;
+    }
+
+    /**
+     * Nós na ordem da netlist. Fontes dependentes de tensão acrescentam
+     * [ctrl+, ctrl−]: a tensão nos terminais do componente de controle,
+     * na mesma ordem da netlist dele.
+     */
+    function nosNetlist(comp, nos, comps, nosPorComp) {
+        const saida = nosProprios(comp, nos);
+        if (!controladaPorTensao(comp.tipo)) return saida;
+        const ctrl = controladorDe(comp, comps);
+        if (!ctrl || ctrl.tipo === 'GND' || ctrl.id === comp.id || !nosPorComp) return saida;
+        const cn = nosPorComp.get(ctrl.id);
+        if (!cn) return saida;
+        const [cp, cm] = nosProprios(ctrl, cn);
+        if (cp == null || cm == null) return saida;
+        return saida.concat([cp, cm]);
     }
 
     /**
@@ -330,22 +348,21 @@
         partes.forEach(c => {
             const n = analise.nosPorComp.get(c.id);
             if (n && n.A != null && n.A === n.B) {
-                const msg = (quatroTerminais(c.tipo) || controladaPorCorrente(c.tipo))
+                const msg = ehDependente(c.tipo)
                     ? `${c.nome} está em curto (os terminais de saída no mesmo nó).`
                     : `${c.nome} está em curto (os dois terminais no mesmo nó).`;
                 const fonteTensao = c.tipo === 'VoltageSource' || c.tipo === 'VCVS' || c.tipo === 'CCVS';
                 if (fonteTensao) erros.push(msg);
                 else avisos.push(msg);
             }
-            if (n && quatroTerminais(c.tipo) && n.C != null && n.C === n.D) {
-                avisos.push(`${c.nome}: Ctrl+ e Ctrl− estão no mesmo nó (tensão de controle nula).`);
-            }
-            if (controladaPorCorrente(c.tipo)) {
-                const alvo = String(c.alvo || '').trim();
-                if (!alvo) {
-                    erros.push(`${c.nome} está sem o componente de Alvo (corrente de referência).`);
-                } else if (!partes.some(o => o !== c && o.nome === alvo)) {
-                    erros.push(`${c.nome} referencia ${alvo}, mas esse componente não existe.`);
+            if (ehDependente(c.tipo)) {
+                const ctrl = controladorDe(c, comps);
+                if (!c.controleId || !ctrl) {
+                    erros.push(`${c.nome} sem componente de controle: clique na fonte e escolha o controle.`);
+                } else if (ctrl.id === c.id) {
+                    erros.push(`${c.nome} não pode usar a si mesma como controle.`);
+                } else if (ctrl.tipo === 'GND') {
+                    erros.push(`${c.nome}: o terra (GND) não serve de controle.`);
                 }
             }
         });
@@ -374,7 +391,9 @@
         cursorNaPlaca: false,
         arrasto: null,
         arrastoPaleta: false,
-        ultimoToque: { id: null, t: 0 }
+        ultimoToque: { id: null, t: 0 },
+        escolha: null,
+        escolhaMsg: ''
     };
     let svg, conteudo, sobreposicao, wrap;
     let timerSync = null;
@@ -436,7 +455,7 @@
             c.valor = padrao;
         }
         if (tipo === 'Capacitor' || tipo === 'Inductor') c.condicaoInicial = '';
-        if (peca.alvo) c.alvo = '';
+        if (peca.dependente) c.controleId = null;
         return c;
     }
 
@@ -470,12 +489,10 @@
     const trocarSeta = s => s.replace(/url\(#esq-arrow-curr\)/g, 'url(#placa-seta)');
 
     function simbolo(c, x, y, orient, aPrimeiro) {
-        const quatro = quatroTerminais(c.tipo);
         return trocarSeta(drawSimbolo({
             tipo: c.tipo,
-            nome: quatro ? '' : (c.nome || ''),
-            valor: (!quatro && c.nome) ? valorExibido(c) : '',
-            alvo: quatro ? null : (c.alvo || null),
+            nome: c.nome || '',
+            valor: c.nome ? valorExibido(c) : '',
             _positiveOnA: aPrimeiro,
             _fromAtoB: !aPrimeiro
         }, x, y, orient));
@@ -488,48 +505,15 @@
             : `<line class="placa-perna" x1="${x}" y1="${y - MEIO}" x2="${x}" y2="${y - h}"/><line class="placa-perna" x1="${x}" y1="${y + h}" x2="${x}" y2="${y + MEIO}"/>`;
     }
 
-    /** Meia-diagonal do losango de drawSimbolo (symDependentSource). */
-    const DIAMANTE = 18;
-
-    /** Saída no eixo da orientação; controle no eixo perpendicular, até os vértices do losango. */
-    function pernasQuatro(x, y, orient) {
-        const s = DIAMANTE;
-        if (orient === 'H') {
-            return pernas(x, y, 'H')
-                + `<line class="placa-perna placa-perna--ctrl" x1="${x}" y1="${y - MEIO}" x2="${x}" y2="${y - s}"/>`
-                + `<line class="placa-perna placa-perna--ctrl" x1="${x}" y1="${y + s}" x2="${x}" y2="${y + MEIO}"/>`;
-        }
-        return pernas(x, y, 'V')
-            + `<line class="placa-perna placa-perna--ctrl" x1="${x - MEIO}" y1="${y}" x2="${x - s}" y2="${y}"/>`
-            + `<line class="placa-perna placa-perna--ctrl" x1="${x + s}" y1="${y}" x2="${x + MEIO}" y2="${y}"/>`;
-    }
-
-    const ROTULO_TERM = { A: 'Out+', B: 'Out−', C: 'Ctrl+', D: 'Ctrl−' };
-
-    /** Rótulo ao lado do terminal, fora do fio. */
-    function deslocRotulo(t, cx, cy) {
-        const dx = t.x - cx;
-        const dy = t.y - cy;
-        let px = -dy;
-        let py = dx;
-        if (py > 0 || (py === 0 && px < 0)) { px = -px; py = -py; }
-        const len = Math.hypot(px, py) || 1;
-        return { x: t.x + (px / len) * 12, y: t.y + (py / len) * 12 };
-    }
-
-    function rotulosQuatro(c) {
-        let html = '';
-        if (c.nome) {
-            html += `<text class="esq-label--name" x="${c.x + 16}" y="${c.y - 14}" text-anchor="start" dominant-baseline="auto">${escapeXml(c.nome)}</text>`;
-            const v = valorExibido(c);
-            if (v) html += `<text class="esq-label--val" x="${c.x + 16}" y="${c.y + 16}" text-anchor="start" dominant-baseline="hanging">${escapeXml(v)}</text>`;
-        }
-        html += terminais(c).map(t => {
-            const p = deslocRotulo(t, c.x, c.y);
-            const ctrl = t.nome === 'C' || t.nome === 'D';
-            return `<text class="placa-rotulo-term${ctrl ? ' placa-rotulo-term--ctrl' : ''}" x="${p.x}" y="${p.y}" text-anchor="middle" dominant-baseline="central">${ROTULO_TERM[t.nome]}</text>`;
-        }).join('');
-        return html;
+    /** Rótulo discreto do controle: ganho vezes a corrente ou a tensão do componente escolhido. */
+    function rotuloControle(c) {
+        const ctrl = controladorDe(c, estado.comps);
+        if (!ctrl || ctrl.tipo === 'GND' || ctrl.id === c.id || !ctrl.nome) return '';
+        const letra = controladaPorTensao(c.tipo) ? 'v' : 'i';
+        const texto = `${valorExibido(c)}·${letra}_${ctrl.nome}`;
+        const vertical = c.rot === 90 || c.rot === 270;
+        const y = vertical ? c.y + MEIO + 8 : c.y + 36;
+        return `<g class="placa-controle"><title>${escapeXml(c.nome)} ← ${escapeXml(ctrl.nome)}</title><text class="placa-controle-label" x="${c.x}" y="${y}" text-anchor="middle" dominant-baseline="hanging">${escapeXml(texto)}</text></g>`;
     }
 
     function desenhoGnd(x, y) {
@@ -541,7 +525,6 @@
 
     function caixaComp(c) {
         if (c.tipo === 'GND') return { x: c.x - 16, y: c.y - 4, w: 32, h: 32 };
-        if (quatroTerminais(c.tipo)) return { x: c.x - MEIO, y: c.y - MEIO, w: 2 * MEIO, h: 2 * MEIO };
         return (c.rot === 90 || c.rot === 270)
             ? { x: c.x - 20, y: c.y - MEIO, w: 40, h: 2 * MEIO }
             : { x: c.x - MEIO, y: c.y - 20, w: 2 * MEIO, h: 40 };
@@ -551,13 +534,15 @@
         const cls = ['placa-comp'];
         if (opts.fantasma) cls.push('is-fantasma');
         if (opts.selecionado) cls.push('is-selecionado');
+        if (opts.destacado) cls.push('is-controle');
+        if (!opts.fantasma && ui.modo === 'escolher') {
+            if (c.id === ui.escolha) cls.push('is-origem');
+            else if (c.tipo !== 'GND') cls.push('is-candidato');
+        }
         const termsSvg = terminais(c).map(t => {
             const solto = opts.soltos && opts.soltos.has(`${c.id}:${t.nome}`);
-            const ctrl = quatroTerminais(c.tipo) && (t.nome === 'C' || t.nome === 'D');
-            const titulo = quatroTerminais(c.tipo)
-                ? ROTULO_TERM[t.nome]
-                : (controladaPorCorrente(c.tipo) ? (t.nome === 'A' ? 'Out+' : 'Out−') : '');
-            return `<circle class="placa-term${ctrl ? ' placa-term--ctrl' : ''}${solto ? ' is-solto' : ''}" cx="${t.x}" cy="${t.y}" r="5" data-comp="${c.id}" data-term="${t.nome}">${titulo ? `<title>${titulo}</title>` : ''}</circle>`;
+            const titulo = ehDependente(c.tipo) ? (t.nome === 'A' ? 'Out+' : 'Out−') : '';
+            return `<circle class="placa-term${solto ? ' is-solto' : ''}" cx="${t.x}" cy="${t.y}" r="5" data-comp="${c.id}" data-term="${t.nome}">${titulo ? `<title>${titulo}</title>` : ''}</circle>`;
         }).join('');
 
         const caixa = caixaComp(c);
@@ -566,15 +551,17 @@
             corpo = desenhoGnd(c.x, c.y);
         } else {
             const orient = (c.rot === 90 || c.rot === 270) ? 'V' : 'H';
-            const pernasSvg = quatroTerminais(c.tipo) ? pernasQuatro(c.x, c.y, orient) : pernas(c.x, c.y, orient);
-            corpo = pernasSvg + simbolo(c, c.x, c.y, orient, c.rot === 0 || c.rot === 90);
-            if (quatroTerminais(c.tipo)) corpo += rotulosQuatro(c);
+            corpo = pernas(c.x, c.y, orient) + simbolo(c, c.x, c.y, orient, c.rot === 0 || c.rot === 90);
+            if (!opts.fantasma && ehDependente(c.tipo)) corpo += rotuloControle(c);
         }
         const sel = opts.selecionado
             ? `<rect class="placa-sel" x="${caixa.x - 4}" y="${caixa.y - 4}" width="${caixa.w + 8}" height="${caixa.h + 8}" rx="6"/>`
             : '';
+        const marca = opts.destacado
+            ? `<rect class="placa-marca" x="${caixa.x - 6}" y="${caixa.y - 6}" width="${caixa.w + 12}" height="${caixa.h + 12}" rx="8"/>`
+            : '';
         return `<g class="${cls.join(' ')}" data-comp="${c.id}">
-            ${sel}
+            ${sel}${marca}
             <rect class="placa-hit" x="${caixa.x}" y="${caixa.y}" width="${caixa.w}" height="${caixa.h}"/>
             ${corpo}
             ${termsSvg}
@@ -612,9 +599,7 @@
             const t = terminais(c).find(k => k.x === p.x && k.y === p.y);
             if (!t) continue;
             if (c.tipo === 'GND') return false;
-            const saidaH = c.rot === 0 || c.rot === 180;
-            if (quatroTerminais(c.tipo) && (t.nome === 'C' || t.nome === 'D')) return !saidaH;
-            return saidaH;
+            return c.rot === 0 || c.rot === 180;
         }
         return null;
     }
@@ -639,7 +624,8 @@
         const soltos = new Set(analise.soltos.map(({ comp, term }) => `${comp.id}:${term.nome}`));
         const sel = ui.selecao;
         let html = estado.fios.map(f => svgFio(f, sel.fios.has(f.id))).join('');
-        html += estado.comps.map(c => svgComp(c, { selecionado: sel.comps.has(c.id), soltos })).join('');
+        const destacados = controlesDestacados();
+        html += estado.comps.map(c => svgComp(c, { selecionado: sel.comps.has(c.id), soltos, destacado: destacados.has(c.id) })).join('');
         html += juncoes(estado.comps, estado.fios).map(j => `<circle class="placa-juncao" cx="${j.x}" cy="${j.y}" r="4"/>`).join('');
         html += svgRotulosNos(analise.grupos);
         const fioSel = ui.modo === 'selecionar' && !sel.comps.size && sel.fios.size === 1 ? acharFio([...sel.fios][0]) : null;
@@ -651,6 +637,8 @@
         renderSobreposicao();
         svg.classList.toggle('placa-svg--fio', ui.modo === 'fio');
         svg.classList.toggle('placa-svg--posicionar', ui.modo === 'posicionar');
+        svg.classList.toggle('placa-svg--escolher', ui.modo === 'escolher');
+        atualizarEscolha();
         atualizarVazia();
         atualizarStatus(analise);
         atualizarToolbar();
@@ -681,6 +669,27 @@
             html += svgComp(f, { fantasma: true });
         }
         sobreposicao.innerHTML = html;
+    }
+
+    /** Controladores das fontes dependentes selecionadas, para o destaque discreto. */
+    function controlesDestacados() {
+        const ids = new Set();
+        ui.selecao.comps.forEach(id => {
+            const c = acharComp(id);
+            if (c && ehDependente(c.tipo) && c.controleId) ids.add(c.controleId);
+        });
+        return ids;
+    }
+
+    function atualizarEscolha() {
+        const el = $('placaEscolha');
+        if (!el) return;
+        if (ui.modo !== 'escolher') { el.hidden = true; el.textContent = ''; return; }
+        const c = acharComp(ui.escolha);
+        const nome = c && c.nome ? c.nome : 'a fonte';
+        const base = `Clique no componente de controle de ${nome}. Esc cancela.`;
+        el.textContent = ui.escolhaMsg ? `${ui.escolhaMsg} ${base}` : base;
+        el.hidden = false;
     }
 
     function atualizarVazia() {
@@ -737,10 +746,56 @@
     function cancelar() {
         ui.modo = 'selecionar';
         ui.fantasma = null;
+        ui.escolha = null;
+        ui.escolhaMsg = '';
         comecarFio(null);
         ui.voltarAoSelecionar = false;
         ui.arrasto = null;
         ui.arrastoPaleta = false;
+    }
+
+    function iniciarEscolha(id) {
+        const c = acharComp(id);
+        if (!c || !ehDependente(c.tipo)) return;
+        fecharProps();
+        ui.modo = 'escolher';
+        ui.escolha = id;
+        ui.escolhaMsg = '';
+        ui.fantasma = null;
+        comecarFio(null);
+        ui.voltarAoSelecionar = false;
+        ui.arrasto = null;
+        selecionarSo('comp', id);
+        render();
+    }
+
+    function escolherNoClique(e) {
+        const alvoComp = e.target.closest('[data-comp]');
+        const fonte = acharComp(ui.escolha);
+        if (!fonte) { cancelar(); render(); return; }
+        if (!alvoComp) {
+            ui.escolhaMsg = 'Clique no componente de controle.';
+            render();
+            return;
+        }
+        const ctrl = acharComp(alvoComp.dataset.comp);
+        if (!ctrl) { render(); return; }
+        if (ctrl.id === fonte.id) {
+            ui.escolhaMsg = 'Uma fonte não pode controlar a si mesma. Clique em outro componente.';
+            render();
+            return;
+        }
+        if (ctrl.tipo === 'GND') {
+            ui.escolhaMsg = 'O terra (GND) não serve de controle. Clique em outro componente.';
+            render();
+            return;
+        }
+        fonte.controleId = ctrl.id;
+        const fonteId = fonte.id;
+        cancelar();
+        selecionarSo('comp', fonteId);
+        mudou();
+        abrirProps(acharComp(fonteId));
     }
 
     function posicionar(p) {
@@ -749,6 +804,7 @@
         cancelar();
         selecionarSo('comp', c.id);
         mudou();
+        if (ehDependente(c.tipo)) iniciarEscolha(c.id);
     }
 
     function pontoConectavel(p, ignorar) {
@@ -839,8 +895,7 @@
         const saidaVertical = c.rot === 90 || c.rot === 270;
         antes.forEach((t, i) => {
             if (!presoNoMeio[i]) return;
-            const ctrl = quatroTerminais(c.tipo) && (t.nome === 'C' || t.nome === 'D');
-            estado.fios.push({ id: novoId(), x1: t.x, y1: t.y, x2: depois[i].x, y2: depois[i].y, hv: ctrl ? saidaVertical : !saidaVertical });
+            estado.fios.push({ id: novoId(), x1: t.x, y1: t.y, x2: depois[i].x, y2: depois[i].y, hv: !saidaVertical });
         });
         mudou();
     }
@@ -850,7 +905,11 @@
         if (selVazia()) return;
         const { comps, fios } = ui.selecao;
         estado.comps = estado.comps.filter(c => !comps.has(c.id));
+        estado.comps.forEach(c => {
+            if (c.controleId && comps.has(c.controleId)) c.controleId = null;
+        });
         estado.fios = estado.fios.filter(f => !fios.has(f.id));
+        if (ui.escolha && comps.has(ui.escolha)) cancelar();
         limparSelecao();
         fecharProps();
         mudou();
@@ -875,8 +934,7 @@
             if (!comps.has(c.id)) return;
             const vertical = c.tipo === 'GND' || c.rot === 90 || c.rot === 270;
             terminais(c).forEach(t => {
-                const ctrl = quatroTerminais(c.tipo) && (t.nome === 'C' || t.nome === 'D');
-                movem.push({ x: t.x, y: t.y, hv: ctrl ? !vertical : vertical });
+                movem.push({ x: t.x, y: t.y, hv: vertical });
             });
         });
         const fiosSel = base.filter(f => fios.has(f.id));
@@ -1001,7 +1059,7 @@
         const ac = modo === 'AC';
         const sdom = modo === 'S';
         const peca = PECAS[c.tipo];
-        const dependente = !!(peca.quatro || peca.alvo);
+        const dependente = ehDependente(c.tipo);
         let campos, nota;
         if (ehFonte(c.tipo)) {
             if (ac) {
@@ -1020,14 +1078,10 @@
                 nota = 'Modo DC. Módulo e fase são editados no modo AC.';
             }
         } else if (dependente) {
-            campos = campoProp(peca.rotuloValor, 'valor', c.valor, true);
-            if (peca.alvo) {
-                const opcoes = estado.comps
-                    .filter(k => k !== c && k.nome && k.tipo !== 'GND')
-                    .map(k => `<option value="${escapeAttr(k.nome)}"></option>`)
-                    .join('');
-                campos += `<label class="placa-props-campo"><span>Alvo</span><input type="text" name="alvo" value="${escapeAttr(c.alvo || '')}" list="placaListaAlvo" autocomplete="off" spellcheck="false" placeholder="ex.: R1"></label><datalist id="placaListaAlvo">${opcoes}</datalist>`;
-            }
+            const ctrl = controladorDe(c, estado.comps);
+            const nomeCtrl = ctrl && ctrl.tipo !== 'GND' && ctrl.id !== c.id && ctrl.nome ? ctrl.nome : 'nenhum';
+            campos = campoProp(peca.rotuloValor, 'valor', c.valor, true)
+                + `<div class="placa-props-controle"><span>Controle</span><strong>${escapeXml(nomeCtrl)}</strong><button type="button" class="placa-props-escolher">Escolher controle</button></div>`;
             nota = peca.nota;
         } else if (sdom && (c.tipo === 'Capacitor' || c.tipo === 'Inductor')) {
             const rotuloIc = c.tipo === 'Capacitor' ? 'v(0)' : 'i(0)';
@@ -1069,6 +1123,8 @@
             mudou();
         });
         form.querySelector('.placa-props-cancelar').addEventListener('click', fecharProps);
+        const btnEscolher = form.querySelector('.placa-props-escolher');
+        if (btnEscolher) btnEscolher.addEventListener('click', () => iniciarEscolha(c.id));
         form.addEventListener('keydown', e => {
             if (e.key === 'Escape') { e.stopPropagation(); fecharProps(); }
         });
@@ -1100,13 +1156,6 @@
         }
         if (dados.has('condicaoInicial')) {
             novos.condicaoInicial = String(dados.get('condicaoInicial') || '').trim();
-        }
-        if (dados.has('alvo')) {
-            const alvo = String(dados.get('alvo') || '').trim();
-            if (alvo && !/^[A-Za-z][A-Za-z0-9_]*$/.test(alvo)) {
-                return 'O Alvo deve ser o nome exato de um componente (letra, depois letras, números ou _).';
-            }
-            novos.alvo = alvo;
         }
         if (novos.valor && validarValorNegativo(c.tipo, novos.valor)) return 'Este componente não aceita valor negativo.';
         c.nome = nome;
@@ -1143,6 +1192,7 @@
         const p = atualizarCursor(e);
         fecharProps();
         if (ui.modo === 'posicionar') { posicionar(ui.cursor); return; }
+        if (ui.modo === 'escolher') { escolherNoClique(e); return; }
         if (ui.modo === 'fio') { cliqueFio(ui.cursor); return; }
 
         const alvoPonta = e.target.closest('[data-ponta]');
@@ -1170,7 +1220,9 @@
                 const agora = performance.now();
                 if (!e.shiftKey && ui.ultimoToque.id === id && agora - ui.ultimoToque.t < 350) {
                     ui.ultimoToque = { id: null, t: 0 };
-                    abrirProps(acharComp(id));
+                    const tocado = acharComp(id);
+                    if (tocado && ehDependente(tocado.tipo)) iniciarEscolha(tocado.id);
+                    else abrirProps(tocado);
                     return;
                 }
                 ui.ultimoToque = { id, t: agora };
@@ -1203,7 +1255,7 @@
     function aoMover(e) {
         if (!svg) return;
         const a = ui.arrasto;
-        if (ui.modo === 'selecionar' && !a) return;
+        if ((ui.modo === 'selecionar' || ui.modo === 'escolher') && !a) return;
         const antes = { ...ui.cursor, naPlaca: ui.cursorNaPlaca };
         const p = atualizarCursor(e);
         if (a && a.tipo === 'grupo') {
@@ -1320,6 +1372,12 @@
             e.preventDefault();
             ui.fioInverter = !ui.fioInverter;
             renderSobreposicao();
+        } else if (k === 'Enter') {
+            const c = compUnico();
+            if (c && c.tipo !== 'GND' && ui.modo === 'selecionar') {
+                e.preventDefault();
+                abrirProps(c);
+            }
         } else if (k === 'r' || k === 'R') {
             e.preventDefault();
             girarAtual();
@@ -1337,9 +1395,6 @@
     function iconePeca(tipo) {
         if (tipo === 'GND') {
             return `<svg class="placa-icone" viewBox="-20 -6 40 36" aria-hidden="true">${desenhoGnd(0, 0)}</svg>`;
-        }
-        if (quatroTerminais(tipo)) {
-            return `<svg class="placa-icone placa-icone--quatro" viewBox="-44 -44 88 88" aria-hidden="true">${pernasQuatro(0, 0, 'H')}${simbolo({ tipo }, 0, 0, 'H', true)}</svg>`;
         }
         return `<svg class="placa-icone" viewBox="-42 -22 84 44" aria-hidden="true">${pernas(0, 0, 'H')}${simbolo({ tipo }, 0, 0, 'H', true)}</svg>`;
     }
@@ -1389,7 +1444,12 @@
         idCounter = 1;
         estado.comps.forEach(c => {
             if (c.tipo === 'GND') return;
-            add(c.tipo, c.nome, nosNetlist(c, nosPorComp.get(c.id)), ehFonte(c.tipo) ? c.valorDc : c.valor, c.alvo || null);
+            const ctrl = controladorDe(c, estado.comps);
+            const ns = nosNetlist(c, nosPorComp.get(c.id), estado.comps, nosPorComp);
+            const alvoNome = (c.tipo === 'CCVS' || c.tipo === 'CCCS') && ctrl && ctrl.tipo !== 'GND' && ctrl.id !== c.id
+                ? ctrl.nome
+                : null;
+            add(c.tipo, c.nome, ns, ehFonte(c.tipo) ? c.valorDc : c.valor, alvoNome);
             const li = lista.lastElementChild;
             li.dataset.placaId = c.id;
             if (ehFonte(c.tipo)) {
@@ -1406,6 +1466,24 @@
             if (c.tipo === 'Capacitor' || c.tipo === 'Inductor') {
                 const ic = li.querySelector('.val-input-ic');
                 if (ic) ic.value = c.condicaoInicial != null ? c.condicaoInicial : '';
+            }
+            if (c.tipo === 'VCVS' || c.tipo === 'VCCS') {
+                const noC = li.querySelector('.no-c');
+                const noD = li.querySelector('.no-d');
+                if (noC && noD) {
+                    if (ns.length >= 4 && ns[2] != null && ns[3] != null) {
+                        noC.value = ns[2];
+                        noD.value = ns[3];
+                    } else {
+                        noC.value = '';
+                        noD.value = '';
+                    }
+                }
+            }
+            const alvoEl = li.querySelector('.alvo-comp');
+            if (alvoEl) {
+                alvoEl.readOnly = true;
+                alvoEl.title = 'Definido na placa pelo componente de controle.';
             }
             if (typeof ligarCamposDominioS === 'function') ligarCamposDominioS(li);
         });
@@ -1426,8 +1504,9 @@
     function assinaturaPlaca() {
         const { nosPorComp } = extrairNos(estado.comps, estado.fios);
         return JSON.stringify(estado.comps.filter(c => c.tipo !== 'GND').map(c => {
-            const ns = nosNetlist(c, nosPorComp.get(c.id));
-            return [c.tipo, c.nome, String(ns[0]), String(ns[1]), ns.length > 2 ? String(ns[2]) : '', ns.length > 3 ? String(ns[3]) : ''];
+            const ns = nosNetlist(c, nosPorComp.get(c.id), estado.comps, nosPorComp);
+            const no = i => (ns.length > i && ns[i] != null) ? String(ns[i]) : '';
+            return [c.tipo, c.nome, no(0), no(1), no(2), no(3)];
         }));
     }
 
@@ -1438,8 +1517,16 @@
         const c = acharComp(li.dataset.placaId);
         if (!c) return;
         const v = alvo.value.trim();
-        if (alvo.classList.contains('nome-comp')) c.nome = v;
-        else if (alvo.classList.contains('val-input-dc')) c.valorDc = v;
+        if (alvo.classList.contains('nome-comp')) {
+            c.nome = v;
+            document.querySelectorAll('#listaComponentes .comp-item[data-placa-id]').forEach(item => {
+                const outro = acharComp(item.dataset.placaId);
+                if (!outro || outro.controleId !== c.id) return;
+                if (outro.tipo !== 'CCVS' && outro.tipo !== 'CCCS') return;
+                const el = item.querySelector('.alvo-comp');
+                if (el) el.value = v;
+            });
+        } else if (alvo.classList.contains('val-input-dc')) c.valorDc = v;
         else if (alvo.classList.contains('val-input-mod')) c.modulo = v;
         else if (alvo.classList.contains('val-input-fase')) c.fase = v;
         else if (alvo.classList.contains('val-input-amp')) c.amplitude = v;
@@ -1447,7 +1534,6 @@
         else if (alvo.classList.contains('val-input-laplace')) c.laplaceTipo = alvo.value || 'degrau';
         else if (alvo.classList.contains('val-input-ic')) c.condicaoInicial = v;
         else if (alvo.classList.contains('val-input')) c.valor = v;
-        else if (alvo.classList.contains('alvo-comp')) c.alvo = v;
         else return;
         salvar();
         render();
@@ -1500,6 +1586,11 @@
             estado.comps = d.comps;
             estado.seq = d.seq || 1;
             estado.fios = normalizarFios(d.fios, novoId);
+            estado.comps.forEach(c => {
+                if (!ehDependente(c.tipo) || c.controleId || !c.alvo) return;
+                const achou = estado.comps.find(k => k !== c && k.nome === c.alvo && k.tipo !== 'GND');
+                if (achou) c.controleId = achou.id;
+            });
             return estado.comps.length > 0;
         } catch (e) {
             return false;

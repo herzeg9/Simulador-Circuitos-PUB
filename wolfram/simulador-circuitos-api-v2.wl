@@ -73,8 +73,9 @@ condicaoBruta[comp_Association, tipo_String] := Module[{chaves, ch},
     {"v0", "V0", "CondicaoInicial"},
     {"i0", "I0", "CondicaoInicial"}
   ];
-  Do[If[KeyExistsQ[comp, ch], Return[comp[ch]]], {ch, chaves}];
-  Missing["KeyAbsent"]
+  (* Return dentro de Do só abandona o Do e a função caía em Missing. *)
+  ch = SelectFirst[chaves, KeyExistsQ[comp, #] &, None];
+  If[ch === None, Missing["KeyAbsent"], comp[ch]]
 ];
 
 numeroCondicao[comp_Association, tipo_String] := Module[{raw = condicaoBruta[comp, tipo], n},

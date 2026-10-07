@@ -115,6 +115,8 @@ console.log('Notebook completo');
     verificar('AC da V25 permanece 1/(I omega C)', wl.includes('(1/(I*omega*compVal))') && wl.includes('(I*omega*compVal)'));
     verificar('DC da V25 abre o capacitor', wl.includes('i[comp["Componente"]]==0'));
     verificar('campos v0, i0 e Laplace step/impulse/exponential', wl.includes('"v0"') && wl.includes('"i0"') && wl.includes('"step"') && wl.includes('"impulse"') && wl.includes('"exponential"'));
+    verificar('condicaoBruta lê a chave com SelectFirst', wl.includes('SelectFirst[chaves, KeyExistsQ[comp, #] &, None]') && nb.includes('SelectFirst[chaves, KeyExistsQ[comp, #] &, None]'));
+    verificar('Return não fica preso no Do', !wl.includes('Return[comp[ch]]') && !nb.includes('Return[comp[ch]]'));
     verificar('wl cabe no nb (primeira definição)', nb.includes('parseValue'));
     verificar('fontes do wl estão referenciadas', wl.includes('validarDominioS') && nb.includes('validarDominioS'));
     verificar('nb não é um Get externo', !nb.includes('Get['));
