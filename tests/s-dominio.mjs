@@ -12,6 +12,8 @@ const require = createRequire(import.meta.url);
 const {
     validarNetlistDominioS,
     valorInicialInformado,
+    valorParametroS,
+    valorNumericoDcAc,
     expressaoLaplace,
     modeloSerieS,
     respostaEhDominioS,
@@ -33,7 +35,10 @@ console.log('Condição inicial');
 verificar('vazio é ausência', valorInicialInformado('  ').motivo === 'ausente');
 verificar('zero é válido', valorInicialInformado('0').ok && valorInicialInformado('-2').ok);
 verificar('sufixo no i(0)', valorInicialInformado('20m').ok && valorInicialInformado('20m').valor === '20*0.001');
-verificar('texto não é número', valorInicialInformado('abc').motivo === 'invalido');
+verificar('texto solto não é parâmetro', valorInicialInformado('2foo').motivo === 'invalido');
+verificar('nome simbólico passa', valorParametroS('v10').ok && valorParametroS('i0').valor === 'i0' && valorParametroS('A').ok && valorParametroS('alpha').ok);
+verificar('expressão simbólica passa', valorParametroS('2*v10').ok && valorParametroS('-i0').valor === '-i0' && valorParametroS('(v10+v20)/2').ok);
+verificar('DC rejeita nome', valorNumericoDcAc('v10') === false && valorNumericoDcAc('1k') === true && valorNumericoDcAc('-30') === true);
 
 console.log('Capacitor e indutor');
 {
@@ -53,8 +58,20 @@ console.log('Capacitor e indutor');
     verificar('zero e sufixo passam', m === '', m);
 }
 {
-    const m = msgs([{ Componente: 'C1', Tipo: 'Capacitor', Nos: [1, 0], CondicaoInicial: 'foo' }]);
+    const m = msgs([{ Componente: 'C1', Tipo: 'Capacitor', Nos: [1, 0], CondicaoInicial: '2foo' }]);
     verificar('v(0) inválido', m.includes('não é um número válido'));
+    verificar('v(0) nome passa', msgs([{ Componente: 'C1', Tipo: 'Capacitor', Nos: [1, 0], CondicaoInicial: 'v10' }]) === '');
+    verificar('i(0) expressão passa', msgs([{ Componente: 'L1', Tipo: 'Inductor', Nos: [1, 0], CondicaoInicial: '-i0' }]) === '');
+}
+{
+    const m = msgs([{ Componente: 'V1', Tipo: 'VoltageSource', Nos: [1, 0], Laplace: { Amplitude: '', Alpha: '1' } }]);
+    verificar('amplitude vazia', m.includes('amplitude') && m.includes('vazia'));
+    const ruim = msgs([{ Componente: 'V1', Tipo: 'VoltageSource', Nos: [1, 0], Laplace: { Amplitude: '2A', Alpha: 'a+' } }]);
+    verificar('amplitude e alpha inválidos', ruim.includes('amplitude') && ruim.includes('decaimento'));
+    verificar('fonte simbólica passa', msgs([{
+        Componente: 'V1', Tipo: 'VoltageSource', Nos: [1, 0],
+        Laplace: { Amplitude: '2*v10', Alpha: 'alpha' }
+    }]) === '');
 }
 
 console.log('Fontes dependentes');
@@ -157,6 +174,28 @@ console.log('Resposta s v3');
         Resultados: [{ Local: 'Nó 2', ExpressaoTeX: '10/s', Unidade: 'V', Tempo: { ExpressaoTeX: '10-10 e^{-t}', Amostras: [[0, 0], [1, 6]] } }]
     });
     verificar('resposta antiga continua com y(t)', antigo.includes('>y(t)<') && antigo.includes('Nó 2'));
+}
+
+console.log('Resposta s simbólica');
+{
+    const exemplo = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'exemplo-resposta-s-v4-simbolico.json'), 'utf8'));
+    const res = htmlResultadosDominioS(exemplo);
+    verificar('parâmetros simbólicos no cabeçalho', res.includes('Parâmetros simbólicos') && res.includes('v_{10}') && res.includes('v_{20}') && res.includes('i_{0}'));
+    verificar('V1 e i_L1 simbólicos', res.includes('V_{1}(s)') && res.includes('v_{1}(t)') && res.includes('i_{L1}(t)') && res.includes('v_{10}+v_{20}'));
+    verificar('nota de gráfico indisponível', res.includes('Gráfico indisponível: há parâmetros simbólicos.'));
+    verificar('sem curva quando Forma é simbolica', !res.includes('<path') && !res.includes('s-tempo-svg'));
+    verificar('forma exata sem nota numérica', !res.includes('coeficientes aproximados'));
+    const num = htmlResultadosDominioS({
+        Resultados: [{
+            Local: 'Nó 1', Unidade: 'V', RotuloTeX: 'V_{1}(s)', ExpressaoTeX: 'v_{10}/s',
+            Tempo: {
+                RotuloTeX: 'v_{1}(t)', ExpressaoTeX: 'v_{10}', Forma: 'simbolica',
+                FormaCoeficientes: 'numerica', Nota: 'sem gráfico',
+                Amostras: [[0, 1], [1, 2], [2, 3]]
+            }
+        }]
+    });
+    verificar('coeficientes numéricos mesmo na forma simbólica', num.includes('(coeficientes aproximados)') && num.includes('sem gráfico') && !num.includes('<path'));
 }
 
 console.log('Notebook completo');

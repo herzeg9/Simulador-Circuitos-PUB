@@ -33,17 +33,88 @@
     const RE_NUMERO = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?(?:\*(?:[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?))*$/;
 
     /**
-     * Condição inicial obrigatória no modo s.
-     * Vazio é ausência. Zero é valor válido. Negativo é válido.
+     * Número, nome (letra e depois letras, dígitos ou _) ou expressão
+     * com + - * / ( ) ^. Espaços são ignorados. Sufixo SI só no número puro.
+     * @returns {boolean}
+     */
+    function expressaoSimbolicaValida(s) {
+        if (!s) return false;
+        let i = 0;
+        const n = s.length;
+        function primary() {
+            if (i >= n) return false;
+            if (s[i] === '(') {
+                i += 1;
+                if (!expr()) return false;
+                if (s[i] !== ')') return false;
+                i += 1;
+                return true;
+            }
+            const rest = s.slice(i);
+            const nome = rest.match(/^[A-Za-z][A-Za-z0-9_]*/);
+            if (nome) { i += nome[0].length; return true; }
+            const num = rest.match(/^(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/);
+            if (num) { i += num[0].length; return true; }
+            return false;
+        }
+        function unary() {
+            if (s[i] === '+' || s[i] === '-') { i += 1; return unary(); }
+            if (!primary()) return false;
+            if (s[i] === '^') { i += 1; return unary(); }
+            return true;
+        }
+        function term() {
+            if (!unary()) return false;
+            while (s[i] === '*' || s[i] === '/') {
+                i += 1;
+                if (!unary()) return false;
+            }
+            return true;
+        }
+        function expr() {
+            if (!term()) return false;
+            while (s[i] === '+' || s[i] === '-') {
+                i += 1;
+                if (!term()) return false;
+            }
+            return true;
+        }
+        return expr() && i === n;
+    }
+
+    /**
+     * v(0), i(0), Amplitude e Alpha no modo s.
+     * Vazio é ausência. Número (com sufixo), nome ou expressão simples passam.
      * @returns {{ok:true, valor:string}|{ok:false, motivo:'ausente'|'invalido'}}
      */
-    function valorInicialInformado(raw) {
+    function valorParametroS(raw) {
         if (raw == null) return { ok: false, motivo: 'ausente' };
         const s = String(raw).trim().replace(/\s+/g, '');
         if (!s) return { ok: false, motivo: 'ausente' };
+        if (expressaoSimbolicaValida(s)) return { ok: true, valor: s };
         const expanded = expandirSufixo(s);
-        if (!RE_NUMERO.test(expanded)) return { ok: false, motivo: 'invalido' };
-        return { ok: true, valor: expanded };
+        if (RE_NUMERO.test(expanded)) return { ok: true, valor: expanded };
+        return { ok: false, motivo: 'invalido' };
+    }
+
+    function valorInicialInformado(raw) {
+        return valorParametroS(raw);
+    }
+
+    /** DC/AC: número com sufixo SI. Não aceita nome nem expressão. */
+    function valorNumericoDcAc(raw) {
+        if (raw == null) return false;
+        const s = String(raw).trim().replace(/\s+/g, '');
+        if (!s) return false;
+        return RE_NUMERO.test(expandirSufixo(s));
+    }
+
+    /** v10 → v_{10}, i0 → i_{0}. Nome sem dígitos fica como está. */
+    function simboloParaTeX(nome) {
+        const s = String(nome ?? '');
+        const m = s.match(/^([A-Za-z]+)_?(\d+)$/);
+        if (m) return `${m[1]}_{${m[2]}}`;
+        return s.replace(/_/g, '\\_');
     }
 
     function contagemNos(netlist) {
@@ -91,8 +162,39 @@
                         nome,
                         campo: 'ic',
                         mensagem: tipo === 'Capacitor'
-                            ? `A condição inicial v(0) do capacitor ${nome} não é um número válido.`
-                            : `A condição inicial i(0) do indutor ${nome} não é um número válido.`
+                            ? `A condição inicial v(0) do capacitor ${nome} não é um número válido nem um nome (ex.: v10). Use um número, um nome ou uma expressão com + - * / ( ) ^.`
+                            : `A condição inicial i(0) do indutor ${nome} não é um número válido nem um nome (ex.: i0). Use um número, um nome ou uma expressão com + - * / ( ) ^.`
+                    });
+                }
+            }
+
+            if ((tipo === 'VoltageSource' || tipo === 'CurrentSource') && c.Laplace) {
+                const amp = valorParametroS(c.Laplace.Amplitude);
+                if (!amp.ok && amp.motivo === 'ausente') {
+                    erros.push({
+                        nome,
+                        campo: 'amp',
+                        mensagem: `A amplitude da fonte ${nome} está vazia. Informe um número ou um nome (ex.: v10).`
+                    });
+                } else if (!amp.ok) {
+                    erros.push({
+                        nome,
+                        campo: 'amp',
+                        mensagem: `A amplitude da fonte ${nome} não é um número válido nem um nome (ex.: A, v10). Use um número, um nome ou uma expressão com + - * / ( ) ^.`
+                    });
+                }
+                const alpha = valorParametroS(c.Laplace.Alpha);
+                if (!alpha.ok && alpha.motivo === 'ausente') {
+                    erros.push({
+                        nome,
+                        campo: 'alpha',
+                        mensagem: `O decaimento α da fonte ${nome} está vazio. Informe um número ou um nome (ex.: alpha).`
+                    });
+                } else if (!alpha.ok) {
+                    erros.push({
+                        nome,
+                        campo: 'alpha',
+                        mensagem: `O decaimento α da fonte ${nome} não é um número válido nem um nome (ex.: alpha). Use um número, um nome ou uma expressão com + - * / ( ) ^.`
                     });
                 }
             }
@@ -338,7 +440,16 @@
      */
     function htmlResultadosDominioS(dados) {
         if (!dados || !Array.isArray(dados.Resultados) || !dados.Resultados.length) return '';
+        const simbolos = Array.isArray(dados.Simbolos) && dados.Simbolos.length
+            ? dados.Simbolos
+            : [];
+        const notaTopo = dados.NotaSimbolica || '';
         let html = `<div class="card card-resultados card-sdominio"><h3 class="section-title">3. Resultados em s</h3>`;
+        if (simbolos.length) {
+            const tex = simbolos.map(simboloParaTeX).join(', ');
+            html += `<p class="s-simbolos">Parâmetros simbólicos:</p>${formulaTex(tex)}`;
+        }
+        if (notaTopo) html += `<p class="s-nota-simbolica">${escaparHtml(notaTopo)}</p>`;
         let plots = '';
         dados.Resultados.forEach(r => {
             if (!r) return;
@@ -356,8 +467,12 @@
             if (tempo && (tempo.RotuloTeX || texT)) {
                 if (tempo.RotuloTeX && texT) html += formulaTex(`${tempo.RotuloTeX} = ${texT}`);
                 else if (texT) html += `<span>y(t)</span>${formulaTex(texT)}`;
-                if (tempo.Forma === 'numerica') {
+                if (tempo.Forma === 'numerica' || tempo.FormaCoeficientes === 'numerica') {
                     html += '<p class="s-nota-aprox">(coeficientes aproximados)</p>';
+                }
+                if (tempo.Forma === 'simbolica') {
+                    const nota = tempo.Nota || '';
+                    if (nota && nota !== notaTopo) html += `<p class="s-nota-simbolica">${escaparHtml(nota)}</p>`;
                 }
                 const impulso = tempo.ImpulsoTeX || tempo.Impulso || '';
                 if (impulso) {
@@ -365,7 +480,7 @@
                 }
             }
             html += '</div>';
-            if (tempo && tempo.Amostras) {
+            if (tempo && tempo.Forma !== 'simbolica' && tempo.Amostras) {
                 const svg = svgAmostrasTemporais(tempo.Amostras, {
                     titulo: tempo.Rotulo || r.Rotulo || r.Local || '',
                     unidade: r.Unidade || ''
@@ -384,6 +499,9 @@
         siglaDependente,
         expandirSufixo,
         valorInicialInformado,
+        valorParametroS,
+        valorNumericoDcAc,
+        simboloParaTeX,
         validarNetlistDominioS,
         expressaoLaplace,
         modeloSerieS,
