@@ -98,9 +98,20 @@ console.log('Notebook completo');
 {
     const nb = fs.readFileSync(path.join(__dirname, '..', 'wolfram', 'simulador-circuitos-api-v2.nb'), 'utf8');
     const wl = fs.readFileSync(path.join(__dirname, '..', 'wolfram', 'simulador-circuitos-api-v2.wl'), 'utf8');
-    verificar('nb contém processCircuit', nb.includes('processCircuit'));
-    verificar('nb contém CloudDeploy no mesmo objeto', nb.includes('simulador-circuitos-api-v2') && nb.includes('CloudDeploy'));
-    verificar('nb contém a substituição do capacitor e do indutor', nb.includes('/(s*compVal)') && nb.includes('compVal*i0'));
+    const pedacos = nb.split('", "Code", InitializationCell -> False]');
+    const miolos = pedacos.slice(0, -1).map((parte) => {
+        const marca = 'Cell["';
+        const em = parte.lastIndexOf(marca);
+        return em < 0 ? '' : parte.slice(em + marca.length);
+    });
+    verificar('nb tem 3 células Code e não inicializa ao abrir', miolos.length === 3 && (nb.match(/", "Code", InitializationCell -> False\]/g) || []).length === 3);
+    verificar('nb não usa RowBox', !nb.includes('RowBox'));
+    verificar('células de código sem comentário (* *)', miolos.every((m) => !m.includes('(*') && !m.includes('*)')));
+    verificar('nb sem a string solta de confirmação', !nb.includes('Definicoes da API carregadas') && !wl.includes('Definicoes da API carregadas'));
+    verificar('CloudDeploy só na última célula de código', !miolos[0].includes('CloudDeploy') && !miolos[1].includes('CloudDeploy') && miolos[2].includes('CloudDeploy'));
+    verificar('nb contém processCircuit', miolos[0].includes('processCircuit'));
+    verificar('nb contém CloudDeploy no mesmo objeto', nb.includes('simulador-circuitos-api-v2') && miolos[2].includes('CloudDeploy'));
+    verificar('nb contém a substituição do capacitor e do indutor', miolos[0].includes('/(s*compVal)') && miolos[0].includes('compVal*i0'));
     verificar('AC da V25 permanece 1/(I omega C)', wl.includes('(1/(I*omega*compVal))') && wl.includes('(I*omega*compVal)'));
     verificar('DC da V25 abre o capacitor', wl.includes('i[comp["Componente"]]==0'));
     verificar('campos v0, i0 e Laplace step/impulse/exponential', wl.includes('"v0"') && wl.includes('"i0"') && wl.includes('"step"') && wl.includes('"impulse"') && wl.includes('"exponential"'));

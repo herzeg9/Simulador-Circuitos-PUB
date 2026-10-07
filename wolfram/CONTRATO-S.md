@@ -130,7 +130,7 @@ Uma fonte independente e dois ou três R/L/C. Circuitos maiores, com fonte depen
 ## Como importar e publicar
 
 1. Abra `wolfram/simulador-circuitos-api-v2.nb` no Wolfram desktop ou na Wolfram Cloud (File → Open).
-2. Avalie a **primeira célula de código** (Shift+Enter). Ela define `processCircuit` e o resto. A saída é a frase de confirmação. Nada é publicado nessa célula.
+2. Avalie a **primeira célula de código** (Shift+Enter). Ela define `processCircuit` e o resto. A saída é `Null`. Se aparecer `Syntax::sntxi`, o arquivo não é o notebook corrigido: pare. Nada é publicado nessa célula, nem ao abrir o arquivo.
 3. Avalie a **célula de testes**. Ela chama `processCircuit` em cinco circuitos e devolve um resumo:
    - divisor DC: nó 2 = `5.00000e0`
    - RC em AC: sem `Erro`, valores polares

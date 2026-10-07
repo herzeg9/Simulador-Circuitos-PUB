@@ -4,8 +4,8 @@ A API que está no ar é a V25 (uma célula só, com `CloudDeploy` no fim). O ar
 
 Publicar substitui https://www.wolframcloud.com/obj/herzeghenrique/simulador-circuitos-api-v2 . Faça isso só depois dos testes locais.
 
-1. Abra `wolfram/simulador-circuitos-api-v2.nb` (File → Open). Não use `IC_1905.nb` nem a célula antiga da V25.
-2. Shift+Enter na primeira célula de código. A saída é a frase de confirmação. Essa célula não publica.
+1. Abra `wolfram/simulador-circuitos-api-v2.nb` (File → Open). Não use `IC_1905.nb`, a célula antiga da V25, nem um `.nb` que ainda mostre `Syntax::sntxi`.
+2. Shift+Enter na primeira célula de código. A saída é `Null`: a célula só define as funções e não imprime frase nenhuma. Se aparecer `Syntax::sntxi` (“more input is needed”), pare. Essa célula não publica, e abrir o arquivo também não publica.
 3. Shift+Enter na célula de testes. Espere:
    - divisor DC: nó 2 = `5.00000e0`
    - RC em AC: sem `Erro`, valores polares

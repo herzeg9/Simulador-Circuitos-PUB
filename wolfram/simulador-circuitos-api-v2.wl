@@ -275,5 +275,3 @@ If[Length[stepSol]>0,AppendTo[superposicao,<|"FonteAtiva"->src["Componente"],"Re
 response=If[modo=="S",respostaDominioS[eqs,subs,solSym,nodes,currentVars,components],<|"Equacoes"->Table[cleanTeX[eq],{eq,eqs}],"Superposicao"->superposicao,(*CORREÇÃO:AGORA O PACOTE É ENVIADO!*)"Resultados"->Flatten[{Table[<|"Local"->"Nó "<>ToString[n],"ValorNumerico"->formatResult[v[n]/. solSym[[1]],modo],"Unidade"->"V"|>,{n,nodes}],Table[<|"Local"->"Corrente "<>ToString[cv[[1]]],"ValorNumerico"->formatResult[cv/. solSym[[1]],modo],"Unidade"->"A"|>,{cv,currentVars}]}],"NosLista"->nodes|>];
 response,Throw[<|"Erro"->"Sistema singular. Frequência de ressonância perigosa ou curto."|>]]];
 ExportString[result,"JSON"]];
-
-"Definicoes da API carregadas a partir da V25 (DC e AC intactos, modo S acrescentado). Avalie a celula de testes e, se o resumo estiver correto, a celula CloudDeploy."
