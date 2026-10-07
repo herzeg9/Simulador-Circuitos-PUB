@@ -417,28 +417,28 @@
                 html += '</ul>';
             }
             if (Array.isArray(passo.Raizes) && passo.Raizes.length) {
-                html += '<table class="s-passo-tabela"><thead><tr><th>Valor</th><th>Multiplicidade</th><th>Na origem</th></tr></thead><tbody>';
+                html += '<div class="s-passo-tabela-scroll"><table class="s-passo-tabela"><thead><tr><th>Valor</th><th>Multiplicidade</th><th>Na origem</th></tr></thead><tbody>';
                 passo.Raizes.forEach(r => {
                     const origem = r && r.NaOrigem === true ? 'sim' : (r && r.NaOrigem === false ? 'não' : '—');
                     html += `<tr><td><code>${escaparHtml(r && r.Valor)}</code></td><td>${escaparHtml(r && r.Multiplicidade)}</td><td>${origem}</td></tr>`;
                 });
-                html += '</tbody></table>';
+                html += '</tbody></table></div>';
             }
             if (Array.isArray(passo.Ligacao) && passo.Ligacao.length) {
-                html += '<table class="s-passo-tabela"><thead><tr><th>Incógnita</th><th>Local</th><th>Rótulo</th></tr></thead><tbody>';
+                html += '<div class="s-passo-tabela-scroll"><table class="s-passo-tabela"><thead><tr><th>Incógnita</th><th>Local</th><th>Rótulo</th></tr></thead><tbody>';
                 passo.Ligacao.forEach(l => {
                     const href = '#' + idResultadoS(l && l.Local);
                     html += `<tr><td>${escaparHtml(l && l.Incognita)}</td><td><a class="s-passo-link" href="${escaparHtml(href)}">${escaparHtml(l && l.Local)}</a></td><td>${escaparHtml(l && l.Rotulo)}</td></tr>`;
                 });
-                html += '</tbody></table>';
+                html += '</tbody></table></div>';
             }
             if (Array.isArray(passo.Conferencia) && passo.Conferencia.length) {
-                html += '<table class="s-passo-tabela"><thead><tr><th>Incógnita</th><th>Local</th><th>Tempo</th><th>Confere</th></tr></thead><tbody>';
+                html += '<div class="s-passo-tabela-scroll"><table class="s-passo-tabela"><thead><tr><th>Incógnita</th><th>Local</th><th>Tempo</th><th>Confere</th></tr></thead><tbody>';
                 passo.Conferencia.forEach(c => {
                     const href = '#' + idResultadoS(c && c.Local);
                     html += `<tr><td>${escaparHtml(c && c.Incognita)}</td><td><a class="s-passo-link" href="${escaparHtml(href)}">${escaparHtml(c && c.Local)}</a></td><td><code>${escaparHtml(c && c.Tempo)}</code></td><td>${marcaConferencia(c && c.ConfereComResultados)}</td></tr>`;
                 });
-                html += '</tbody></table>';
+                html += '</tbody></table></div>';
             }
             html += '</div></details>';
         });
