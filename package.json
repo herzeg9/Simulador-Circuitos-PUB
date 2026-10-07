@@ -7,7 +7,8 @@
     "test:visual": "node tests/visual-esquematico.mjs",
     "test:placa": "node tests/placa-netlist.mjs",
     "test:formato": "node tests/formato-resultado.mjs",
-    "test": "npm run test:placa && npm run test:formato && npm run test:esquematico && npm run test:svg && npm run test:visual"
+    "test:s": "node tests/s-dominio.mjs",
+    "test": "npm run test:placa && npm run test:formato && npm run test:s && npm run test:esquematico && npm run test:svg && npm run test:visual"
   },
   "devDependencies": {
     "pixelmatch": "^6.0.0",

@@ -143,6 +143,22 @@ const exemplos = {
             {"Componente": "T1", "Tipo": "Transformer", "Valor": "1:2", "Nos": [1, 0, 2, 0]},
             {"Componente": "R_Carga", "Tipo": "Resistor", "Valor": "100", "Nos": [2, 0]}
         ]
+    },
+    "rc_s": {
+        regime: { modo: 'S' },
+        circuito: [
+            {"Componente": "V1", "Tipo": "VoltageSource", "Valor": "10", "Laplace": {"Tipo": "degrau", "Amplitude": "10"}, "Nos": [1, 0]},
+            {"Componente": "R1", "Tipo": "Resistor", "Valor": "1k", "Nos": [1, 2]},
+            {"Componente": "C1", "Tipo": "Capacitor", "Valor": "100u", "CondicaoInicial": "0", "Nos": [2, 0]}
+        ]
+    },
+    "rl_s": {
+        regime: { modo: 'S' },
+        circuito: [
+            {"Componente": "V1", "Tipo": "VoltageSource", "Valor": "10", "Laplace": {"Tipo": "degrau", "Amplitude": "10"}, "Nos": [1, 0]},
+            {"Componente": "R1", "Tipo": "Resistor", "Valor": "100", "Nos": [1, 2]},
+            {"Componente": "L1", "Tipo": "Inductor", "Valor": "100m", "CondicaoInicial": "0", "Nos": [2, 0]}
+        ]
     }
 };
 
@@ -181,14 +197,8 @@ function carregarExemplo(chave) {
     // componentes, para que as fontes nasçam com os inputs de AC já visíveis
     // (e a fase configurada via campo "Fase" seja aceita pelo .val-input-fase).
     if (regime) {
-        const toggleAc = document.getElementById('toggleModoAc');
-        if (toggleAc) {
-            const queroAc = regime.modo === 'AC';
-            if (toggleAc.checked !== queroAc) {
-                toggleAc.checked = queroAc;
-            }
-            sincronizarModoSimulacao();
-        }
+        const modo = regime.modo === 'AC' ? 'AC' : regime.modo === 'S' ? 'S' : 'DC';
+        definirModoSimulacao(modo);
         if (regime.frequencia != null) {
             const freqEl = document.getElementById('inputFrequenciaAc');
             if (freqEl) freqEl.value = String(regime.frequencia);
@@ -209,6 +219,23 @@ function carregarExemplo(chave) {
                 if (faseEl) faseEl.value = String(comp.Fase);
             }
         }
+        const liCriado = lista.lastElementChild;
+        if (liCriado && comp.CondicaoInicial != null) {
+            const icEl = liCriado.querySelector('.val-input-ic');
+            if (icEl) icEl.value = String(comp.CondicaoInicial);
+        }
+        if (liCriado && comp.Laplace && (comp.Tipo === 'VoltageSource' || comp.Tipo === 'CurrentSource')) {
+            const sel = liCriado.querySelector('.val-input-laplace');
+            const amp = liCriado.querySelector('.val-input-amp');
+            const alpha = liCriado.querySelector('.val-input-alpha');
+            if (sel && comp.Laplace.Tipo) sel.value = String(comp.Laplace.Tipo);
+            if (amp) {
+                const ampVal = comp.Laplace.Amplitude != null ? comp.Laplace.Amplitude : comp.Valor;
+                if (ampVal != null) amp.value = String(ampVal);
+            }
+            if (alpha && comp.Laplace.Alpha != null) alpha.value = String(comp.Laplace.Alpha);
+            ligarCamposDominioS(liCriado);
+        }
     });
 
     _atualizarBotaoApagarExemplo();
@@ -225,7 +252,9 @@ function _mostrarToastRegime(regime) {
     if (!regime) return;
     const msg = regime.modo === 'AC'
         ? `Carregado em modo AC, ${regime.frequencia || '60'} Hz`
-        : 'Carregado em modo DC';
+        : regime.modo === 'S'
+            ? 'Carregado em modo s (Laplace)'
+            : 'Carregado em modo DC';
 
     let toast = document.getElementById('regimeToast');
     if (!toast) {
@@ -237,8 +266,8 @@ function _mostrarToastRegime(regime) {
         document.body.appendChild(toast);
     }
     toast.textContent = msg;
-    toast.classList.remove('regime-toast--ac', 'regime-toast--dc');
-    toast.classList.add(regime.modo === 'AC' ? 'regime-toast--ac' : 'regime-toast--dc');
+    toast.classList.remove('regime-toast--ac', 'regime-toast--dc', 'regime-toast--s');
+    toast.classList.add(regime.modo === 'AC' ? 'regime-toast--ac' : regime.modo === 'S' ? 'regime-toast--s' : 'regime-toast--dc');
 
     // Restart animation: força reflow para reiniciar o fade-out
     toast.classList.remove('is-visible');
@@ -433,10 +462,23 @@ function validarInputValor(input, tipo) {
     }
 }
 
-/** @returns {'DC'|'AC'} */
+/** @returns {'DC'|'AC'|'S'} */
 function getModoSimulacao() {
-    const el = document.getElementById('toggleModoAc');
+    const body = (typeof document !== 'undefined') ? document.body : null;
+    const m = body && body.dataset ? body.dataset.modoSim : undefined;
+    if (m === 'AC' || m === 'S' || m === 'DC') return m;
+    const el = (typeof document !== 'undefined' && document.getElementById)
+        ? document.getElementById('toggleModoAc')
+        : null;
     return el && el.checked ? 'AC' : 'DC';
+}
+
+function definirModoSimulacao(modo) {
+    const m = modo === 'AC' || modo === 'S' ? modo : 'DC';
+    if (document.body && document.body.dataset) document.body.dataset.modoSim = m;
+    const toggle = document.getElementById('toggleModoAc');
+    if (toggle) toggle.checked = m === 'AC';
+    sincronizarModoSimulacao();
 }
 
 function escapeAttr(s) {
@@ -499,7 +541,41 @@ function buildFonteIndepValorHtml(tipo, val) {
         <span class="val-input-wrapper"><input type="text" class="val-input val-input-mod" value="${escapeAttr(v)}" data-tipo="${tipo}"></span>
         <span class="label-val">Fase (°)</span>
         <span class="val-input-wrapper"><input type="text" class="val-input val-input-fase" value="0" data-tipo="${tipo}"></span>
+    </span>
+    <span class="src-val-s" data-laplace="degrau">
+        <span class="label-val">Forma</span>
+        <select class="val-input-laplace" aria-label="Transformada de Laplace da fonte">
+            <option value="degrau">Degrau</option>
+            <option value="impulso">Impulso</option>
+            <option value="exponencial">Exponencial</option>
+        </select>
+        <span class="label-val">Amplitude</span>
+        <span class="val-input-wrapper"><input type="text" class="val-input val-input-amp" value="${escapeAttr(v)}" data-tipo="${tipo}"></span>
+        <span class="src-alpha">
+            <span class="label-val">α</span>
+            <span class="val-input-wrapper"><input type="text" class="val-input val-input-alpha" value="1" data-tipo="${tipo}"></span>
+        </span>
     </span>`;
+}
+
+function htmlCondicaoInicial(rotulo) {
+    return `
+    <span class="src-ic">
+        <span class="label-val">${rotulo}</span>
+        <span class="val-input-wrapper"><input type="text" class="val-input val-input-ic" value="" placeholder="0" inputmode="decimal" autocomplete="off"></span>
+    </span>`;
+}
+
+function ligarCamposDominioS(li) {
+    if (!li) return;
+    const sel = li.querySelector('.val-input-laplace');
+    const box = li.querySelector('.src-val-s');
+    const sync = () => { if (sel && box) box.dataset.laplace = sel.value || 'degrau'; };
+    if (sel && !sel.dataset.ligadoS) {
+        sel.addEventListener('change', sync);
+        sel.dataset.ligadoS = '1';
+    }
+    sync();
 }
 
 function aplicarSufixosValor(valRaw) {
@@ -514,16 +590,29 @@ function aplicarSufixosValor(valRaw) {
 }
 
 /**
- * Sincroniza classe no body, painel de frequência e persistência do modo DC/AC.
+ * Sincroniza classe no body, painéis de AC/s e persistência do modo.
  */
 function sincronizarModoSimulacao() {
-    const ac = getModoSimulacao() === 'AC';
+    const modo = getModoSimulacao();
+    const ac = modo === 'AC';
+    const sdom = modo === 'S';
     document.body.classList.toggle('modo-ac', ac);
+    document.body.classList.toggle('modo-s', sdom);
     const painel = document.getElementById('painelConfigAc');
     if (painel) painel.hidden = !ac;
+    const painelS = document.getElementById('painelConfigS');
+    if (painelS) painelS.hidden = !sdom;
+    document.querySelectorAll('.modo-sim-btn').forEach(btn => {
+        const on = btn.dataset.modo === modo;
+        btn.classList.toggle('is-active', on);
+        btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
     try {
-        localStorage.setItem('simModoAc', ac ? '1' : '0');
+        localStorage.setItem('simModo', modo);
     } catch (e) { /* ignore */ }
+    if (typeof window !== 'undefined' && window.Placa && typeof window.Placa.aoMudarModo === 'function') {
+        window.Placa.aoMudarModo();
+    }
 }
 
 function anexarListenersValorFonte(li, tipo) {
@@ -642,6 +731,8 @@ function add(tipo, nomeFixo=null, nosInput=null, val=null, alvo=null) {
     if (tipo === 'VoltageSource' || tipo === 'CurrentSource') {
         valorSecaoHtml = buildFonteIndepValorHtml(tipo, val);
     }
+    if (tipo === 'Capacitor') valorSecaoHtml += htmlCondicaoInicial('v(0)');
+    if (tipo === 'Inductor') valorSecaoHtml += htmlCondicaoInicial('i(0)');
 
     // Estrutura HTML personalizada do componente na interface
     const btnRelacionarStyle = (tipo === 'Transformer') ? 'display:none;' : '';
@@ -695,6 +786,7 @@ function add(tipo, nomeFixo=null, nosInput=null, val=null, alvo=null) {
             }
         }
     }
+    ligarCamposDominioS(li);
 }
 
 /**
@@ -751,7 +843,20 @@ function gerarJSON() {
             return;
         }
 
-        if (modo === 'AC' && fonteIndep) {
+        if (modo === 'S' && fonteIndep) {
+            const ampIn = item.querySelector('.val-input-amp');
+            const tipoIn = item.querySelector('.val-input-laplace');
+            const alphaIn = item.querySelector('.val-input-alpha');
+            let ampRaw = (ampIn && ampIn.value.trim()) ? ampIn.value.trim() : '';
+            const tipoL = (tipoIn && tipoIn.value) ? tipoIn.value : 'degrau';
+            let alphaRaw = (alphaIn && alphaIn.value.trim()) ? alphaIn.value.trim() : '0';
+            if (ampRaw) ampRaw = aplicarSufixosValor(ampRaw.replace(/\s+/g, ''));
+            else ampRaw = nomeComp(item);
+            if (alphaRaw) alphaRaw = aplicarSufixosValor(alphaRaw.replace(/\s+/g, ''));
+            compObj["Valor"] = ampRaw;
+            const tipoApi = { degrau: 'step', impulso: 'impulse', exponencial: 'exponential' }[tipoL] || 'step';
+            compObj["Laplace"] = { "Tipo": tipoApi, "Amplitude": ampRaw, "Alpha": alphaRaw };
+        } else if (modo === 'AC' && fonteIndep) {
             const modIn = item.querySelector('.val-input-mod');
             const faseIn = item.querySelector('.val-input-fase');
             let modRaw = (modIn && modIn.value.trim()) ? modIn.value.trim() : '';
@@ -789,6 +894,17 @@ function gerarJSON() {
             compObj["Valor"] = valRaw;
         }
 
+        if (modo === 'S' && (tipo === 'Capacitor' || tipo === 'Inductor')) {
+            const icEl = item.querySelector('.val-input-ic');
+            const icRaw = icEl ? icEl.value.trim().replace(/\s+/g, '') : '';
+            const icEnvio = icRaw ? aplicarSufixosValor(icRaw) : '';
+            /* v0 / i0 são o contrato com o notebook da V25 estendida.
+               CondicaoInicial permanece como alias, lido pelo mesmo notebook. */
+            if (tipo === 'Capacitor') compObj["v0"] = icEnvio;
+            else compObj["i0"] = icEnvio;
+            compObj["CondicaoInicial"] = icEnvio;
+        }
+
         if (tipo === 'CCVS' || tipo === 'CCCS') {
             const alvoEl = item.querySelector('.alvo-comp');
             compObj["Alvo"] = alvoEl ? alvoEl.value.trim() : '';
@@ -806,9 +922,55 @@ function gerarJSON() {
     return { "Config": config, "Netlist": netlist };
 }
 
+function lerNosItem(item) {
+    const nos = [];
+    for (const sel of ['.no-a', '.no-b', '.no-c', '.no-d']) {
+        const el = item.querySelector(sel);
+        if (!el) break;
+        const t = String(el.value ?? '').trim();
+        const n = Number(t);
+        nos.push(t !== '' && Number.isInteger(n) && n >= 0 ? n : NaN);
+    }
+    return nos;
+}
+
+/**
+ * Checagens do modo s, com as mesmas frases do notebook.
+ * Marca o campo que falta. Não roda em DC/AC.
+ * @param {Element[]} itens
+ * @returns {string[]}
+ */
+function mensagensValidacaoDominioS(itens) {
+    if (typeof validarNetlistDominioS !== 'function') return [];
+    const lista = itens.map(item => ({
+        _el: item,
+        Componente: (item.querySelector('.nome-comp')?.value || '').trim() || 'sem nome',
+        Tipo: item.dataset.tipo,
+        Nos: lerNosItem(item),
+        CondicaoInicial: item.querySelector('.val-input-ic')?.value ?? '',
+        Alvo: item.querySelector('.alvo-comp')?.value ?? ''
+    }));
+    const erros = validarNetlistDominioS(lista);
+    itens.forEach(item => {
+        item.querySelectorAll('.val-input-ic, .alvo-comp, .no-c, .no-d').forEach(el => el.classList.remove('error'));
+    });
+    erros.forEach(e => {
+        const item = lista.find(c => c.Componente === e.nome);
+        if (!item) return;
+        if (e.campo === 'ic') item._el.querySelector('.val-input-ic')?.classList.add('error');
+        if (e.campo === 'alvo') item._el.querySelector('.alvo-comp')?.classList.add('error');
+        if (e.campo === 'ctrl') {
+            item._el.querySelector('.no-c')?.classList.add('error');
+            item._el.querySelector('.no-d')?.classList.add('error');
+        }
+    });
+    return erros.map(e => e.mensagem);
+}
+
 /**
  * Valida todos os componentes antes de enviar para a API.
  * Verifica se há valores negativos em Resistências ou Capacitâncias.
+ * No modo s, também exige v(0)/i(0) e referência de controle resolvida.
  * @returns {Object} - {valido: boolean, erros: Array<string>}
  */
 function validarAntesEnvio() {
@@ -849,6 +1011,10 @@ function validarAntesEnvio() {
             `conecte um dos seus nós ao nó <code>0</code> (GND).`
         );
     });
+
+    if (getModoSimulacao() === 'S') {
+        erros.push(...mensagensValidacaoDominioS(itensArr));
+    }
 
     return {
         valido: erros.length === 0,
@@ -1664,6 +1830,7 @@ function _diagramaImpedanciaSvg(z) {
  */
 function renderPainelImpedancias(container) {
     const modo = getModoSimulacao();
+    if (modo === 'S') return;
     const omega = _omegaAtual();
     const top = getTopologiaAtual();
     const passivos = top.filter(c => c.tipo === 'Resistor' || c.tipo === 'Capacitor' || c.tipo === 'Inductor');
@@ -1831,7 +1998,8 @@ function normalizarIdComponenteMNA(id) {
  * @returns {string}
  */
 function idComponenteEquacaoMNA(eq) {
-    const ids = [...String(eq).matchAll(/\bi\s*\(\s*([A-Za-z][A-Za-z0-9_]*)\s*\)/g)].map(m => m[1]);
+    const ids = [...String(eq).matchAll(/\bi\s*(?:\(\s*([A-Za-z][A-Za-z0-9_]*)\s*\)|\[\s*"([A-Za-z][A-Za-z0-9_]*)"\s*\])/g)]
+        .map(m => m[1] || m[2]);
     if (!ids.length) return 'outros';
     const bases = [...new Set(ids.map(normalizarIdComponenteMNA))];
     if (bases.length === 1) return bases[0];
@@ -1852,27 +2020,31 @@ function formatarEquacaoMNA(eq) {
  * Separa equações MNA em KCL (por nó) e leis constitutivas (por componente).
  * A ordem segue o backend: |NosLista| equações KCL, depois uma ou mais por componente.
  *
- * @param {string[]} equacoes
+ * @param {string[]} equacoes - usadas para agrupar (InputForm, i["R1"] ou i(R1))
  * @param {number[]} [nosLista]
  * @param {object[]} [netlist]
+ * @param {string[]} [equacoesExibir] - texto paralelo (TeX) com o mesmo comprimento
  * @returns {{ kcl: {no:number, eq:string}[], constitutivas: {id:string, tipo:string|null, eqs:string[]}[] }}
  */
-function organizarEquacoesMNA(equacoes, nosLista, netlist) {
+function organizarEquacoesMNA(equacoes, nosLista, netlist, equacoesExibir) {
     const todas = Array.isArray(equacoes) ? equacoes : [];
+    const exibir = Array.isArray(equacoesExibir) && equacoesExibir.length === todas.length
+        ? equacoesExibir
+        : todas;
     const nos = Array.isArray(nosLista) ? nosLista : [];
     const kclCount = nos.length > 0 && nos.length <= todas.length ? nos.length : 0;
 
     const kcl = [];
     for (let i = 0; i < kclCount; i++) {
-        kcl.push({ no: nos[i], eq: todas[i] });
+        kcl.push({ no: nos[i], eq: exibir[i] });
     }
 
     const restantes = todas.slice(kclCount);
     const grupos = new Map();
-    restantes.forEach(eq => {
+    restantes.forEach((eq, idx) => {
         const id = idComponenteEquacaoMNA(eq);
         if (!grupos.has(id)) grupos.set(id, { id, tipo: null, eqs: [] });
-        grupos.get(id).eqs.push(eq);
+        grupos.get(id).eqs.push(exibir[kclCount + idx]);
     });
 
     const tipoPorId = new Map();
@@ -1902,16 +2074,32 @@ function organizarEquacoesMNA(equacoes, nosLista, netlist) {
  *
  * @param {object} dados - Resposta da API (Equacoes, NosLista)
  * @param {object[]} listaComp - Netlist enviada ao servidor
- * @param {{ modoAc?: boolean, topPassivos?: boolean }} [opts]
+ * @param {{ modoAc?: boolean, topPassivos?: boolean, modoS?: boolean, equacoesExibir?: string[]|null }} [opts]
  * @returns {string}
  */
-function renderCardEquacoesMNA(dados, listaComp, opts = {}) {
-    const { modoAc = false, topPassivos = false } = opts;
-    const notaReatancias = (modoAc && topPassivos)
-        ? `<p class="mna-reatancias-nota">Reatâncias substituídas automaticamente: <code>Z_L = jωL</code> para indutores, <code>Z_C = 1/(jωC)</code> para capacitores. O detalhamento numérico está no painel <em>Impedâncias do circuito</em> abaixo.</p>`
-        : '';
+function escaparHtmlTex(s) {
+    return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
 
-    const { kcl, constitutivas } = organizarEquacoesMNA(dados.Equacoes, dados.NosLista, listaComp);
+function htmlFormulaMNA(eq, usarTex, modoS) {
+    if (usarTex) return `<div class="formula mna-formula">\\[ ${escaparHtmlTex(eq)} \\]</div>`;
+    if (modoS) return `<div class="formula mna-formula"><code>${escapeXml(eq)}</code></div>`;
+    return `<div class="formula mna-formula">\` ${formatarEquacaoMNA(eq)} \`</div>`;
+}
+
+function renderCardEquacoesMNA(dados, listaComp, opts = {}) {
+    const { modoAc = false, topPassivos = false, modoS = false } = opts;
+    const tex = modoS && Array.isArray(opts.equacoesExibir) && opts.equacoesExibir.length === (dados.Equacoes || []).length
+        ? opts.equacoesExibir
+        : null;
+    const usarTex = !!tex;
+    const notaReatancias = modoS
+        ? `<p class="mna-reatancias-nota">O desenho do circuito continua com C e L. No sistema, o capacitor entra como <code>1/(sC)</code> em série com a fonte <code>v(0)/s</code>, e o indutor como <code>sL</code> em série com <code>−L·i(0)</code>.</p>`
+        : (modoAc && topPassivos)
+            ? `<p class="mna-reatancias-nota">Reatâncias substituídas automaticamente: <code>Z_L = jωL</code> para indutores, <code>Z_C = 1/(jωC)</code> para capacitores. O detalhamento numérico está no painel <em>Impedâncias do circuito</em> abaixo.</p>`
+            : '';
+
+    const { kcl, constitutivas } = organizarEquacoesMNA(dados.Equacoes, dados.NosLista, listaComp, tex);
 
     let html = `<div class="card card-mna">
         <h3 class="section-title">1. Equações do Sistema (MNA)</h3>
@@ -1924,13 +2112,12 @@ function renderCardEquacoesMNA(dados, listaComp, opts = {}) {
             <p class="mna-secao-hint">Em cada nó, a soma algébrica das correntes dos ramos conectados é zero.</p>
             <div class="mna-no-grid">`;
         kcl.forEach(({ no, eq }) => {
-            const limpa = formatarEquacaoMNA(eq);
             html += `<div class="mna-no-bloco">
                 <div class="mna-no-cabecalho">
                     <span class="mna-no-badge">Nó ${no}</span>
                     <span class="mna-no-legenda">tensão desconhecida <code>v(${no})</code></span>
                 </div>
-                <div class="formula mna-formula">\` ${limpa} \`</div>
+                ${htmlFormulaMNA(eq, usarTex, modoS)}
             </div>`;
         });
         html += `</div></section>`;
@@ -1954,8 +2141,7 @@ function renderCardEquacoesMNA(dados, listaComp, opts = {}) {
                     ${meta ? `<span class="mna-comp-meta">${meta}</span>` : ''}
                 </div>`;
             eqs.forEach(eq => {
-                const limpa = formatarEquacaoMNA(eq);
-                html += `<div class="formula mna-formula">\` ${limpa} \`</div>`;
+                html += htmlFormulaMNA(eq, usarTex, modoS);
             });
             html += `</div>`;
         });
@@ -1963,9 +2149,8 @@ function renderCardEquacoesMNA(dados, listaComp, opts = {}) {
     }
 
     if (kcl.length === 0 && constitutivas.length === 0) {
-        (dados.Equacoes || []).forEach(eq => {
-            const limpa = formatarEquacaoMNA(eq);
-            html += `<div class="formula mna-formula">\` ${limpa} \`</div>`;
+        (tex || dados.Equacoes || []).forEach(eq => {
+            html += htmlFormulaMNA(eq, usarTex, modoS);
         });
     }
 
@@ -2256,6 +2441,83 @@ function _setupFasorTogglesInteratividade(card) {
  * Exibe também indicadores de carregamento, trata erros e mostra resultados múltiplos (equações, superposição, malhas etc.).
  * @returns {Promise<void>}
  */
+/**
+ * Resolução simbólica do modo s: equações em TeX, modelo série de C/L,
+ * expressões e, quando a inversa veio amostrada, o gráfico y(t).
+ */
+function renderResolucaoDominioS(dados, listaComp, container) {
+    const eqs = Array.isArray(dados.Equacoes) ? dados.Equacoes : [];
+    const tex = Array.isArray(dados.EquacoesTeX) && dados.EquacoesTeX.length === eqs.length
+        ? dados.EquacoesTeX
+        : null;
+    container.innerHTML = renderCardEquacoesMNA(dados, listaComp, { modoS: true, equacoesExibir: tex });
+
+    if (Array.isArray(dados.Substituicoes) && dados.Substituicoes.length) {
+        const rows = dados.Substituicoes.map(s => {
+            const modelo = (typeof modeloSerieS === 'function') ? modeloSerieS(s.Tipo) : null;
+            const z = s.Impedancia || (modelo && modelo.impedancia) || '';
+            const fs = s.FonteSerie || (modelo && modelo.fonteSerie) || '';
+            return `<tr>
+                <td><strong>${escapeXml(s.Componente)}</strong></td>
+                <td>${escapeXml(s.Tipo || '')}</td>
+                <td><code>${escapeXml(z)}</code></td>
+                <td><code>${escapeXml(fs)}</code></td>
+                <td>${escapeXml(s.CondicaoInicial ?? '')}</td>
+            </tr>`;
+        }).join('');
+        container.insertAdjacentHTML('beforeend', `
+            <div class="card card-sdominio">
+                <h3 class="section-title">2. Modelo em s</h3>
+                <p>O símbolo na placa e na lista continua C ou L. No sistema, o capacitor entra como <code>1/(sC)</code> em série com <code>v(0)/s</code>, e o indutor como <code>sL</code> em série com <code>−L·i(0)</code>.</p>
+                <table class="s-modelo-table">
+                    <thead><tr><th>Comp.</th><th>Tipo</th><th>Impedância</th><th>Fonte série</th><th>Condição inicial</th></tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>`);
+    }
+
+    if (dados.Aviso) {
+        container.insertAdjacentHTML('beforeend',
+            `<div class="card card-aviso"><h3 class="section-title">Aviso</h3><p>${escapeXml(dados.Aviso)}</p></div>`);
+    }
+
+    if (!Array.isArray(dados.Resultados)) return;
+    let html = `<div class="card card-resultados card-sdominio"><h3 class="section-title">3. Resultados em s</h3>`;
+    let plots = '';
+    dados.Resultados.forEach(r => {
+        const texR = r.ExpressaoTeX || r.Expressao || '';
+        html += `<div class="resultado-linha"><strong>${escapeXml(r.Local)}:</strong>`;
+        html += texR
+            ? `<div class="formula">\\[ ${escaparHtmlTex(texR)} \\]</div>`
+            : `<div class="numeric-result">${escapeXml(r.ValorNumerico || '')}</div>`;
+        html += `</div>`;
+        if (r.Tempo && (r.Tempo.ExpressaoTeX || r.Tempo.Expressao)) {
+            const texT = r.Tempo.ExpressaoTeX || r.Tempo.Expressao;
+            html += `<div class="resultado-linha"><span>y(t)</span><div class="formula">\\[ ${escaparHtmlTex(texT)} \\]</div></div>`;
+        }
+        if (r.Tempo && typeof svgAmostrasTemporais === 'function') {
+            const svg = svgAmostrasTemporais(r.Tempo.Amostras, {
+                titulo: r.Local || '',
+                unidade: r.Unidade || ''
+            });
+            if (svg) plots += `<div class="s-tempo-item">${svg}</div>`;
+        }
+    });
+    html += `</div>`;
+    if (plots) {
+        html += `<div class="card card-sdominio"><h3 class="section-title">4. Resposta no tempo</h3><div class="s-tempo-grid">${plots}</div></div>`;
+    }
+    container.insertAdjacentHTML('beforeend', html);
+}
+
+function avisoApiSemDominioS() {
+    return `<div class="card card-aviso">
+        <h3 class="section-title">A nuvem ainda responde em DC</h3>
+        <p>O circuito passou na validação do modo s, mas o objeto <code>simulador-circuitos-api-v2</code> não devolveu expressões em s. Os números de uma análise DC (capacitor aberto, indutor em curto) não são o resultado de Laplace, então eles não aparecem aqui.</p>
+        <p>Importe <code>wolfram/simulador-circuitos-api-v2.nb</code>, avalie a célula de definições e, em seguida, a célula CloudDeploy do mesmo objeto.</p>
+    </div>`;
+}
+
 async function calcular() {
     const divRes = document.getElementById('resultado');
     const load = document.getElementById('loading');
@@ -2299,7 +2561,17 @@ async function calcular() {
         divRes.innerHTML = "";
 
         if (dados.Erro) {
-            divRes.innerHTML = `<div class="card card-erro"><h3 class="section-title">Erro do servidor</h3><p>${dados.Erro}</p></div>`;
+            divRes.innerHTML = `<div class="card card-erro"><h3 class="section-title">Erro do servidor</h3><p>${escapeXml(dados.Erro)}</p></div>`;
+            return;
+        }
+
+        if (getModoSimulacao() === 'S') {
+            if (typeof respostaEhDominioS !== 'function' || !respostaEhDominioS(dados)) {
+                divRes.innerHTML = avisoApiSemDominioS();
+                return;
+            }
+            renderResolucaoDominioS(dados, listaComp, divRes);
+            renderMathJaxSafe();
             return;
         }
 
@@ -2504,7 +2776,8 @@ function escapeXml(s) {
 function getTopologiaAtual() {
     const itens = document.querySelectorAll('.comp-item');
     const lista = [];
-    const modoAc = getModoSimulacao() === 'AC';
+    const modo = getModoSimulacao();
+    const modoAc = modo === 'AC';
     itens.forEach(item => {
         if (item.dataset.removing === '1') return;
         const tipo = item.dataset.tipo;
@@ -2533,6 +2806,14 @@ function getTopologiaAtual() {
                 const m = (mod?.value || '').trim();
                 const f = (fas?.value || '0').trim();
                 valor = m ? (f && f !== '0' ? `${m}∠${f}°` : m) : '';
+            } else if (modo === 'S') {
+                const amp = (item.querySelector('.val-input-amp')?.value || '').trim();
+                const tipoL = item.querySelector('.val-input-laplace')?.value || 'degrau';
+                const alpha = (item.querySelector('.val-input-alpha')?.value || '').trim();
+                const forma = tipoL === 'impulso' ? 'δ(t)'
+                    : tipoL === 'exponencial' ? `e^{−${alpha || 'α'}t}`
+                    : 'u(t)';
+                valor = amp ? `${amp} ${forma}` : forma;
             } else {
                 valor = (dc?.value || '').trim();
             }
@@ -4017,10 +4298,14 @@ function coletarEstadoCompleto() {
                 c: item.querySelector('.no-c')?.value ?? null,
                 d: item.querySelector('.no-d')?.value ?? null
             },
-            valor: item.querySelector('.val-input:not(.val-input-dc):not(.val-input-mod):not(.val-input-fase)')?.value ?? null,
+            valor: item.querySelector('.val-input:not(.val-input-dc):not(.val-input-mod):not(.val-input-fase):not(.val-input-amp):not(.val-input-alpha):not(.val-input-ic)')?.value ?? null,
             valorDc: item.querySelector('.val-input-dc')?.value ?? null,
             valorMod: item.querySelector('.val-input-mod')?.value ?? null,
             valorFase: item.querySelector('.val-input-fase')?.value ?? null,
+            valorAmp: item.querySelector('.val-input-amp')?.value ?? null,
+            laplaceTipo: item.querySelector('.val-input-laplace')?.value ?? null,
+            laplaceAlpha: item.querySelector('.val-input-alpha')?.value ?? null,
+            condicaoInicial: item.querySelector('.val-input-ic')?.value ?? null,
             alvo: item.querySelector('.alvo-comp')?.value ?? null,
             seriesMeta
         });
@@ -4083,11 +4368,7 @@ function restaurarEstadoSalvo(state) {
 
     limparTudo();
 
-    const toggleAc = document.getElementById('toggleModoAc');
-    if (toggleAc) {
-        toggleAc.checked = state.modo === 'AC';
-        sincronizarModoSimulacao();
-    }
+    definirModoSimulacao(state.modo === 'AC' || state.modo === 'S' ? state.modo : 'DC');
     const freqEl = document.getElementById('inputFrequenciaAc');
     if (freqEl && state.frequencia != null) freqEl.value = state.frequencia;
 
@@ -4125,7 +4406,17 @@ function restaurarEstadoSalvo(state) {
             if (dcEl && comp.valorDc != null) dcEl.value = comp.valorDc;
             if (modEl && comp.valorMod != null) modEl.value = comp.valorMod;
             if (faseEl && comp.valorFase != null) faseEl.value = comp.valorFase;
+            const ampEl = li.querySelector('.val-input-amp');
+            const alphaEl = li.querySelector('.val-input-alpha');
+            const lapEl = li.querySelector('.val-input-laplace');
+            if (ampEl && comp.valorAmp != null) ampEl.value = comp.valorAmp;
+            if (alphaEl && comp.laplaceAlpha != null) alphaEl.value = comp.laplaceAlpha;
+            if (lapEl && comp.laplaceTipo) lapEl.value = comp.laplaceTipo;
+            ligarCamposDominioS(li);
         }
+
+        const icEl = li.querySelector('.val-input-ic');
+        if (icEl && comp.condicaoInicial != null) icEl.value = comp.condicaoInicial;
 
         if (comp.uid) li.dataset.uid = comp.uid;
 
@@ -4306,8 +4597,12 @@ const _TOOLTIPS = {
     'val-input-dc': 'Valor DC. Aceita sufixos k/M/m/u/n/p.',
     'val-input-mod': 'Módulo (amplitude) da fonte AC. Aceita sufixos k/M/m/u/n/p. Aceita também forma retangular: "3+4j" (matemática) ou "3+j4" (engenharia) — o campo Fase é calculado automaticamente.',
     'val-input-fase': 'Fase em graus. Pode ser negativa (ex: -30). Ignorada se o Módulo for digitado em forma retangular "a+bj" / "a+jb".',
+    'val-input-ic': 'Condição inicial no modo s. Capacitor: v(0). Indutor: i(0). Digite 0 se o componente começa em repouso. Campo vazio bloqueia o envio.',
+    'val-input-amp': 'Amplitude A da fonte no modo s. Degrau A·u(t) → A/s, impulso A·δ(t) → A, exponencial A·e^{−αt} → A/(s+α).',
+    'val-input-laplace': 'Forma da fonte no modo s: degrau, impulso ou exponencial.',
+    'val-input-alpha': 'Decaimento α de e^{−αt}. Só entra na conta quando a forma é exponencial.',
     'nome-comp': 'Nome do componente. Deve ser único.',
-    'alvo-comp': 'Nome do componente cuja corrente serve de referência. Deve existir na lista.'
+    'alvo-comp': 'Nome do componente cuja corrente serve de referência. Deve existir na lista. No modo s, Alvo vazio ou inexistente bloqueia o envio.'
 };
 
 /**
@@ -4746,18 +5041,28 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    const toggleAc = document.getElementById('toggleModoAc');
-    if (toggleAc) {
-        try {
-            if (localStorage.getItem('simModoAc') === '1') {
-                toggleAc.checked = true;
-            }
-        } catch (e) { /* ignore */ }
-        toggleAc.addEventListener('change', () => {
-            sincronizarModoSimulacao();
+    try {
+        let modoSalvo = localStorage.getItem('simModo');
+        if (modoSalvo !== 'AC' && modoSalvo !== 'S' && modoSalvo !== 'DC') {
+            modoSalvo = localStorage.getItem('simModoAc') === '1' ? 'AC' : 'DC';
+        }
+        definirModoSimulacao(modoSalvo);
+    } catch (e) {
+        definirModoSimulacao('DC');
+    }
+    document.querySelectorAll('.modo-sim-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            definirModoSimulacao(btn.dataset.modo);
             _mostrarToastModoAtual();
         });
-        sincronizarModoSimulacao();
+    });
+    const toggleAc = document.getElementById('toggleModoAc');
+    if (toggleAc) {
+        toggleAc.addEventListener('change', () => {
+            if (document.body.dataset.modoSim === 'S') return;
+            definirModoSimulacao(toggleAc.checked ? 'AC' : 'DC');
+            _mostrarToastModoAtual();
+        });
     }
 
     // FASE 5.1: restaura convenção temporal cos/sen do localStorage e

@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Laboratório PUB 2025 - Versão Master</title>
     
-    <script>MathJax = {loader: {load: ['input/asciimath', 'output/chtml']}, asciimath: {delimiters: [['`','`']]}};</script>
+    <script>MathJax = {loader: {load: ['input/asciimath', 'input/tex', 'output/chtml']}, asciimath: {delimiters: [['`','`']]}};</script>
     <script type="text/javascript" id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/startup.js"></script>
 
-    <link rel="stylesheet" href="styles.css?v=20261006-ctrl">
+    <link rel="stylesheet" href="styles.css?v=20261007-s">
 </head>
 <body>
 
@@ -36,6 +36,7 @@
                     <li>O <strong>nome</strong> de cada componente (R1, V1, etc.) &eacute; edit&aacute;vel mas deve ser &uacute;nico.</li>
                     <li>No modo <strong>AC</strong>, fontes independentes recebem <strong>m&oacute;dulo</strong> (amplitude) e <strong>fase</strong> em graus.</li>
                     <li>No modo <strong>DC</strong>, fontes t&ecirc;m um &uacute;nico valor num&eacute;rico.</li>
+                    <li>No modo <strong>s</strong>, o c&aacute;lculo &eacute; simb&oacute;lico em <em>s</em>. C e L continuam desenhados como capacitor e indutor; <code>v(0)</code> e <code>i(0)</code> s&atilde;o obrigat&oacute;rios.</li>
                     <li>O bot&atilde;o <strong>+</strong> em cada card abre um di&aacute;logo para inserir um novo componente <em>em s&eacute;rie</em> ou <em>em paralelo</em> com o atual &mdash; sem precisar gerenciar n&oacute;s manualmente.</li>
                 </ul>
             </div>
@@ -113,6 +114,21 @@
 
         <details class="ajuda-section ajuda-section--nested">
             <summary class="ajuda-summary">
+                <span>Dom&iacute;nio s (Laplace)</span>
+            </summary>
+            <div class="ajuda-content">
+                <p>O modo <strong>s</strong> resolve o circuito com a vari&aacute;vel complexa <em>s</em>. Na placa e na lista, capacitor e indutor continuam com o s&iacute;mbolo de sempre. A troca s&oacute; entra na equa&ccedil;&atilde;o enviada &agrave; Wolfram:</p>
+                <ul>
+                    <li>Capacitor: imped&acirc;ncia <code>1/(sC)</code> em s&eacute;rie com a fonte <code>v(0)/s</code>.</li>
+                    <li>Indutor: imped&acirc;ncia <code>sL</code> em s&eacute;rie com a fonte <code>&minus;L&middot;i(0)</code>.</li>
+                </ul>
+                <p><code>v(0)</code> e <code>i(0)</code> s&atilde;o obrigat&oacute;rios. Use <strong>0</strong> se o componente come&ccedil;a em repouso. Fontes independentes podem ser degrau (<code>A/s</code>), impulso (<code>A</code>) ou exponencial <code>A&middot;e<sup>&minus;&alpha;t</sup></code> (<code>A/(s+&alpha;)</code>).</p>
+                <p class="ajuda-nota">Uma fonte dependente (E, G, H ou F) sem a refer&ecirc;ncia de controle ligada &mdash; pinos Ctrl+/Ctrl&minus; ou campo Alvo &mdash; impede o c&aacute;lculo.</p>
+            </div>
+        </details>
+
+        <details class="ajuda-section ajuda-section--nested">
+            <summary class="ajuda-summary">
                 <span>Fontes dependentes (controladas)</span>
             </summary>
             <div class="ajuda-content">
@@ -175,14 +191,12 @@
     <div class="main-layout">
         <div class="input-panel">
             <div class="panel-top-bar">
-                <div class="modo-sim-toggle-wrap" title="Modo de simulação">
-                    <span class="modo-sim-text modo-sim-text--dc">DC</span>
-                    <label class="switch switch-modo-sim">
-                        <input type="checkbox" id="toggleModoAc" aria-label="Alternar entre modo DC e AC">
-                        <span class="slider slider-modo-sim"></span>
-                    </label>
-                    <span class="modo-sim-text modo-sim-text--ac">AC</span>
+                <div class="modo-sim-toggle-wrap" role="radiogroup" aria-label="Modo de simulação" title="DC, AC (jω) ou domínio s (Laplace)">
+                    <button type="button" class="modo-sim-btn is-active" data-modo="DC" aria-pressed="true">DC</button>
+                    <button type="button" class="modo-sim-btn" data-modo="AC" aria-pressed="false">AC</button>
+                    <button type="button" class="modo-sim-btn" data-modo="S" aria-pressed="false">s</button>
                 </div>
+                <input type="checkbox" id="toggleModoAc" class="modo-sim-check-legado" hidden aria-hidden="true" tabindex="-1">
             </div>
 
             <div id="painelConfigAc" class="sim-config-ac" hidden>
@@ -201,6 +215,12 @@
                     </label>
                 </fieldset>
             </div>
+
+            <div id="painelConfigS" class="sim-config-s" hidden>
+                <div class="sim-config-s__title">Domínio s (Laplace)</div>
+                <p>C e L continuam desenhados como estão. Na resolução, o capacitor entra como <code>1/(sC)</code> em série com <code>v(0)/s</code>, e o indutor como <code>sL</code> em série com <code>−L·i(0)</code>.</p>
+                <p>Preencha <strong>v(0)</strong> e <strong>i(0)</strong> (use 0 se o componente começa em repouso). Fontes: degrau <code>A/s</code>, impulso <code>A</code> ou exponencial <code>A/(s+α)</code>.</p>
+            </div>
             
             <label style="font-weight:bold; color:#3498db;">Biblioteca:</label>
             <div class="biblioteca-row">
@@ -217,6 +237,10 @@
                     <optgroup label="Reativos (impedâncias L/C)">
                         <option value="capacitor_dc">RC s&eacute;rie (bloqueio em DC, filtro em AC)</option>
                         <option value="indutor_dc">RL s&eacute;rie (curto em DC, filtro em AC)</option>
+                    </optgroup>
+                    <optgroup label="Dom&iacute;nio s (Laplace)">
+                        <option value="rc_s">RC s&eacute;rie com degrau (v(0) = 0)</option>
+                        <option value="rl_s">RL s&eacute;rie com degrau (i(0) = 0)</option>
                     </optgroup>
                     <optgroup label="An&aacute;lise AC (fases + frequência)">
                         <option value="misto">Malhas com 2 fontes (AC)</option>
@@ -413,7 +437,8 @@
         </form>
     </dialog>
 
-    <script src="script.js?v=20260926-seta"></script>
-    <script src="placa.js?v=20261006-ctrl"></script>
+    <script src="sdominio.js?v=20261007-s"></script>
+    <script src="script.js?v=20261007-s"></script>
+    <script src="placa.js?v=20261007-s"></script>
 </body>
 </html>
