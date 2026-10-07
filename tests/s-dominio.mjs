@@ -240,6 +240,13 @@ console.log('Passos da MNA');
     verificar('título desconhecido usa o texto da API', desconhecido.includes('linha um') && desconhecido.includes('linha dois') && desconhecido.includes('forma fechada'));
     const semControle = htmlPassosDominioS([{ Titulo: '1. Incógnitas', Texto: 'Só tensões de nó.', TeX: [], Incognitas: ['E1'] }]);
     verificar('sem CCCS não cita corrente de controle', semControle.includes('Tensões de nó') && !semControle.includes('usa'));
+    const nomeComUnderscore = htmlPassosDominioS([{
+        Titulo: '1. Incógnitas',
+        Texto: 'Correntes de controle de CCVS/CCCS (F_BJT usa a corrente de R_Base).',
+        TeX: [],
+        Incognitas: ['E1']
+    }]);
+    verificar('nome com _ na corrente de controle', nomeComUnderscore.includes('F_BJT usa') && nomeComUnderscore.includes('I_{R_Base}'));
     const comNota = htmlPassosDominioS([{ Titulo: '7. Solução', Texto: 'Não há forma fechada para este caso.', TeX: [] }]);
     verificar('nota de forma fechada permanece', comNota.includes('Cada') && comNota.includes('Não há forma fechada'));
     const indisponivel = htmlPassosDominioS({ Indisponivel: 'A matriz não foi fatorada.' });

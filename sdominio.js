@@ -580,7 +580,7 @@
         if (!/CCCS|CCVS/i.test(textos)) return '';
         const vistos = new Set();
         const linhas = [];
-        const re = /([A-Za-z]+\d+)\s+usa a corrente de\s+([A-Za-z][A-Za-z0-9]*)/gi;
+        const re = /([A-Za-z][A-Za-z0-9_]*)\s+usa a corrente de\s+([A-Za-z][A-Za-z0-9_]*)/gi;
         let m;
         while ((m = re.exec(textos))) {
             const chave = `${m[1]}|${m[2]}`;
