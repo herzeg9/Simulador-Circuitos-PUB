@@ -209,13 +209,14 @@ console.log('Passos da MNA');
     verificar('título da resolução', html.includes('Resolução passo a passo (MNA)'));
     verificar('oito passos sem a convenção', (html.match(/<details class="s-passo"/g) || []).length === 8 && !html.includes('Convenção do site'));
     verificar('renumerados de 1 a 8', [1, 2, 3, 4, 5, 6, 7, 8].every(n => html.includes(`>${n}</span>`)) && html.includes('Passo 1 de 8'));
-    verificar('texto quebrado em parágrafos', html.includes('Tensões de nó') && html.includes('s = 0 (multiplicidade 2)'));
+    verificar('textos curtos', html.includes('Tensões de nó (terra = nó 0)') && html.includes('F1 usa') && html.includes('I_{L1}') && html.includes('Frações parciais') && !html.includes('Conferência com as respostas') && !html.includes('multiplicidade 2) —'));
+    verificar('regras do tempo', html.includes('class="s-regras"') && html.includes('\\tfrac{t^k}{k!}e^{pt}') && html.includes('\\delta(t)'));
     verificar('nota curta da fonte dependente', html.includes('CCCS/VCCS') && html.includes('s-info'));
     verificar('TeX em display math', html.includes('\\[ \\begin{pmatrix}'));
     verificar('matriz num scroll horizontal', html.includes('class="s-passo-tex-scroll"') && html.includes('\\begin{pmatrix}'));
     verificar('alterna simbólico e numérico', html.includes('>Simbólico<') && html.includes('>Numérico<') && html.includes('data-forma-bloco="numerico" hidden'));
-    verificar('copiar LaTeX', html.includes('Copiar LaTeX') && html.includes('data-tex="'));
-    verificar('incógnitas', html.includes('Incógnitas:') && html.includes('>E1<') && html.includes('>I_L1<') && html.includes('data-inc="e1"'));
+    verificar('sem copiar LaTeX', !html.includes('Copiar LaTeX') && !html.includes('s-copiar'));
+    verificar('incógnitas', html.includes('>E1<') && html.includes('>I_L1<') && html.includes('data-inc="e1"'));
     verificar('valores do passo 4', html.includes('G1 = 93/10') && html.includes('β1 = -1'));
     verificar('raízes em chips', html.includes('s-raiz--origem') && html.includes('s-raiz--estavel') && html.includes('×2') && html.includes('na origem') && html.includes('-31/10'));
     verificar('atalho para f(t)', html.includes('href="#grafico-resultado-s-no-1"') && html.includes('Ver f(t)'));
@@ -234,7 +235,20 @@ console.log('Passos da MNA');
         ]
     }]);
     verificar('marcas de conferência', marcas.includes('>✓</span>') && marcas.includes('✗</span>') && marcas.includes('>—</span>'));
-    verificar('dois parágrafos', (marcas.match(/<p>/g) || []).length === 2);
+    verificar('passo 8 substitui o texto longo', marcas.includes('Frações parciais') && marcas.includes('>Regras<') && !marcas.includes('linha um'));
+    const desconhecido = htmlPassosDominioS([{ Titulo: '9. Outra etapa', Texto: 'linha um\nlinha dois\nNão há forma fechada.', TeX: [] }]);
+    verificar('título desconhecido usa o texto da API', desconhecido.includes('linha um') && desconhecido.includes('linha dois') && desconhecido.includes('forma fechada'));
+    const semControle = htmlPassosDominioS([{ Titulo: '1. Incógnitas', Texto: 'Só tensões de nó.', TeX: [], Incognitas: ['E1'] }]);
+    verificar('sem CCCS não cita corrente de controle', semControle.includes('Tensões de nó') && !semControle.includes('usa'));
+    const nomeComUnderscore = htmlPassosDominioS([{
+        Titulo: '1. Incógnitas',
+        Texto: 'Correntes de controle de CCVS/CCCS (F_BJT usa a corrente de R_Base).',
+        TeX: [],
+        Incognitas: ['E1']
+    }]);
+    verificar('nome com _ na corrente de controle', nomeComUnderscore.includes('F_BJT usa') && nomeComUnderscore.includes('I_{R_Base}'));
+    const comNota = htmlPassosDominioS([{ Titulo: '7. Solução', Texto: 'Não há forma fechada para este caso.', TeX: [] }]);
+    verificar('nota de forma fechada permanece', comNota.includes('Cada') && comNota.includes('Não há forma fechada'));
     const indisponivel = htmlPassosDominioS({ Indisponivel: 'A matriz não foi fatorada.' });
     verificar('motivo quando indisponível', indisponivel.includes('A matriz não foi fatorada.') && !indisponivel.includes('<details'));
     const soConvencao = htmlPassosDominioS([{ Titulo: '0. Convenção de sinais', Texto: 'não mostrar', TeX: [] }]);

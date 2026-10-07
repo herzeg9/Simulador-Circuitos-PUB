@@ -492,7 +492,7 @@
         const largo = texEMatriz(bruto);
         const formula = `<div class="formula">\\[ ${escaparHtml(marcado)} \\]</div>`;
         const miolo = largo ? `<div class="s-passo-tex-scroll">${formula}</div>` : formula;
-        return `<div class="s-math"><div class="s-math-barra"><button type="button" class="s-copiar" data-tex="${escaparAttr(bruto)}" aria-label="Copiar LaTeX">Copiar LaTeX</button></div>${miolo}</div>`;
+        return `<div class="s-math">${miolo}</div>`;
     }
 
     function htmlFormasTex(lista, nomes) {
@@ -539,6 +539,88 @@
             return `<li class="s-raiz s-raiz--${cls}"><span class="s-raiz-valor">${escaparHtml(r && r.Valor)}</span>${mult}${tag}</li>`;
         }).join('');
         return `<ul class="s-raizes" aria-label="Raízes">${chips}</ul>`;
+    }
+
+    function htmlInline(tex) {
+        return `\\( ${escaparHtml(tex)} \\)`;
+    }
+
+    /** Título conhecido vira um texto curto. Título novo continua com o Texto da API. */
+    function chaveDoPasso(passo) {
+        const t = tituloSemNumero(passo && passo.Titulo).toLowerCase();
+        if (/volta/.test(t) && /tempo/.test(t)) return 'tempo';
+        if (/frequ[eê]n/.test(t) || /ra[ií]z/.test(t)) return 'raizes';
+        if (/determinant/.test(t)) return 'det';
+        if (/matric/.test(t)) return 'matriz';
+        if (/reorganiz/.test(t)) return 'reorg';
+        if (/por extenso|equa[cç][aã]o de cada/.test(t)) return 'equacoes';
+        if (/solu[cç]/.test(t)) return 'solucao';
+        if (/inc[oó]gnita/.test(t)) return 'incognitas';
+        return '';
+    }
+
+    function htmlTextoApi(texto) {
+        let html = '';
+        String(texto || '').split('\n').forEach(linha => {
+            const t = linha.trim();
+            if (t) html += `<p>${escaparHtml(t)}</p>`;
+        });
+        return html;
+    }
+
+    /** Frases da API que avisam ausência de forma fechada ou outro impedimento. */
+    function htmlNotaDinamica(texto) {
+        const frases = String(texto || '').split(/\n|(?<=[.!])\s+/);
+        const notas = frases.map(s => s.trim()).filter(s => /forma fechada|indispon[ií]vel|não há|nao ha|não foi|nao foi/i.test(s));
+        return notas.map(s => `<p class="s-nota-simbolica">${escaparHtml(s)}</p>`).join('');
+    }
+
+    function htmlControles(passos) {
+        const textos = (Array.isArray(passos) ? passos : []).map(p => String((p && p.Texto) || '')).join('\n');
+        if (!/CCCS|CCVS/i.test(textos)) return '';
+        const vistos = new Set();
+        const linhas = [];
+        const re = /([A-Za-z][A-Za-z0-9_]*)\s+usa a corrente de\s+([A-Za-z][A-Za-z0-9_]*)/gi;
+        let m;
+        while ((m = re.exec(textos))) {
+            const chave = `${m[1]}|${m[2]}`;
+            if (vistos.has(chave)) continue;
+            vistos.add(chave);
+            linhas.push(`${escaparHtml(m[1])} usa ${htmlInline('I_{' + m[2] + '}')}`);
+        }
+        if (!linhas.length) return '';
+        return `<p class="s-passo-lead">${linhas.join('; ')}.</p>`;
+    }
+
+    function htmlRegrasTempo() {
+        return `<details class="s-regras"><summary>Regras</summary><ul>
+            <li>Polos repetidos ${htmlInline('\\tfrac{t^k}{k!}e^{pt}')}</li>
+            <li>Pares complexos ${htmlInline('e^{\\sigma t}(\\cos\\omega t,\\ \\sin\\omega t)')}</li>
+            <li>Parte imprópria ${htmlInline('\\delta(t)')}</li>
+        </ul></details>`;
+    }
+
+    function htmlLeadPasso(chave, passos) {
+        switch (chave) {
+            case 'incognitas':
+                return `<p class="s-passo-lead">Tensões de nó (terra = nó 0) + correntes extras do MNA.</p>${htmlControles(passos)}`;
+            case 'equacoes':
+                return '<p class="s-passo-lead">Uma LCK por nó e uma equação de ramo por corrente extra.</p>';
+            case 'reorg':
+                return '<p class="s-passo-lead">Termos agrupados por incógnita; o restante vai ao lado direito.</p>';
+            case 'matriz':
+                return `<p class="s-passo-lead">Sistema ${htmlInline('M(s)\\,x = b')}, simbólico ou com os valores do circuito.</p>`;
+            case 'det':
+                return `<p class="s-passo-lead">${htmlInline('\\det M(s)')} fatorado, nas formas simbólica e numérica.</p>`;
+            case 'raizes':
+                return `<p class="s-passo-lead">Raízes de ${htmlInline('\\det M(s) = 0')}, com multiplicidade.</p>`;
+            case 'solucao':
+                return `<p class="s-passo-lead">Cada ${htmlInline('X(s)')} liga ao resultado do mesmo local.</p>`;
+            case 'tempo':
+                return `<p class="s-passo-lead">Frações parciais de cada ${htmlInline('X(s)')} e inversa para ${htmlInline('t \\ge 0')}.</p>${htmlRegrasTempo()}`;
+            default:
+                return '';
+        }
     }
 
     function htmlInfoSinais() {
@@ -603,17 +685,17 @@
                 matrizMarcada = true;
                 html += htmlInfoSinais();
             }
-            String(passo.Texto || '').split('\n').forEach(linha => {
-                const t = linha.trim();
-                if (t) html += `<p>${escaparHtml(t)}</p>`;
-            });
+            const chave = chaveDoPasso(passo);
+            const lead = htmlLeadPasso(chave, passos);
+            if (lead) html += lead + htmlNotaDinamica(passo.Texto);
+            else html += htmlTextoApi(passo.Texto);
             html += htmlFormasTex(passo.TeX, nomes);
             if (Array.isArray(passo.Incognitas) && passo.Incognitas.length) {
                 const chips = passo.Incognitas.map(nome => {
                     const info = mapa.get(slugIncognita(nome)) || {};
                     return `<button type="button" class="s-incognita" data-inc="${escaparAttr(slugIncognita(nome))}" data-no="${escaparAttr(info.no || '')}" data-comp="${escaparAttr(info.comp || '')}">${escaparHtml(nome)}</button>`;
                 }).join('');
-                html += `<p class="s-passo-extra"><strong>Incógnitas:</strong> <span class="s-incognitas">${chips}</span></p>`;
+                html += `<div class="s-incognitas" aria-label="Incógnitas">${chips}</div>`;
             }
             if (Array.isArray(passo.Valores) && passo.Valores.length) {
                 html += '<ul class="s-passo-valores">';
@@ -735,27 +817,7 @@
                 syncAria();
             } else if (acao === 'anterior') mover(-1);
             else if (acao === 'proximo') mover(1);
-            else if (btn.classList.contains('s-copiar')) {
-                const tex = btn.getAttribute('data-tex') || '';
-                const pronto = () => {
-                    const antigo = btn.textContent;
-                    btn.textContent = 'Copiado';
-                    setTimeout(() => { btn.textContent = antigo; }, 1200);
-                };
-                if (navigator.clipboard && navigator.clipboard.writeText) {
-                    navigator.clipboard.writeText(tex).then(pronto).catch(() => { btn.textContent = 'Falhou'; });
-                } else {
-                    const ta = document.createElement('textarea');
-                    ta.value = tex;
-                    ta.setAttribute('readonly', '');
-                    ta.style.position = 'fixed';
-                    ta.style.left = '-9999px';
-                    document.body.appendChild(ta);
-                    ta.select();
-                    try { document.execCommand('copy'); pronto(); } catch (err) { btn.textContent = 'Falhou'; }
-                    ta.remove();
-                }
-            } else if (btn.classList.contains('s-forma-btn')) {
+            else if (btn.classList.contains('s-forma-btn')) {
                 const grupo = btn.closest('.s-forma');
                 if (!grupo) return;
                 const modo = btn.dataset.forma;
