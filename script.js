@@ -2118,8 +2118,11 @@ function escaparHtmlTex(s) {
     return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-function htmlFormulaMNA(eq, usarTex, modoS) {
-    if (usarTex) return `<div class="formula mna-formula">\\[ ${escaparHtmlTex(eq)} \\]</div>`;
+function htmlFormulaMNA(eq, usarTex, modoS, nomesInc) {
+    const texEq = (usarTex && nomesInc && nomesInc.length && typeof marcarIncognitasNoTex === 'function')
+        ? marcarIncognitasNoTex(eq, nomesInc)
+        : eq;
+    if (usarTex) return `<div class="formula mna-formula">\\[ ${escaparHtmlTex(texEq)} \\]</div>`;
     if (modoS) return `<div class="formula mna-formula"><code>${escapeXml(eq)}</code></div>`;
     return `<div class="formula mna-formula">\` ${formatarEquacaoMNA(eq)} \`</div>`;
 }
@@ -2137,6 +2140,7 @@ function renderCardEquacoesMNA(dados, listaComp, opts = {}) {
             : '';
 
     const { kcl, constitutivas } = organizarEquacoesMNA(dados.Equacoes, dados.NosLista, listaComp, tex);
+    const nomesInc = (modoS && typeof incognitasDosPassos === 'function') ? incognitasDosPassos(dados.Passos) : [];
 
     let html = `<div class="card card-mna">
         <h3 class="section-title">1. Equações do Sistema (MNA)</h3>
@@ -2154,7 +2158,7 @@ function renderCardEquacoesMNA(dados, listaComp, opts = {}) {
                     <span class="mna-no-badge">Nó ${no}</span>
                     <span class="mna-no-legenda">tensão desconhecida <code>v(${no})</code></span>
                 </div>
-                ${htmlFormulaMNA(eq, usarTex, modoS)}
+                ${htmlFormulaMNA(eq, usarTex, modoS, nomesInc)}
             </div>`;
         });
         html += `</div></section>`;
@@ -2178,7 +2182,7 @@ function renderCardEquacoesMNA(dados, listaComp, opts = {}) {
                     ${meta ? `<span class="mna-comp-meta">${meta}</span>` : ''}
                 </div>`;
             eqs.forEach(eq => {
-                html += htmlFormulaMNA(eq, usarTex, modoS);
+                html += htmlFormulaMNA(eq, usarTex, modoS, nomesInc);
             });
             html += `</div>`;
         });
@@ -2187,7 +2191,7 @@ function renderCardEquacoesMNA(dados, listaComp, opts = {}) {
 
     if (kcl.length === 0 && constitutivas.length === 0) {
         (tex || dados.Equacoes || []).forEach(eq => {
-            html += htmlFormulaMNA(eq, usarTex, modoS);
+            html += htmlFormulaMNA(eq, usarTex, modoS, nomesInc);
         });
     }
 
@@ -2525,7 +2529,10 @@ function renderResolucaoDominioS(dados, listaComp, container) {
 
     if (typeof htmlPassosDominioS === 'function') {
         const passos = htmlPassosDominioS(dados.Passos);
-        if (passos) container.insertAdjacentHTML('beforeend', passos);
+        if (passos) {
+            container.insertAdjacentHTML('beforeend', passos);
+            if (typeof ligarPassosDominioS === 'function') ligarPassosDominioS(container);
+        }
     }
 
     if (typeof htmlResultadosDominioS === 'function') {
@@ -2762,12 +2769,15 @@ function renderMathJaxSafe() {
     const mj = (typeof window !== 'undefined') ? window.MathJax : null;
     if (!mj) return;
 
+    const depois = () => {
+        if (typeof recolherPassosDepoisDoTypeset === 'function') recolherPassosDepoisDoTypeset();
+    };
     if (typeof mj.typesetPromise === 'function') {
-        mj.typesetPromise().catch(err => console.warn('MathJax typesetPromise:', err));
+        mj.typesetPromise().then(depois).catch(err => console.warn('MathJax typesetPromise:', err));
         return;
     }
     if (typeof mj.typeset === 'function') {
-        try { mj.typeset(); } catch (err) { console.warn('MathJax typeset:', err); }
+        try { mj.typeset(); depois(); } catch (err) { console.warn('MathJax typeset:', err); }
         return;
     }
     if (mj.startup && mj.startup.promise && typeof mj.startup.promise.then === 'function') {
@@ -2777,6 +2787,7 @@ function renderMathJaxSafe() {
                 if (m && typeof m.typesetPromise === 'function') return m.typesetPromise();
                 if (m && typeof m.typeset === 'function') return m.typeset();
             })
+            .then(depois)
             .catch(err => console.warn('MathJax startup:', err));
         return;
     }
@@ -2786,8 +2797,8 @@ function renderMathJaxSafe() {
         if (m && (typeof m.typesetPromise === 'function' || typeof m.typeset === 'function')) {
             clearInterval(id);
             try {
-                if (typeof m.typesetPromise === 'function') m.typesetPromise();
-                else m.typeset();
+                if (typeof m.typesetPromise === 'function') m.typesetPromise().then(depois);
+                else { m.typeset(); depois(); }
             } catch (err) { console.warn('MathJax (poll):', err); }
         } else if (++tentativas > 20) {
             clearInterval(id);

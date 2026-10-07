@@ -565,7 +565,7 @@
         const marca = opts.destacado
             ? `<rect class="placa-marca" x="${caixa.x - 6}" y="${caixa.y - 6}" width="${caixa.w + 12}" height="${caixa.h + 12}" rx="8"/>`
             : '';
-        return `<g class="${cls.join(' ')}" data-comp="${c.id}">
+        return `<g class="${cls.join(' ')}" data-comp="${c.id}"${c.nome ? ` data-nome="${escapeXml(c.nome)}"` : ''}>
             ${sel}${marca}
             <rect class="placa-hit" x="${caixa.x}" y="${caixa.y}" width="${caixa.w}" height="${caixa.h}"/>
             ${corpo}
@@ -594,7 +594,7 @@
         return grupos.filter(g => g.no > 0 && g.pontos.length).map(g => {
             const p = g.pontos.reduce((a, b) => (b.y < a.y || (b.y === a.y && b.x < a.x)) ? b : a);
             const x = p.x + 11, y = p.y - 11;
-            return `<g class="placa-no"><circle cx="${x}" cy="${y}" r="8"/><text class="esq-label--node" x="${x}" y="${y}">${g.no}</text></g>`;
+            return `<g class="placa-no" data-no="${g.no}"><circle cx="${x}" cy="${y}" r="8"/><text class="esq-label--node" x="${x}" y="${y}">${g.no}</text></g>`;
         }).join('');
     }
 
